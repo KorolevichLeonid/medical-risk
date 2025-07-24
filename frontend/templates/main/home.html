@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <header class="header">
+        <div class="logo">
+            <span class="logo-text">SCICYBERLAB</span>
+        </div>
+        
+        <nav class="nav-menu">
+            <a href="#" class="nav-link">Products</a>
+            <a href="#" class="nav-link">About us</a>
+            <a href="#" class="nav-link">Partners</a>
+            <a href="#" class="nav-link">Contacts</a>
+        </nav>
+        
+        {% if user.is_authenticated %}
+            <div class="button-group">
+                <button onclick="window.location.href='/dashboard/'" class="btn-primary full-width">
+                    Личный кабинет
+                </button>
+            </div>
+        {% else %}
+            <div class="header-actions">
+                <button class="btn-secondary" id="loginBtn">Log In</button>
+                <button class="btn-secondary" id="signupBtn">Sign In</button>
+            </div>
+        {% endif %}
+        
+        <div class="support">
+            <span class="search-icon">🔍</span>
+            <span>Support</span>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="content-left">
+            <h1 class="main-title">Lower Risk<br>For Medical Products</h1>
+            <p class="main-description">
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Sequi vero ante et erat. Voluptate 
+                vel blanditiis quisquam fugit. Praesentium impedit ab porro molestiae. Ut 
+                consequatur quaerat voluptatem, eum illo nulla fugiat apertas pellentesque.
+            </p>
+            <button class="btn-primary">+ Add Project</button>
+        </div>
+        
+        <div class="content-right">
+            <div class="card card-1"></div>
+            <div class="card card-2"></div>
+        </div>
+    </main>
+
+    <div class="chat-button"></div>
+</div>
+
+<!-- Модальные окна -->
+<div id="loginModal" class="modal">...</div>
+<div id="registerModal" class="modal">...</div>
+<div id="notification" class="notification"></div>
+{% endblock %}
