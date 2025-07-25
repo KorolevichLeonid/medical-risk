@@ -9,5 +9,10 @@
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": ["/static/*"]
+  },
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html"
+    }
   }
 }
