@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Очистка содержимого перед рендерингом
+const container = document.getElementById('root');
+container.innerHTML = ''; // Критически важная строка
+
+const root = ReactDOM.createRoot(container);
+root.render(<App />);
