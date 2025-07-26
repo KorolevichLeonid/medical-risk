@@ -1,10 +1,13 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
+import { PublicClientApplication } from '@azure/msal-browser';
+import { msalConfig } from './authConfig';
 import App from './App';
-import './index.css';
-// Очистка содержимого перед рендерингом
-const container = document.getElementById('root');
-container.innerHTML = ''; // Критически важная строка
 
-const root = ReactDOM.createRoot(container);
-root.render(<App />);
+const msalInstance = new PublicClientApplication(msalConfig);
+
+const container = document.getElementById('root');
+const root = createRoot(container);
+
+root.render(
+  <App msalInstance={msalInstance} />
+);

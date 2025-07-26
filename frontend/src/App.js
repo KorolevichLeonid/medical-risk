@@ -1,18 +1,24 @@
-// src/App.js
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { MsalProvider } from '@azure/msal-react';
 import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
+import ProtectedPage from './pages/ProtectedPage';
+import AuthErrorPage from './pages/AuthErrorPage';
+import Layout from './components/Layout';
 
-function App() {
+export default function App({ msalInstance }) {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/auth" element={<AuthPage />} />
-      </Routes>
-    </Router>
+    <MsalProvider instance={msalInstance}>
+      <Router>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/protected" element={<ProtectedPage />} />
+            <Route path="/auth-error" element={<AuthErrorPage />} />
+          </Route>
+        </Routes>
+      </Router>
+    </MsalProvider>
   );
 }
-
-export default App;
