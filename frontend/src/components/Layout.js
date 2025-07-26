@@ -1,5 +1,5 @@
 import { Outlet, Link } from 'react-router-dom';
-import { useMsal, useAccount } from '@azure/msal-react';
+import { useMsal} from '@azure/msal-react';
 
 export default function Layout() {
   const { instance, accounts } = useMsal();
