@@ -1,0 +1,208 @@
+.figma-login-bg {
+  min-height: 100vh;
+  width: 100vw;
+  background: #BFBFBF;
+  font-family: 'Inter', Arial, sans-serif;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.figma-login-container {
+  background: #D9D9D9;
+  width: 720px;
+  height: 100vh;
+  max-height: 900px;
+  position: relative;
+  box-shadow: 0 4px 4px 0 rgba(0,0,0,0.25);
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  margin-left: 0;
+  margin-top: 0;
+  overflow: hidden;
+}
+
+.figma-login-header {
+  position: absolute;
+  top: 30px;
+  right: 60px;
+}
+
+.figma-login-support {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.5em;
+  color: #000;
+}
+
+.figma-login-image2 {
+  position: absolute;
+  left: 101px;
+  top: 80px;
+  width: 309px;
+  height: 39px;
+}
+
+.figma-login-title {
+  position: absolute;
+  left: 101px;
+  top: 140px;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 28px;
+  color: #000;
+}
+
+.figma-login-return {
+  position: absolute;
+  left: 104px;
+  bottom: 20px;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #131313;
+  backdrop-filter: blur(4px);
+}
+
+.figma-login-form {
+  position: absolute;
+  left: 101px;
+  top: 180px;
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.figma-login-label {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #000;
+  margin-bottom: 2px;
+}
+
+.figma-login-input-group {
+  background: #EEEEEE;
+  border-radius: 5px;
+  margin-bottom: 4px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  height: 38px;
+}
+
+.figma-login-input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  height: 36px;
+  font-size: 14px;
+  color: #888585;
+  outline: none;
+}
+
+.figma-login-remember-row {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.figma-login-remember-label {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #000;
+  margin-left: 8px;
+}
+
+.figma-login-btn {
+  width: 100%;
+  height: 48px;
+  background: #4CD7CD;
+  border-radius: 20px;
+  border: none;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #000;
+  margin-top: 20px;
+  cursor: pointer;
+}
+
+.figma-login-or-row {
+  position: absolute;
+  left: 101px;
+  top: 530px;
+  width: 400px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.figma-login-or-line {
+  flex: 1;
+  height: 1px;
+  background: #000;
+  opacity: 0.1;
+}
+
+.figma-login-or-text {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #9A9898;
+  margin: 0 10px;
+}
+
+.figma-login-image3 {
+  width: 180px;
+  height: 95px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.figma-login-image3:hover {
+  opacity: 0.8;
+}
+
+.figma-login-image4 {
+  width: 180px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.figma-login-image4:hover {
+  opacity: 0.8;
+}
+
+.figma-login-image3 img,
+.figma-login-image4 img {
+  max-width: 140%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.figma-login-social-buttons {
+  position: absolute;
+  left: 101px;
+  top: 575px;
+  width: 400px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 20px;
+}

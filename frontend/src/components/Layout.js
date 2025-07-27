@@ -13,7 +13,7 @@ export default function Layout() {
         {account ? (
           <button onClick={() => instance.logoutRedirect()}>Выйти</button>
         ) : (
-          <Link to="/auth">Войти</Link>
+          <Link to="/signin">Войти</Link>
         )}
       </nav>
       <main>
