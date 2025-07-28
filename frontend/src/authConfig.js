@@ -4,10 +4,10 @@ export const msalConfig = {
     authority: "https://korolevichleonid.ciamlogin.com/deb8c5e9-54cd-477d-be23-71cb103b773f/v2.0",
     knownAuthorities: ["korolevichleonid.ciamlogin.com"],
 
-    // redirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net",
-    // postLogoutRedirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net"
-    redirectUri: "http://localhost:3000",
-    postLogoutRedirectUri: "http://localhost:3000"
+    redirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net",
+    postLogoutRedirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net"
+    //redirectUri: "http://localhost:3000",
+    //postLogoutRedirectUri: "http://localhost:3000"
     
   },
   cache: {
