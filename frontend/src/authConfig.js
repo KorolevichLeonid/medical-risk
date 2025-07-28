@@ -5,8 +5,8 @@ export const msalConfig = {
     knownAuthorities: ["korolevichleonid.ciamlogin.com"],
     redirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net",
     postLogoutRedirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net"
-  //  redirectUri: "http://localhost:3000",
-   // postLogoutRedirectUri: "http://localhost:3000"
+    //redirectUri: "http://localhost:3000",
+    //postLogoutRedirectUri: "http://localhost:3000"
   },
   cache: {
     cacheLocation: "sessionStorage",
