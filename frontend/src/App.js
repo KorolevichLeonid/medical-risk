@@ -6,6 +6,7 @@ import ProtectedPage from './pages/ProtectedPage';
 import AuthErrorPage from './pages/AuthErrorPage';
 import Layout from './components/Layout';
 import Signin from './pages/signin';
+import Login from './pages/login';
 
 export default function App({ msalInstance }) {
   return (
@@ -18,6 +19,7 @@ export default function App({ msalInstance }) {
             <Route path="/protected" element={<ProtectedPage />} />
             <Route path="/auth-error" element={<AuthErrorPage />} />
             <Route path="/signin" element={<Signin />} />
+            <Route path="/login" element={<Login />} />
           </Route>
         </Routes>
       </Router>

@@ -1,11 +1,19 @@
 import { useMsal } from '@azure/msal-react';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './signin.css';
 
 export default function Login() {
-  const { instance } = useMsal();
+  const { instance, accounts } = useMsal();
+  const navigate = useNavigate();
 
-  const handleLogin = () => {
+  useEffect(() => {
+    if (accounts && accounts.length > 0) {
+      navigate('/protected', { replace: true });
+    }
+  }, [accounts, navigate]);
+
+  const handlelogin = () => {
     instance.loginRedirect({
       scopes: ["openid", "profile", "email"]
     }).catch(error => {
@@ -13,48 +21,50 @@ export default function Login() {
       window.location.href = '/auth-error';
     });
   };
+
+  const handleLoginRedirect = () => {
+    window.location.href = '/login';
+  };
+
   return (
-    <div className="figma-login-bg">
-      <div className="figma-login-container">
-        <div className="figma-login-header">
-          <span className="figma-login-support">Support</span>
-        </div>
-        <div className="figma-login-image2">
-          <img src={require('../assets/figma/image2.png')} alt="Figma visual" />
-        </div>
-        <div className="figma-login-title">First time?</div>
-        <div className="figma-login-return">return</div>
-        <form className="figma-login-form">
-          <label className="figma-login-label" htmlFor="email">Email</label>
-          <div className="figma-login-input-group">
-            <input id="email" type="email" placeholder="Enter your mail address" className="figma-login-input" />
+    <div className="figma-signin-bg">
+      <div className="figma-signin-container">
+        <div className="figma-signin-title">First time?</div>
+        <div className="figma-signin-return">return</div>
+        <form className="figma-signin-form">
+          <label className="figma-signin-label" htmlFor="email">Email</label>
+          <div className="figma-signin-input-group">
+            <input id="email" type="email" placeholder="Enter your mail address" className="figma-signin-input" />
           </div>
-          <label className="figma-login-label" htmlFor="password">Password</label>
-          <div className="figma-login-input-group">
-            <input id="password" type="password" placeholder="Enter password" className="figma-login-input" />
+          <label className="figma-signin-label" htmlFor="password">Password</label>
+          <div className="figma-signin-input-group">
+            <input id="password" type="password" placeholder="Enter password" className="figma-signin-input" />
           </div>
-          <label className="figma-login-label" htmlFor="repeat-password">Repeat password</label>
-          <div className="figma-login-input-group">
-            <input id="repeat-password" type="password" placeholder="Enter password" className="figma-login-input" />
+          <label className="figma-signin-label" htmlFor="repeat-password">Repeat password</label>
+          <div className="figma-signin-input-group">
+            <input id="repeat-password" type="password" placeholder="Enter password" className="figma-signin-input" />
           </div>
-          <div className="figma-login-remember-row">
+          <div className="figma-signin-remember-row">
             <input type="checkbox" id="remember" />
-            <label htmlFor="remember" className="figma-login-remember-label">Remember me</label>
+            <label htmlFor="remember" className="figma-signin-remember-label">Remember me</label>
           </div>
-          <button type="submit" className="figma-login-btn">Sign In</button>
+          <button type="submit" className="figma-signin-btn">Sign In</button>
         </form>
-        <div className="figma-login-or-row">
-          <div className="figma-login-or-line" />
-          <span className="figma-login-or-text">Or, Sign in with</span>
-          <div className="figma-login-or-line" />
+        <div className="figma-signin-or-row">
+          <div className="figma-signin-or-line" />
+          <span className="figma-signin-or-text">Or, Sign in with</span>
+          <div className="figma-signin-or-line" />
         </div>
-        <div className="figma-login-social-buttons">
-          <div className="figma-login-image3">
-            <img src={require('../assets/figma/image3.png')} alt="Social login option 1" />
+        <div className="figma-signin-social-buttons">
+          <div className="figma-signin-image3">
+            <img src={require('../assets/figma/image3.png')} alt="Social signin option 1" />
           </div>
-          <div className="figma-login-image4"onClick={handleLogin}>
-            <img src={require('../assets/figma/image4.png')} alt="Social login option 2" />
+          <div className="figma-signin-image4"onClick={handlelogin}>
+            <img src={require('../assets/figma/image4.png')} alt="Social signin option 2" />
           </div>
+          <a href="#" className="figma-signin-register-link" onClick={handleLoginRedirect}>
+            Already have an account? Login here
+          </a>
         </div>
       </div>
     </div>

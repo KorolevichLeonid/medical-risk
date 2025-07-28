@@ -1,4 +1,4 @@
-.figma-signin-bg {
+.figma-login-bg {
   min-height: 90vh;
   width: 100vw;
   background: #BFBFBF;
@@ -8,7 +8,7 @@
   justify-content: flex-start;
 }
 
-.figma-signin-container {
+.figma-login-container {
   background: #D9D9D9;
   width: 720px;
   height: 90vh;
@@ -25,13 +25,13 @@
   overflow: hidden;
 }
 
-.figma-signin-header {
+.figma-login-header {
   position: absolute;
   top: 30px;
   right: 60px;
 }
 
-.figma-signin-support {
+.figma-login-support {
   font-family: 'Inter', Arial, sans-serif;
   font-weight: 300;
   font-size: 16px;
@@ -39,7 +39,7 @@
   color: #000;
 }
 
-.figma-signin-image2 {
+.figma-login-image2 {
   position: absolute;
   left: 101px;
   top: 80px;
@@ -47,7 +47,7 @@
   height: 39px;
 }
 
-.figma-signin-title {
+.figma-login-title {
   position: absolute;
   left: 101px;
   top: 20px;
@@ -57,7 +57,7 @@
   color: #000;
 }
 
-.figma-signin-return {
+.figma-login-return {
   position: absolute;
   left: 94px;
   bottom: 20px;
@@ -68,7 +68,7 @@
   backdrop-filter: blur(4px);
 }
 
-.figma-signin-form {
+.figma-login-form {
   position: absolute;
   left: 101px;
   top: 80px;
@@ -78,7 +78,7 @@
   gap: 6px;
 }
 
-.figma-signin-label {
+.figma-login-label {
   font-family: 'Inter', Arial, sans-serif;
   font-weight: 600;
   font-size: 14px;
@@ -86,7 +86,7 @@
   margin-bottom: 2px;
 }
 
-.figma-signin-input-group {
+.figma-login-input-group {
   background: none;
   border-radius: 0;
   margin-bottom: 10px;
@@ -96,7 +96,7 @@
   height: auto;
 }
 
-.figma-signin-input {
+.figma-login-input {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid #ccc;
@@ -109,18 +109,23 @@
   transition: border 0.2s;
 }
 
-.figma-signin-input:focus {
+.figma-login-input:focus {
   border: 1.5px solid #4CD7CD;
 }
 
-.figma-signin-remember-row {
+.figma-login-remember-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin: 10px 0;
 }
 
-.figma-signin-remember-label {
+.figma-login-remember-left {
+  display: flex;
+  align-items: center;
+}
+
+.figma-login-remember-label {
   font-family: 'Inter', Arial, sans-serif;
   font-weight: 400;
   font-size: 14px;
@@ -128,7 +133,20 @@
   margin-left: 8px;
 }
 
-.figma-signin-btn {
+.figma-login-forgot-password {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #007bff;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.figma-login-forgot-password:hover {
+  text-decoration: underline;
+}
+
+.figma-login-btn {
   width: 100%;
   height: 48px;
   background: #4CD7CD;
@@ -142,24 +160,24 @@
   cursor: pointer;
 }
 
-.figma-signin-or-row {
+.figma-login-or-row {
   position: absolute;
   left: 101px;
-  top: 455px;
+  top: 380px;
   width: 400px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.figma-signin-or-line {
+.figma-login-or-line {
   flex: 1;
   height: 1px;
   background: #000;
   opacity: 0.1;
 }
 
-.figma-signin-or-text {
+.figma-login-or-text {
   font-family: 'Inter', Arial, sans-serif;
   font-weight: 400;
   font-size: 14px;
@@ -167,7 +185,7 @@
   margin: 0 10px;
 }
 
-.figma-signin-image3 {
+.figma-login-image3 {
   width: 180px;
   height: 95px;
   display: flex;
@@ -177,11 +195,11 @@
   transition: opacity 0.2s;
 }
 
-.figma-signin-image3:hover {
+.figma-login-image3:hover {
   opacity: 0.8;
 }
 
-.figma-signin-image4 {
+.figma-login-image4 {
   width: 180px;
   height: 45px;
   display: flex;
@@ -191,21 +209,21 @@
   transition: opacity 0.2s;
 }
 
-.figma-signin-image4:hover {
+.figma-login-image4:hover {
   opacity: 0.8;
 }
 
-.figma-signin-image3 img,
-.figma-signin-image4 img {
+.figma-login-image3 img,
+.figma-login-image4 img {
   max-width: 150%;
   max-height: 150%;
   object-fit: contain;
 }
 
-.figma-signin-social-buttons {
+.figma-login-social-buttons {
   position: absolute;
   left: 101px;
-  top: 500px;
+  top: 430px;
   width: 400px;
   height: 45px;
   display: flex;
@@ -214,8 +232,7 @@
   gap: 20px;
 }
 
-
-.figma-signin-register-link {
+.figma-login-register-link {
   font-family: 'Inter', Arial, sans-serif;
   font-weight: 400;
   font-size: 14px;
