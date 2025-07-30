@@ -9,7 +9,7 @@ export const msalConfig = {
     //postLogoutRedirectUri: "http://localhost:3000"
   },
   cache: {
-    cacheLocation: "sessionStorage",
+    cacheLocation: "localStorage",
     storeAuthStateInCookie: false
   }
 };

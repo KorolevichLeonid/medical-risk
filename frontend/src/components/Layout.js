@@ -6,6 +6,10 @@ export default function Layout() {
   const { instance, accounts } = useMsal();
   const account = accounts[0];
 
+  const handleLogin = () => {
+    instance.loginRedirect();
+  };
+
   return (
     <div className="app-layout">
       <header className="header">
@@ -31,10 +35,9 @@ export default function Layout() {
                 </button>
               </>
             ) : (
-              <>
-                <Link to="/login" className="btn-secondary">Войти</Link>
-                <Link to="/signin" className="btn-secondary">Зарегистрироваться</Link>
-              </>
+              <button onClick={handleLogin} className="btn-secondary">
+                Войти
+              </button>
             )}
             <span className="support">Support</span>
           </div>
