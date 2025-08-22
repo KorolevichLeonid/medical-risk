@@ -1,0 +1,288 @@
+/* Changelog styles based on Figma design */
+
+.changelog-container {
+    min-height: 100vh;
+    background-color: #BFBFBF;
+    padding: 40px;
+    font-family: 'Inter', sans-serif;
+}
+
+.changelog-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.changelog-header h1 {
+    font-size: 36px;
+    font-weight: 600;
+    color: #131313;
+    margin: 0 0 10px 0;
+}
+
+.changelog-header p {
+    font-size: 18px;
+    color: #131313;
+    opacity: 0.8;
+    margin: 0;
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    font-size: 18px;
+    color: #131313;
+}
+
+.error-message {
+    background-color: #AFADAD;
+    border-radius: 30px;
+    padding: 40px;
+    text-align: center;
+    color: #131313;
+    margin: 40px auto;
+    max-width: 600px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.error-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+.error-message h3 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+}
+
+.error-message p {
+    font-size: 16px;
+    margin: 10px 0;
+    opacity: 0.9;
+}
+
+.projects-changelog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.project-changelog-card {
+    background-color: #AFADAD;
+    border-radius: 30px;
+    padding: 30px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+    min-height: 250px;
+}
+
+.project-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-main-info {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.project-status-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+}
+
+.status-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.project-version {
+    font-size: 18px;
+    font-weight: 700;
+    color: #131313;
+}
+
+.project-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #131313;
+    margin: 0 0 10px 0;
+}
+
+.project-description {
+    font-size: 16px;
+    font-weight: 700;
+    color: #131313;
+    margin: 0 0 15px 0;
+    line-height: 1.5;
+}
+
+.project-status {
+    margin-top: 15px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 30px;
+    color: #131313;
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.project-changelog {
+    flex: 1;
+    background-color: #D9D9D9;
+    border-radius: 20px;
+    padding: 25px;
+    min-height: 200px;
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.project-changelog h4 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #131313;
+    margin: 0 0 20px 0;
+    text-align: center;
+}
+
+.recent-changes {
+    margin-bottom: 20px;
+}
+
+.no-changes {
+    text-align: center;
+    padding: 40px 20px;
+    color: #131313;
+    opacity: 0.7;
+}
+
+.changes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.change-item {
+    background-color: #F5F5F5;
+    border-radius: 15px;
+    padding: 15px;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.change-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.change-user {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.user-name {
+    font-weight: 600;
+    color: #131313;
+    font-size: 14px;
+}
+
+.user-role {
+    font-size: 12px;
+    color: #131313;
+    opacity: 0.7;
+}
+
+.change-action {
+    font-size: 14px;
+    color: #131313;
+    font-weight: 500;
+}
+
+.change-time {
+    font-size: 12px;
+    color: #131313;
+    opacity: 0.6;
+}
+
+.view-full-history {
+    border-top: 1px solid #ADB0B5;
+    padding-top: 15px;
+    text-align: center;
+}
+
+.view-history-btn {
+    background: linear-gradient(231deg, #ADB0B5 25%, #4C4D4F 100%);
+    color: #131313;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.view-history-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.no-projects {
+    text-align: center;
+    padding: 60px 20px;
+    color: #131313;
+    font-size: 18px;
+    opacity: 0.7;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .changelog-container {
+        padding: 20px;
+    }
+    
+    .project-changelog-card {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .project-main-info {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .project-status-indicator {
+        align-self: center;
+    }
+    
+    .project-changelog {
+        min-height: auto;
+    }
+    
+    .changelog-header h1 {
+        font-size: 28px;
+    }
+}
