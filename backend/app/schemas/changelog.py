@@ -57,6 +57,11 @@ class ProjectChangeLogResponse(BaseModel):
     project_name: str
     project_status: str
     project_description: Optional[str] = None
+    device_name: str = Field(..., description="Название медицинского устройства")
+    
+    # Project metadata
+    members_count: int = Field(..., description="Количество участников проекта")
+    last_updated: datetime = Field(..., description="Дата последнего обновления проекта")
     
     # Recent changes (last 4)
     recent_changes: List[ChangeLogResponse]

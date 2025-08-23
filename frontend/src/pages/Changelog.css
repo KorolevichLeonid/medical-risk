@@ -93,6 +93,37 @@
     align-items: flex-start;
 }
 
+.project-metadata {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.project-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    padding: 4px 0;
+}
+
+.stat-label {
+    color: #666;
+    font-weight: 500;
+}
+
+.stat-value {
+    color: #131313;
+    font-weight: 600;
+}
+
 .project-status-indicator {
     display: flex;
     flex-direction: column;
@@ -134,8 +165,52 @@
     line-height: 1.5;
 }
 
-.project-status {
+.project-device {
+    margin: 10px 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.project-device .device-label {
+    font-weight: 500;
+    margin-right: 5px;
+}
+
+.project-device .device-name {
+    font-weight: 400;
+}
+
+.project-meta {
     margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.project-status {
+    display: flex;
+    align-items: center;
+}
+
+.project-stats {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: #666;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.stat-label {
+    font-weight: 500;
+}
+
+.stat-value {
+    font-weight: 400;
 }
 
 .status-badge {
@@ -187,6 +262,17 @@
     border-radius: 15px;
     padding: 15px;
     box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.change-item.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.change-item.clickable:hover {
+    background-color: #E8E8E8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .change-info {
@@ -255,6 +341,21 @@
     color: #131313;
     font-size: 18px;
     opacity: 0.7;
+}
+
+.no-projects-message h3 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+    color: #131313;
+}
+
+.no-projects-message p {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.5;
+    max-width: 500px;
+    margin: 0 auto;
 }
 
 /* Responsive design */

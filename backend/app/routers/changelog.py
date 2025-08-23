@@ -30,6 +30,8 @@ def check_changelog_access_all_projects(current_user: User):
 
 def check_project_changelog_access(current_user: User, project: Project, db: Session):
     """Check if user has access to specific project changelog"""
+    from ..models.project import ProjectMember, ProjectRole
+    
     # Sys admin can view all project logs
     if current_user.role == UserRole.SYS_ADMIN:
         return True
@@ -38,10 +40,20 @@ def check_project_changelog_access(current_user: User, project: Project, db: Ses
     if project.owner_id == current_user.id:
         return True
     
-    # Project members cannot view logs - only owners can
+    # Check if user has ADMIN role in this project
+    admin_membership = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project.id,
+        ProjectMember.user_id == current_user.id,
+        ProjectMember.role == ProjectRole.ADMIN
+    ).first()
+    
+    if admin_membership:
+        return True
+    
+    # Only admins (system, project owner, or project admin role) can view logs
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Access denied. Only project owners and system administrators can view project logs."
+        detail="Access denied. Only project administrators can view project logs."
     )
 
 
@@ -51,12 +63,41 @@ async def get_projects_changelog(
     current_user: User = Depends(get_current_user)
 ):
     """Get changelog for all projects with recent changes"""
-    check_changelog_access_all_projects(current_user)
     
-    # Get all projects with their recent changes
-    projects = db.query(Project).options(
-        joinedload(Project.owner)
-    ).all()
+    # Role-based project filtering
+    if current_user.role == UserRole.SYS_ADMIN:
+        # SYS_ADMIN sees all projects
+        projects = db.query(Project).options(
+            joinedload(Project.owner)
+        ).all()
+    else:
+        # USER sees only projects where they are admin (owner or ProjectRole.ADMIN)
+        from ..models.project import ProjectMember, ProjectRole
+        
+        # Get projects where user is owner
+        owned_projects = db.query(Project).filter(
+            Project.owner_id == current_user.id
+        ).options(joinedload(Project.owner)).all()
+        
+        # Get projects where user has ADMIN role as member
+        admin_project_ids = db.query(ProjectMember.project_id).filter(
+            ProjectMember.user_id == current_user.id,
+            ProjectMember.role == ProjectRole.ADMIN
+        ).all()
+        admin_project_ids = [pid[0] for pid in admin_project_ids]
+        
+        admin_projects = db.query(Project).filter(
+            Project.id.in_(admin_project_ids)
+        ).options(joinedload(Project.owner)).all() if admin_project_ids else []
+        
+        # Combine and deduplicate
+        project_ids = set()
+        projects = []
+        
+        for project in owned_projects + admin_projects:
+            if project.id not in project_ids:
+                projects.append(project)
+                project_ids.add(project.id)
     
     projects_with_changes = []
     
@@ -74,6 +115,20 @@ async def get_projects_changelog(
         total_changes = db.query(ChangeLog).filter(
             ChangeLog.project_id == project.id
         ).count()
+        
+        # Get members count
+        from ..models.project import ProjectMember
+        members_count = db.query(ProjectMember).filter(
+            ProjectMember.project_id == project.id
+        ).count() + 1  # +1 for owner
+        
+        # Get last updated time (most recent changelog entry)
+        last_update = None
+        if recent_changes:
+            last_update = recent_changes[0].created_at
+        else:
+            # If no changelog, use project created_at
+            last_update = project.created_at
         
         # Convert changes to response format
         change_responses = []
@@ -93,7 +148,7 @@ async def get_projects_changelog(
                 project_name=project.name if change.project else None,
                 old_values=change.old_values,
                 new_values=change.new_values,
-                metadata=change.metadata,
+                extra_data=change.extra_data,
                 created_at=change.created_at
             ))
         
@@ -102,6 +157,9 @@ async def get_projects_changelog(
             project_name=project.name,
             project_status=project.status.value,
             project_description=project.description,
+            device_name=project.device_name,
+            members_count=members_count,
+            last_updated=last_update,
             recent_changes=change_responses,
             total_changes=total_changes
         )
@@ -123,6 +181,7 @@ async def get_project_changelog(
     current_user: User = Depends(get_current_user)
 ):
     """Get full changelog for a specific project with pagination"""
+    
     # Check if project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -187,6 +246,7 @@ async def get_changelog_detail(
     current_user: User = Depends(get_current_user)
 ):
     """Get detailed information about a specific changelog entry"""
+    
     # First get the changelog to check project access
     changelog = db.query(ChangeLog).options(
         joinedload(ChangeLog.project)
@@ -201,13 +261,12 @@ async def get_changelog_detail(
     # Check if user has access to this project's changelog
     if changelog.project:
         check_project_changelog_access(current_user, changelog.project, db)
-    else:
-        # For system-wide logs, only sys admin can access
-        if current_user.role != UserRole.SYS_ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied. Only system administrators can view system logs."
-            )
+    # For system-wide logs that are not project-specific, only sys_admin can view
+    elif current_user.role != UserRole.SYS_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Only system administrators can view system-wide logs."
+        )
     
     # Get changelog with user and project data
     changelog = db.query(ChangeLog).options(

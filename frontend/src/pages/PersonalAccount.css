@@ -112,10 +112,18 @@
 }
 
 .role-sys-admin {
-  background-color: #FFEBEE;
-  color: #C62828;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+  color: white;
   font-weight: 700;
-  border: 2px solid #C62828;
+  border: 2px solid #FF6B6B;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+}
+
+.role-user {
+  background: linear-gradient(135deg, #4ECDC4 0%, #6BCDC4 100%);
+  color: white;
+  border: 2px solid #4ECDC4;
+  box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
 }
 
 .role-admin {
@@ -131,6 +139,20 @@
 .role-doctor {
   background-color: #E8F5E8;
   color: #2E7D32;
+}
+
+.role-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.role-description {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+  max-width: 400px;
 }
 
 .profile-department {

@@ -7,6 +7,7 @@ const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterRole, setFilterRole] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -44,7 +45,10 @@ const Dashboard = () => {
           lastUpdated: project.updated_at || project.created_at,
           notifications: 0, // TODO: получать из API
           team: [], // TODO: получать участников проекта
-          deviceType: project.device_name
+          deviceType: project.device_name,
+          userRole: project.user_role,
+          ownerId: project.owner_id,
+          memberCount: project.member_count
         }));
         setProjects(formattedProjects);
         setFilteredProjects(formattedProjects);
@@ -60,12 +64,16 @@ const Dashboard = () => {
     }
   };
 
-  // Filter projects based on status and search term
+  // Filter projects based on status, role and search term
   useEffect(() => {
     let filtered = projects;
     
     if (filterStatus !== 'all') {
       filtered = filtered.filter(project => project.status === filterStatus);
+    }
+
+    if (filterRole !== 'all') {
+      filtered = filtered.filter(project => project.userRole === filterRole);
     }
     
     if (searchTerm) {
@@ -76,7 +84,7 @@ const Dashboard = () => {
     }
     
     setFilteredProjects(filtered);
-  }, [projects, filterStatus, searchTerm]);
+  }, [projects, filterStatus, filterRole, searchTerm]);
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -90,6 +98,25 @@ const Dashboard = () => {
     return <span className={`status-badge ${config.className}`}>{config.label}</span>;
   };
 
+  const getRoleBadge = (role) => {
+    const roleConfig = {
+      admin: { label: 'Администратор', className: 'role-admin' },
+      manager: { label: 'Менеджер', className: 'role-manager' },
+      doctor: { label: 'Врач', className: 'role-doctor' }
+    };
+    
+    const config = roleConfig[role] || { label: role, className: 'role-unknown' };
+    return <span className={`role-badge ${config.className}`}>{config.label}</span>;
+  };
+
+  const canEditProject = (project) => {
+    // Доступ к редактированию проекта:
+    // - admin: полный доступ
+    // - manager: может редактировать информацию проекта
+    // - doctor: НЕ может редактировать
+    return project.userRole === 'admin' || project.userRole === 'manager';
+  };
+
   const handleProjectClick = (projectId) => {
     navigate(`/project/${projectId}`);
   };
@@ -97,8 +124,15 @@ const Dashboard = () => {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>Projects Dashboard</h1>
-        <p>Manage your medical device risk analysis projects</p>
+        <h1>
+          {currentUser?.role === 'SYS_ADMIN' ? 'System Projects Dashboard' : 'My Projects Dashboard'}
+        </h1>
+        <p>
+          {currentUser?.role === 'SYS_ADMIN' 
+            ? 'Manage all medical device risk analysis projects in the system'
+            : 'Manage your medical device risk analysis projects'
+          }
+        </p>
       </div>
 
       <div className="dashboard-controls">
@@ -128,6 +162,24 @@ const Dashboard = () => {
           </select>
         </div>
 
+        {/* Role filter - only for regular users */}
+        {currentUser?.role === 'USER' && (
+          <div className="filter-section">
+            <label htmlFor="role-filter">Filter by my role:</label>
+            <select
+              id="role-filter"
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Roles</option>
+              <option value="admin">Administrator</option>
+              <option value="manager">Manager</option>
+              <option value="doctor">Doctor</option>
+            </select>
+          </div>
+        )}
+
         <Link to="/project/new" className="add-project-btn">
           ➕ Создать проект
         </Link>
@@ -139,16 +191,14 @@ const Dashboard = () => {
             <div className="empty-icon">📊</div>
             <h3>No projects found</h3>
             <p>
-              {(currentUser?.role === 'admin' || currentUser?.role === 'sys_admin')
-                ? 'Create your first project to get started with risk analysis'
-                : 'No projects available. Contact administrator to create projects.'
+              {currentUser?.role === 'SYS_ADMIN'
+                ? 'No projects in the system yet. Users can create their first projects.'
+                : 'Create your first project to get started with risk analysis'
               }
             </p>
-            {currentUser?.role === 'admin' && (
-              <Link to="/project/new" className="btn btn-primary">
-                Create Project
-              </Link>
-            )}
+            <Link to="/project/new" className="btn btn-primary">
+              Create Project
+            </Link>
           </div>
         ) : (
           filteredProjects.map(project => (
@@ -166,7 +216,10 @@ const Dashboard = () => {
                     </div>
                   )}
                 </div>
-                {getStatusBadge(project.status)}
+                <div className="project-badges">
+                  {getStatusBadge(project.status)}
+                  {project.userRole && getRoleBadge(project.userRole)}
+                </div>
               </div>
 
               <div className="project-description">
@@ -180,8 +233,8 @@ const Dashboard = () => {
                 </div>
                 
                 <div className="team-info">
-                  <span className="label">Team:</span>
-                  <span className="value">{project.team.join(', ')}</span>
+                  <span className="label">Team size:</span>
+                  <span className="value">{project.memberCount + 1} members</span>
                 </div>
               </div>
 
@@ -203,17 +256,17 @@ const Dashboard = () => {
                   Updated: {new Date(project.lastUpdated).toLocaleDateString()}
                 </span>
                 <div className="project-actions">
-                              {(currentUser?.role === 'admin' || currentUser?.role === 'sys_admin' || currentUser?.role === 'manager') && (
-              <button 
-                className="action-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/project/${project.id}/edit`);
-                }}
-              >
-                Edit
-              </button>
-            )}
+                  {canEditProject(project) && (
+                    <button 
+                      className="action-btn edit-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/project/${project.id}/edit`);
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )}
                   <button 
                     className="action-btn"
                     onClick={(e) => {

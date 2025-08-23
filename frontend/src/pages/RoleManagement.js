@@ -36,7 +36,7 @@ const RoleManagement = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/users/', {
+      const response = await fetch('http://localhost:8000/api/users/with-projects', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -44,80 +44,30 @@ const RoleManagement = () => {
 
       if (response.ok) {
         const usersData = await response.json();
+        console.log('✅ Received users data:', usersData);
         
-        // Получаем проекты для каждого пользователя
-        const usersWithProjects = await Promise.all(
-          usersData.map(async (user) => {
-            try {
-              const projectsResponse = await fetch(`http://localhost:8000/api/users/${user.id}/projects`, {
-                headers: {
-                  'Authorization': `Bearer ${token}`
-                }
-              });
-              
-              let userProjects = [];
-              if (projectsResponse.ok) {
-                userProjects = await projectsResponse.json();
-              }
-
-              // Для SYS_ADMIN также получаем информацию о проектных ролях
-              if (currentUser?.role === 'SYS_ADMIN') {
-                userProjects = await Promise.all(
-                  userProjects.map(async (project) => {
-                    try {
-                      const projectResponse = await fetch(`http://localhost:8000/api/projects/${project.id}`, {
-                        headers: {
-                          'Authorization': `Bearer ${token}`
-                        }
-                      });
-                      
-                      if (projectResponse.ok) {
-                        const projectData = await projectResponse.json();
-                        const userMember = projectData.members?.find(m => m.user_id === user.id);
-                        return {
-                          ...project,
-                          project_role: userMember ? userMember.role : (project.is_owner ? 'admin' : 'member')
-                        };
-                      }
-                    } catch (error) {
-                      console.error(`Failed to load project details for ${project.id}:`, error);
-                    }
-                    return project;
-                  })
-                );
-              }
-
-              return {
-                id: user.id,
-                firstName: user.first_name || '',
-                lastName: user.last_name || '',
-                email: user.email,
-                systemRole: user.role,
-                isActive: user.is_active,
-                lastLogin: user.last_login || null,
-                projects: userProjects || [],
-                avatar: user.avatar_url || '/api/placeholder/50/50'
-              };
-            } catch (error) {
-              console.error(`Failed to load projects for user ${user.id}:`, error);
-              return {
-                id: user.id,
-                firstName: user.first_name || '',
-                lastName: user.last_name || '',
-                email: user.email,
-                systemRole: user.role,
-                isActive: user.is_active,
-                lastLogin: user.last_login || null,
-                projects: [],
-                avatar: user.avatar_url || '/api/placeholder/50/50'
-              };
-            }
-          })
-        );
+        // Transform data to match expected format
+        const formattedUsers = usersData.map(user => ({
+          id: user.id,
+          firstName: user.first_name || '',
+          lastName: user.last_name || '',
+          email: user.email,
+          systemRole: user.role || null, // Will be null for regular users (they don't see system roles)
+          lastLogin: user.last_login || null,
+          projects: user.projects || [],
+          avatar: user.avatar_url || '/api/placeholder/50/50'
+        }));
         
-        setUsers(usersWithProjects);
+        console.log('✅ Formatted users:', formattedUsers);
+        setUsers(formattedUsers);
       } else {
-        console.error('Failed to load users:', response.status);
+        console.error('Failed to load users:', response.status, response.statusText);
+        try {
+          const errorText = await response.text();
+          console.error('Response body:', errorText);
+        } catch (e) {
+          console.error('Could not read response body:', e);
+        }
         setUsers([]);
       }
     } catch (error) {
@@ -138,6 +88,8 @@ const RoleManagement = () => {
   });
 
   const getSystemRoleBadge = (role) => {
+    if (!role) return null; // Don't show system role for regular users
+    
     const roleConfig = {
       SYS_ADMIN: { label: 'Системный администратор', className: 'role-sys-admin' },
       USER: { label: 'Пользователь', className: 'role-user' },
@@ -151,13 +103,17 @@ const RoleManagement = () => {
     const roleConfig = {
       admin: { label: 'Админ', className: 'project-role-admin' },
       manager: { label: 'Менеджер', className: 'project-role-manager' },
-      doctor: { label: 'Доктор', className: 'project-role-doctor' }
+      doctor: { label: 'Врач', className: 'project-role-doctor' }
     };
     
-    const config = roleConfig[role] || { label: 'Участник', className: 'project-role-member' };
+    const config = roleConfig[role] || { label: role, className: 'project-role-unknown' };
     return <span className={`project-role-badge ${config.className}`}>{config.label}</span>;
   };
 
+  const showAllProjects = (projects, userName) => {
+    setSelectedUserProjects({ projects, userName });
+    setShowProjectsModal(true);
+  };
   const renderProjectsColumn = (user) => {
     if (!user.projects || user.projects.length === 0) {
       return <span className="no-projects">Нет проектов</span>;
@@ -171,16 +127,13 @@ const RoleManagement = () => {
         {visibleProjects.map((project, index) => (
           <div key={project.id} className="project-entry">
             <span className="project-name">{project.name}</span>
-            {getProjectRoleBadge(project.project_role || (project.is_owner ? 'admin' : 'doctor'))}
+            {getProjectRoleBadge(project.role)}
           </div>
         ))}
         {hasMoreProjects && (
           <button 
-            className="more-projects-btn"
-            onClick={() => {
-              setSelectedUserProjects(user.projects);
-              setShowProjectsModal(true);
-            }}
+            className="show-all-projects-btn"
+            onClick={() => showAllProjects(user.projects, `${user.firstName} ${user.lastName}`)}
           >
             <span className="dots">•••</span>
             <span className="count">+{user.projects.length - 3}</span>
@@ -254,10 +207,7 @@ const RoleManagement = () => {
             <div className="stat-number">{users.length}</div>
             <div className="stat-label">Всего пользователей</div>
           </div>
-          <div className="stat-card">
-            <div className="stat-number">{users.filter(u => u.isActive).length}</div>
-            <div className="stat-label">Активных</div>
-          </div>
+
           <div className="stat-card">
             <div className="stat-number">{users.filter(u => u.systemRole === 'SYS_ADMIN').length}</div>
             <div className="stat-label">Сис админов</div>
@@ -296,7 +246,7 @@ const RoleManagement = () => {
           </thead>
           <tbody>
             {filteredUsers.map(user => (
-              <tr key={user.id} className={`user-row ${!user.isActive ? 'inactive' : ''}`}>
+              <tr key={user.id} className="user-row">
                 <td className="user-cell">
                   <div className="user-info">
                     <div className="user-avatar">
@@ -306,9 +256,6 @@ const RoleManagement = () => {
                       <div className="user-name">{user.firstName} {user.lastName}</div>
                       <div className="user-meta">
                         {getSystemRoleBadge(user.systemRole)}
-                        <span className={`status-indicator ${user.isActive ? 'active' : 'inactive'}`}>
-                          {user.isActive ? 'активен' : 'неактивен'}
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -368,14 +315,14 @@ const RoleManagement = () => {
             
             <div className="modal-body">
               <div className="projects-list">
-                {selectedUserProjects.map(project => (
+                {selectedUserProjects.projects?.map(project => (
                   <div key={project.id} className="project-item-modal">
                     <div className="project-info">
                       <h4>{project.name}</h4>
                       <p>{project.device_name}</p>
                     </div>
                     <div className="project-role">
-                      {getProjectRoleBadge(project.project_role || (project.is_owner ? 'admin' : 'doctor'))}
+                      {getProjectRoleBadge(project.role)}
                     </div>
                   </div>
                 ))}

@@ -3,6 +3,7 @@ import './PersonalAccount.css';
 
 const PersonalAccount = () => {
   const [user, setUser] = useState(null);
+  const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -24,6 +25,7 @@ const PersonalAccount = () => {
 
   useEffect(() => {
     loadUserData();
+    loadStatistics();
   }, []);
 
   const loadUserData = async () => {
@@ -54,8 +56,6 @@ const PersonalAccount = () => {
           avatar: userData.avatar_url || '/api/placeholder/120/120',
           joinDate: userData.created_at,
           lastLogin: userData.last_login,
-          projectsCount: 0, // TODO: получать из API
-          risksAnalyzed: 0, // TODO: получать из API
           notifications: {
             email: userData.email_notifications !== false,
             browser: userData.browser_notifications !== false,
@@ -83,6 +83,26 @@ const PersonalAccount = () => {
       console.error('Failed to load user data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStatistics = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:8000/api/users/me/statistics', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const statsData = await response.json();
+        setStatistics(statsData);
+      } else {
+        console.error('Failed to load statistics:', response.status);
+      }
+    } catch (error) {
+      console.error('Failed to load statistics:', error);
     }
   };
 
@@ -135,8 +155,9 @@ const PersonalAccount = () => {
         const updatedUser = await response.json();
         // Обновляем localStorage
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        // Перезагружаем данные пользователя
+        // Перезагружаем данные пользователя и статистику
         loadUserData();
+        loadStatistics();
         setIsEditing(false);
         alert('Профиль успешно обновлен!');
       } else {
@@ -159,6 +180,14 @@ const PersonalAccount = () => {
     
     const config = roleConfig[role] || { label: 'Пользователь', className: 'role-user' };
     return <span className={`role-badge ${config.className}`}>{config.label}</span>;
+  };
+
+  const getRoleDescription = (role) => {
+    if (role === 'SYS_ADMIN') {
+      return 'Полный доступ к управлению системой, пользователями и всеми проектами';
+    } else {
+      return 'Доступ к своим проектам с возможностью участия в качестве администратора, врача или менеджера проекта';
+    }
   };
 
   if (loading) {
@@ -185,7 +214,10 @@ const PersonalAccount = () => {
             <h1>{user.firstName} {user.lastName}</h1>
             <p className="profile-email">{user.email}</p>
             <div className="profile-meta">
-              {getRoleBadge(user.role)}
+              <div className="role-info">
+                {getRoleBadge(user.role)}
+                <div className="role-description">{getRoleDescription(user.role)}</div>
+              </div>
               <span className="profile-department">{user.department}</span>
             </div>
           </div>
@@ -365,29 +397,73 @@ const PersonalAccount = () => {
         {/* Account Statistics */}
         <div className="stats-section">
           <h2>Account Statistics</h2>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon">📊</div>
-              <div className="stat-info">
-                <div className="stat-number">{user.projectsCount}</div>
-                <div className="stat-label">Active Projects</div>
-              </div>
+          {statistics ? (
+            <div className="stats-grid">
+              {user.role === 'SYS_ADMIN' ? (
+                // Sys Admin Statistics
+                <>
+                  <div className="stat-card">
+                    <div className="stat-icon">📊</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{statistics.total_projects}</div>
+                      <div className="stat-label">Total Projects</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">👥</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{statistics.total_users}</div>
+                      <div className="stat-label">Total Users</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">⚠️</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{statistics.total_risk_analyses}</div>
+                      <div className="stat-label">Total Risks Analyzed</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">🚀</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{statistics.active_projects}</div>
+                      <div className="stat-label">Active Projects</div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // User Statistics
+                <>
+                  <div className="stat-card">
+                    <div className="stat-icon">📊</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{statistics.user_projects}</div>
+                      <div className="stat-label">My Projects</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">⚠️</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{statistics.user_risk_analyses}</div>
+                      <div className="stat-label">My Risks Analyzed</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">📅</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{Math.floor((new Date() - new Date(user.joinDate)) / (1000 * 60 * 60 * 24))}</div>
+                      <div className="stat-label">Days Active</div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="stat-card">
-              <div className="stat-icon">⚠️</div>
-              <div className="stat-info">
-                <div className="stat-number">{user.risksAnalyzed}</div>
-                <div className="stat-label">Risks Analyzed</div>
-              </div>
+          ) : (
+            <div className="loading-state">
+              <div className="loading-spinner"></div>
+              <p>Loading statistics...</p>
             </div>
-            <div className="stat-card">
-              <div className="stat-icon">📅</div>
-              <div className="stat-info">
-                <div className="stat-number">{Math.floor((new Date() - new Date(user.joinDate)) / (1000 * 60 * 60 * 24))}</div>
-                <div className="stat-label">Days Active</div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Notification Settings */}

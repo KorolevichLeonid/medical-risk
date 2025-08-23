@@ -10,16 +10,8 @@ const ChangelogDetail = () => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        // Check user access
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            const parsedUser = JSON.parse(userData);
-            if (parsedUser.role !== 'admin' && parsedUser.role !== 'sys_admin') {
-                setError('Access denied. Only administrators can view changelog.');
-                setLoading(false);
-                return;
-            }
-        }
+        // Access control is now handled by backend API
+        // No need for frontend access checks
 
         fetchChangelogDetail();
     }, [changelogId]);

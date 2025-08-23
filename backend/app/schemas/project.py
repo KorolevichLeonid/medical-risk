@@ -133,6 +133,7 @@ class ProjectListResponse(BaseModel):
     owner_id: int
     created_at: datetime
     member_count: int = 0
+    user_role: Optional[str] = None  # Role of current user in this project
 
     class Config:
         from_attributes = True

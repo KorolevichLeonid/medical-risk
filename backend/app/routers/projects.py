@@ -63,12 +63,39 @@ def check_project_edit_permission(project: Project, user: User, db: Session = No
             ProjectMember.user_id == user.id
         ).first()
         
-        if member and member.role == ProjectRole.MANAGER:
+        if member and member.role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return True
     
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Not enough permissions to edit this project"
+    )
+
+
+def check_project_delete_permission(project: Project, user: User, db: Session = None):
+    """Check if user can delete project (only admin)"""
+    # System administrator can delete any project
+    if user.role == UserRole.SYS_ADMIN:
+        return True
+    
+    # Project owner (automatically admin role) can delete their project
+    if project.owner_id == user.id:
+        return True
+    
+    # Check if user is a project member with admin role
+    if db:
+        member = db.query(ProjectMember).filter(
+            ProjectMember.project_id == project.id,
+            ProjectMember.user_id == user.id,
+            ProjectMember.role == ProjectRole.ADMIN
+        ).first()
+        
+        if member:
+            return True
+    
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Only project administrators can delete projects"
     )
 
 
@@ -89,7 +116,7 @@ def check_project_member_management_permission(project: Project, user: User, db:
             ProjectMember.user_id == user.id
         ).first()
         
-        if member and member.role == ProjectRole.MANAGER:
+        if member and member.role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return True
     
     raise HTTPException(
@@ -115,10 +142,29 @@ async def read_projects(
             (Project.owner_id == current_user.id) | (ProjectMember.user_id == current_user.id)
         ).distinct().offset(skip).limit(limit).all()
     
-    # Add member count for each project
+    # Add member count and user role for each project
     result = []
     for project in projects:
         member_count = db.query(ProjectMember).filter(ProjectMember.project_id == project.id).count()
+        
+        # Determine user's role in this project
+        user_role = None
+        if current_user.role == UserRole.SYS_ADMIN:
+            # Sys admin is always admin in every project
+            user_role = "admin"
+        else:
+            # Check if user is owner (project creator = admin)
+            if project.owner_id == current_user.id:
+                user_role = "admin"
+            else:
+                # Check if user is member and get their role
+                member = db.query(ProjectMember).filter(
+                    ProjectMember.project_id == project.id,
+                    ProjectMember.user_id == current_user.id
+                ).first()
+                if member:
+                    user_role = member.role.value
+        
         project_data = ProjectListResponse(
             id=project.id,
             name=project.name,
@@ -127,7 +173,8 @@ async def read_projects(
             device_name=project.device_name,
             owner_id=project.owner_id,
             created_at=project.created_at,
-            member_count=member_count
+            member_count=member_count,
+            user_role=user_role
         )
         result.append(project_data)
     
@@ -187,7 +234,7 @@ async def create_project(
         "status": db_project.status.value,
         "owner_id": db_project.owner_id
     }
-    log_project_created(
+    await log_project_created(
         db=db,
         user=current_user,
         project_id=db_project.id,
@@ -233,7 +280,29 @@ async def read_project(
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
     member_responses = []
     
+    # Add owner to members list
+    member_responses.append(owner_member)
+    
+    # For sys admin: add them as admin if they're not the owner
+    if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
+        sysadmin_member = ProjectMemberResponse(
+            id=-1,  # Special ID for sys admin
+            project_id=project_id,
+            user_id=current_user.id,
+            role="admin",  # Sys admin is always admin in any project
+            joined_at=db_project.created_at,
+            user_email=current_user.email,
+            user_first_name=current_user.first_name,
+            user_last_name=current_user.last_name
+        )
+        member_responses.append(sysadmin_member)
+    
+    # Add actual project members (excluding owner to avoid duplication)
     for member in members:
+        # Skip if this member is the owner (already added above)
+        if member.user_id == db_project.owner_id:
+            continue
+            
         user = db.query(User).filter(User.id == member.user_id).first()
         if user:
             member_responses.append(ProjectMemberResponse(
@@ -272,7 +341,7 @@ async def read_project(
         owner_id=db_project.owner_id,
         created_at=db_project.created_at,
         updated_at=db_project.updated_at,
-        members=[owner_member] + member_responses,
+        members=member_responses,
         versions=[]  # We'll add versions if needed later
     )
     
@@ -323,7 +392,7 @@ async def update_project(
     }
     
     # Log project update
-    log_project_updated(
+    await log_project_updated(
         db=db,
         user=current_user,
         project_id=db_project.id,
@@ -335,7 +404,7 @@ async def update_project(
     
     # Log status change separately if status was changed
     if old_status != db_project.status:
-        log_project_status_changed(
+        await log_project_status_changed(
             db=db,
             user=current_user,
             project_id=db_project.id,
@@ -364,7 +433,32 @@ async def update_project(
     ).all()
     
     member_responses = []
+    
+    # Add owner to response first
+    member_responses.append(owner_member)
+    
+    # For sys admin: add them as admin if they're not the owner AND not already a member
+    if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
+        # Check if sys admin is already in project members
+        is_already_member = any(member.user_id == current_user.id for member in members)
+        if not is_already_member:
+            sysadmin_member = ProjectMemberResponse(
+                id=-1,  # Special ID for sys admin
+                project_id=db_project.id,
+                user_id=current_user.id,
+                role="admin",  # Sys admin is always admin in any project
+                joined_at=db_project.created_at,
+                user_email=current_user.email,
+                user_first_name=current_user.first_name,
+                user_last_name=current_user.last_name
+            )
+            member_responses.append(sysadmin_member)
+    
+    # Add actual project members (excluding owner to avoid duplication)
     for member in members:
+        # Skip if this member is the owner (already added above)
+        if member.user_id == db_project.owner_id:
+            continue
         member_user = db.query(User).filter(User.id == member.user_id).first()
         if member_user:
             member_responses.append(ProjectMemberResponse(
@@ -403,7 +497,7 @@ async def update_project(
         owner_id=db_project.owner_id,
         created_at=db_project.created_at,
         updated_at=db_project.updated_at,
-        members=[owner_member] + member_responses,
+        members=member_responses,
         versions=[]  # We'll add versions if needed later
     )
     
@@ -422,7 +516,7 @@ async def delete_project(
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    check_project_edit_permission(db_project, current_user, db)
+    check_project_delete_permission(db_project, current_user, db)
     
     # Store project data for logging before deletion
     project_data = {
@@ -438,7 +532,7 @@ async def delete_project(
     db.commit()
     
     # Log project deletion
-    log_project_deleted(
+    await log_project_deleted(
         db=db,
         user=current_user,
         project_id=project_id,
@@ -486,6 +580,18 @@ async def add_project_member(
     db.commit()
     db.refresh(db_member)
     
+    # Log member addition
+    await log_project_member_added(
+        db=db,
+        user=current_user,
+        project_id=project_id,
+        project_name=db_project.name,
+        member_id=user.id,
+        member_name=f"{user.first_name} {user.last_name}",
+        member_email=user.email,
+        member_role=db_member.role.value
+    )
+    
     # Return properly formatted response
     return ProjectMemberResponse(
         id=db_member.id,
@@ -525,8 +631,27 @@ async def remove_project_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     
+    # Get member user info for logging
+    member_user = db.query(User).filter(User.id == user_id).first()
+    member_name = f"{member_user.first_name} {member_user.last_name}" if member_user else f"User {user_id}"
+    member_email = member_user.email if member_user else "Unknown"
+    member_role = member.role.value
+    
     db.delete(member)
     db.commit()
+    
+    # Log member removal
+    await log_project_member_removed(
+        db=db,
+        user=current_user,
+        project_id=project_id,
+        project_name=db_project.name,
+        member_id=user_id,
+        member_name=member_name,
+        member_email=member_email,
+        member_role=member_role
+    )
+    
     return {"message": "Member removed successfully"}
 
 
@@ -553,18 +678,43 @@ async def get_project_members(
         id=0,  # Special ID for owner
         project_id=project_id,
         user_id=owner.id,
-        role="owner",
+        role="admin",  # Project owner is always admin
         joined_at=db_project.created_at,
         user_email=owner.email,
         user_first_name=owner.first_name,
         user_last_name=owner.last_name
     )
     
-    # Get project members (exclude sys_admin from visible members)
+    # Get project members
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
     member_responses = []
     
+    # Add owner to members list first (always admin)
+    member_responses.append(owner_member)
+    
+    # For sys admin: add them as admin if they're not the owner AND not already a member
+    if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
+        # Check if sys admin is already in project members
+        is_already_member = any(member.user_id == current_user.id for member in members)
+        if not is_already_member:
+            sysadmin_member = ProjectMemberResponse(
+                id=-1,  # Special ID for sys admin
+                project_id=project_id,
+                user_id=current_user.id,
+                role="admin",  # Sys admin is always admin in any project
+                joined_at=db_project.created_at,
+                user_email=current_user.email,
+                user_first_name=current_user.first_name,
+                user_last_name=current_user.last_name
+            )
+            member_responses.append(sysadmin_member)
+    
+    # Add actual project members (excluding owner to avoid duplication)
     for member in members:
+        # Skip if this member is the owner (already added above)
+        if member.user_id == db_project.owner_id:
+            continue
+            
         user = db.query(User).filter(User.id == member.user_id).first()
         if user:  # Show all project members
             member_responses.append(ProjectMemberResponse(
@@ -578,8 +728,8 @@ async def get_project_members(
                 user_last_name=user.last_name
             ))
     
-    # Add owner at the beginning
-    return [owner_member] + member_responses
+    # Return all members (owner already added first)
+    return member_responses
 
 
 @router.post("/{project_id}/versions", response_model=ProjectVersionResponse)

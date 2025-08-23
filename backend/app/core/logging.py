@@ -1,86 +1,16 @@
 """
-Logging utilities for tracking changes in the system
+Logging functions for various system operations
 """
-import json
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from fastapi import Request
 
-from ..models import ChangeLog, ActionType, User
-from ..database import SessionLocal
+from .logging_helper import log_action
+from ..models.changelog import ActionType
+from ..models.user import User
 
 
-def log_action(
-    db: Session,
-    user: User,
-    action_type: ActionType,
-    action_description: str,
-    target_type: Optional[str] = None,
-    target_id: Optional[int] = None,
-    target_name: Optional[str] = None,
-    project_id: Optional[int] = None,
-    old_values: Optional[Dict[str, Any]] = None,
-    new_values: Optional[Dict[str, Any]] = None,
-    extra_data: Optional[Dict[str, Any]] = None,
-    request: Optional[Request] = None
-) -> ChangeLog:
-    """
-    Log an action in the system
-    
-    Args:
-        db: Database session
-        user: User who performed the action
-        action_type: Type of action performed
-        action_description: Human-readable description
-        target_type: Type of target object (e.g., "project", "user")
-        target_id: ID of target object
-        target_name: Name of target object for display
-        project_id: Related project ID (if applicable)
-        old_values: Previous values (for updates)
-        new_values: New values (for updates)
-        extra_data: Additional metadata
-        request: FastAPI request object for IP/user agent
-    
-    Returns:
-        Created ChangeLog instance
-    """
-    # Extract IP and user agent from request if available
-    ip_address = None
-    user_agent = None
-    
-    if request:
-        ip_address = request.client.host if request.client else None
-        user_agent = request.headers.get("user-agent")
-    
-    # Convert dictionaries to JSON strings
-    old_values_json = json.dumps(old_values, ensure_ascii=False) if old_values else None
-    new_values_json = json.dumps(new_values, ensure_ascii=False) if new_values else None
-    extra_data_json = json.dumps(extra_data, ensure_ascii=False) if extra_data else None
-    
-    # Create changelog entry
-    changelog = ChangeLog(
-        action_type=action_type,
-        action_description=action_description,
-        user_id=user.id,
-        target_type=target_type,
-        target_id=target_id,
-        target_name=target_name,
-        project_id=project_id,
-        old_values=old_values_json,
-        new_values=new_values_json,
-        extra_data=extra_data_json,
-        ip_address=ip_address,
-        user_agent=user_agent
-    )
-    
-    db.add(changelog)
-    db.commit()
-    db.refresh(changelog)
-    
-    return changelog
-
-
-def log_project_created(
+async def log_project_created(
     db: Session,
     user: User,
     project_id: int,
@@ -89,11 +19,11 @@ def log_project_created(
     request: Optional[Request] = None
 ):
     """Log project creation"""
-    return log_action(
+    await log_action(
         db=db,
         user=user,
         action_type=ActionType.PROJECT_CREATED,
-        action_description=f"Создан проект '{project_name}'",
+        action_description=f"Создан новый проект '{project_name}'",
         target_type="project",
         target_id=project_id,
         target_name=project_name,
@@ -103,7 +33,7 @@ def log_project_created(
     )
 
 
-def log_project_updated(
+async def log_project_updated(
     db: Session,
     user: User,
     project_id: int,
@@ -113,22 +43,32 @@ def log_project_updated(
     request: Optional[Request] = None
 ):
     """Log project update"""
-    return log_action(
-        db=db,
-        user=user,
-        action_type=ActionType.PROJECT_UPDATED,
-        action_description=f"Обновлен проект '{project_name}'",
-        target_type="project",
-        target_id=project_id,
-        target_name=project_name,
-        project_id=project_id,
-        old_values=old_data,
-        new_values=new_data,
-        request=request
-    )
+    # Only log fields that actually changed
+    changed_fields = {}
+    old_changed = {}
+    
+    for key in old_data:
+        if old_data[key] != new_data.get(key):
+            old_changed[key] = old_data[key]
+            changed_fields[key] = new_data[key]
+    
+    if changed_fields:  # Only log if something actually changed
+        await log_action(
+            db=db,
+            user=user,
+            action_type=ActionType.PROJECT_UPDATED,
+            action_description=f"Обновлен проект '{project_name}'. Изменены поля: {', '.join(changed_fields.keys())}",
+            target_type="project",
+            target_id=project_id,
+            target_name=project_name,
+            project_id=project_id,
+            old_values=old_changed,
+            new_values=changed_fields,
+            request=request
+        )
 
 
-def log_project_deleted(
+async def log_project_deleted(
     db: Session,
     user: User,
     project_id: int,
@@ -137,7 +77,7 @@ def log_project_deleted(
     request: Optional[Request] = None
 ):
     """Log project deletion"""
-    return log_action(
+    await log_action(
         db=db,
         user=user,
         action_type=ActionType.PROJECT_DELETED,
@@ -151,7 +91,7 @@ def log_project_deleted(
     )
 
 
-def log_project_status_changed(
+async def log_project_status_changed(
     db: Session,
     user: User,
     project_id: int,
@@ -161,7 +101,7 @@ def log_project_status_changed(
     request: Optional[Request] = None
 ):
     """Log project status change"""
-    return log_action(
+    await log_action(
         db=db,
         user=user,
         action_type=ActionType.PROJECT_STATUS_CHANGED,
@@ -176,192 +116,224 @@ def log_project_status_changed(
     )
 
 
-def log_user_added(
+async def log_project_member_added(
     db: Session,
     user: User,
-    target_user_id: int,
-    target_user_name: str,
-    user_data: Dict[str, Any],
+    project_id: int,
+    project_name: str,
+    member_id: int,
+    member_name: str,
+    member_email: str,
+    member_role: str,
     request: Optional[Request] = None
 ):
-    """Log user creation"""
-    return log_action(
+    """Log project member addition"""
+    await log_action(
         db=db,
         user=user,
-        action_type=ActionType.USER_ADDED,
-        action_description=f"Добавлен пользователь '{target_user_name}'",
+        action_type=ActionType.PROJECT_MEMBER_ADDED,
+        action_description=f"Добавлен участник {member_name} ({member_email}) с ролью '{member_role}' в проект '{project_name}'",
         target_type="user",
-        target_id=target_user_id,
-        target_name=target_user_name,
-        new_values=user_data,
+        target_id=member_id,
+        target_name=member_name,
+        project_id=project_id,
+        new_values={
+            "user_id": member_id,
+            "user_name": member_name,
+            "user_email": member_email,
+            "role": member_role
+        },
         request=request
     )
 
 
-def log_user_role_changed(
+async def log_project_member_removed(
     db: Session,
     user: User,
-    target_user_id: int,
-    target_user_name: str,
+    project_id: int,
+    project_name: str,
+    member_id: int,
+    member_name: str,
+    member_email: str,
+    member_role: str,
+    request: Optional[Request] = None
+):
+    """Log project member removal"""
+    await log_action(
+        db=db,
+        user=user,
+        action_type=ActionType.PROJECT_MEMBER_REMOVED,
+        action_description=f"Удален участник {member_name} ({member_email}) с ролью '{member_role}' из проекта '{project_name}'",
+        target_type="user",
+        target_id=member_id,
+        target_name=member_name,
+        project_id=project_id,
+        old_values={
+            "user_id": member_id,
+            "user_name": member_name,
+            "user_email": member_email,
+            "role": member_role
+        },
+        request=request
+    )
+
+
+async def log_project_member_role_changed(
+    db: Session,
+    user: User,
+    project_id: int,
+    project_name: str,
+    member_id: int,
+    member_name: str,
     old_role: str,
     new_role: str,
     request: Optional[Request] = None
 ):
-    """Log user role change"""
-    return log_action(
+    """Log project member role change"""
+    await log_action(
         db=db,
         user=user,
-        action_type=ActionType.USER_ROLE_CHANGED,
-        action_description=f"Изменена роль пользователя '{target_user_name}' с '{old_role}' на '{new_role}'",
+        action_type=ActionType.PROJECT_MEMBER_ROLE_CHANGED,
+        action_description=f"Изменена роль участника {member_name} в проекте '{project_name}' с '{old_role}' на '{new_role}'",
         target_type="user",
-        target_id=target_user_id,
-        target_name=target_user_name,
+        target_id=member_id,
+        target_name=member_name,
+        project_id=project_id,
         old_values={"role": old_role},
         new_values={"role": new_role},
         request=request
     )
 
 
-def log_project_member_added(
-    db: Session,
-    user: User,
-    project_id: int,
-    project_name: str,
-    member_user_id: int,
-    member_name: str,
-    member_role: str,
-    request: Optional[Request] = None
-):
-    """Log project member addition"""
-    return log_action(
-        db=db,
-        user=user,
-        action_type=ActionType.PROJECT_MEMBER_ADDED,
-        action_description=f"Добавлен участник '{member_name}' в проект '{project_name}' с ролью '{member_role}'",
-        target_type="project_member",
-        target_id=member_user_id,
-        target_name=member_name,
-        project_id=project_id,
-        new_values={"member_role": member_role, "member_id": member_user_id},
-        request=request
-    )
-
-
-def log_project_member_removed(
-    db: Session,
-    user: User,
-    project_id: int,
-    project_name: str,
-    member_user_id: int,
-    member_name: str,
-    member_role: str,
-    request: Optional[Request] = None
-):
-    """Log project member removal"""
-    return log_action(
-        db=db,
-        user=user,
-        action_type=ActionType.PROJECT_MEMBER_REMOVED,
-        action_description=f"Удален участник '{member_name}' из проекта '{project_name}'",
-        target_type="project_member",
-        target_id=member_user_id,
-        target_name=member_name,
-        project_id=project_id,
-        old_values={"member_role": member_role, "member_id": member_user_id},
-        request=request
-    )
-
-
-def log_risk_created(
+# Risk analysis logging functions
+async def log_risk_created(
     db: Session,
     user: User,
     project_id: int,
     project_name: str,
     risk_id: int,
-    risk_name: str,
+    risk_description: str,
     risk_data: Dict[str, Any],
     request: Optional[Request] = None
 ):
-    """Log risk creation"""
-    return log_action(
+    """Log risk analysis creation"""
+    await log_action(
         db=db,
         user=user,
         action_type=ActionType.RISK_CREATED,
-        action_description=f"Создан риск '{risk_name}' в проекте '{project_name}'",
+        action_description=f"Создан риск '{risk_description}' в проекте '{project_name}'",
         target_type="risk",
         target_id=risk_id,
-        target_name=risk_name,
+        target_name=risk_description,
         project_id=project_id,
         new_values=risk_data,
         request=request
     )
 
 
-def log_risk_updated(
+async def log_risk_updated(
     db: Session,
     user: User,
     project_id: int,
     project_name: str,
     risk_id: int,
-    risk_name: str,
+    risk_description: str,
     old_data: Dict[str, Any],
     new_data: Dict[str, Any],
     request: Optional[Request] = None
 ):
-    """Log risk update"""
-    return log_action(
-        db=db,
-        user=user,
-        action_type=ActionType.RISK_UPDATED,
-        action_description=f"Обновлен риск '{risk_name}' в проекте '{project_name}'",
-        target_type="risk",
-        target_id=risk_id,
-        target_name=risk_name,
-        project_id=project_id,
-        old_values=old_data,
-        new_values=new_data,
-        request=request
-    )
+    """Log risk analysis update"""
+    # Only log fields that actually changed
+    changed_fields = {}
+    old_changed = {}
+    
+    for key in old_data:
+        if old_data[key] != new_data.get(key):
+            old_changed[key] = old_data[key]
+            changed_fields[key] = new_data[key]
+    
+    if changed_fields:  # Only log if something actually changed
+        await log_action(
+            db=db,
+            user=user,
+            action_type=ActionType.RISK_UPDATED,
+            action_description=f"Обновлен риск '{risk_description}' в проекте '{project_name}'. Изменены поля: {', '.join(changed_fields.keys())}",
+            target_type="risk",
+            target_id=risk_id,
+            target_name=risk_description,
+            project_id=project_id,
+            old_values=old_changed,
+            new_values=changed_fields,
+            request=request
+        )
 
 
-def log_risk_deleted(
+async def log_risk_deleted(
     db: Session,
     user: User,
     project_id: int,
     project_name: str,
     risk_id: int,
-    risk_name: str,
+    risk_description: str,
     risk_data: Dict[str, Any],
     request: Optional[Request] = None
 ):
-    """Log risk deletion"""
-    return log_action(
+    """Log risk analysis deletion"""
+    await log_action(
         db=db,
         user=user,
         action_type=ActionType.RISK_DELETED,
-        action_description=f"Удален риск '{risk_name}' из проекта '{project_name}'",
+        action_description=f"Удален риск '{risk_description}' из проекта '{project_name}'",
         target_type="risk",
         target_id=risk_id,
-        target_name=risk_name,
+        target_name=risk_description,
         project_id=project_id,
         old_values=risk_data,
         request=request
     )
 
 
-def log_user_login(
+# User authentication logging functions
+async def log_user_login(
     db: Session,
     user: User,
     request: Optional[Request] = None
 ):
     """Log user login"""
-    return log_action(
+    await log_action(
         db=db,
         user=user,
         action_type=ActionType.USER_LOGIN,
-        action_description=f"Пользователь {user.first_name} {user.last_name} вошел в систему",
+        action_description=f"Пользователь {user.first_name} {user.last_name} ({user.email}) выполнил вход в систему",
         target_type="user",
         target_id=user.id,
         target_name=f"{user.first_name} {user.last_name}",
+        extra_data={
+            "user_email": user.email,
+            "user_role": user.role.value,
+            "login_time": str(user.last_login) if user.last_login else None
+        },
+        request=request
+    )
+
+
+async def log_user_logout(
+    db: Session,
+    user: User,
+    request: Optional[Request] = None
+):
+    """Log user logout"""
+    await log_action(
+        db=db,
+        user=user,
+        action_type=ActionType.USER_LOGOUT,
+        action_description=f"Пользователь {user.first_name} {user.last_name} ({user.email}) вышел из системы",
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.first_name} {user.last_name}",
+        extra_data={
+            "user_email": user.email,
+            "user_role": user.role.value
+        },
         request=request
     )

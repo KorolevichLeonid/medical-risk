@@ -89,6 +89,11 @@ const Changelog = () => {
         navigate(`/changelog/project/${projectId}`);
     };
 
+    const handleChangeClick = (changeId) => {
+        console.log(`🔄 Navigating to change detail: ${changeId}`);
+        navigate(`/changelog/change/${changeId}`);
+    };
+
     if (loading) {
         return (
             <div className="changelog-container">
@@ -145,13 +150,29 @@ const Changelog = () => {
                                     <p className="project-description">
                                         {project.project_description || 'Описание проекта отсутствует'}
                                     </p>
-                                    <div className="project-status">
-                                        <span 
-                                            className="status-badge"
-                                            style={{ backgroundColor: getStatusColor(project.project_status) }}
-                                        >
-                                            {getStatusText(project.project_status)}
-                                        </span>
+                                    <div className="project-device">
+                                        <span className="device-label">Устройство:</span>
+                                        <span className="device-name">{project.device_name}</span>
+                                    </div>
+                                    <div className="project-meta">
+                                        <div className="project-status">
+                                            <span 
+                                                className="status-badge"
+                                                style={{ backgroundColor: getStatusColor(project.project_status) }}
+                                            >
+                                                {getStatusText(project.project_status)}
+                                            </span>
+                                        </div>
+                                        <div className="project-stats">
+                                            <div className="stat-item">
+                                                <span className="stat-label">Участников:</span>
+                                                <span className="stat-value">{project.members_count}</span>
+                                            </div>
+                                            <div className="stat-item">
+                                                <span className="stat-label">Обновлено:</span>
+                                                <span className="stat-value">{formatDate(project.last_updated)}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -167,7 +188,11 @@ const Changelog = () => {
                                 ) : (
                                     <div className="changes-list">
                                         {project.recent_changes.map((change, index) => (
-                                            <div key={change.id} className="change-item">
+                                            <div 
+                                                key={change.id} 
+                                                className="change-item clickable"
+                                                onClick={() => handleChangeClick(change.id)}
+                                            >
                                                 <div className="change-info">
                                                     <div className="change-user">
                                                         <span className="user-name">{change.user_name}</span>
@@ -199,7 +224,15 @@ const Changelog = () => {
 
             {projects.length === 0 && (
                 <div className="no-projects">
-                    <p>Проекты не найдены</p>
+                    <div className="no-projects-message">
+                        <h3>Проекты для просмотра логов не найдены</h3>
+                        <p>
+                            {user?.role === 'SYS_ADMIN' 
+                                ? 'В системе пока нет проектов с изменениями.'
+                                : 'У вас нет прав администратора ни в одном проекте. Логи доступны только администраторам проектов.'
+                            }
+                        </p>
+                    </div>
                 </div>
             )}
         </div>

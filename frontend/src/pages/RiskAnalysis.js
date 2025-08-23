@@ -16,6 +16,7 @@ const RiskAnalysis = () => {
   const [showViewRisk, setShowViewRisk] = useState(false);
   const [selectedRisk, setSelectedRisk] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [userProjectRole, setUserProjectRole] = useState(null);
   const [newRisk, setNewRisk] = useState({
     lifecycleStage: 'operation',
     hazardName: '',
@@ -31,6 +32,7 @@ const RiskAnalysis = () => {
   useEffect(() => {
     loadCurrentUser();
     loadProjectAndRisks();
+    loadUserProjectRole();
   }, [id]);
 
   const loadCurrentUser = () => {
@@ -40,20 +42,51 @@ const RiskAnalysis = () => {
     }
   };
 
+  const loadUserProjectRole = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8000/api/projects/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const projectData = await response.json();
+        const currentUserId = JSON.parse(localStorage.getItem('user'))?.id;
+        
+        // Find current user's role in this project
+        const userMember = projectData.members?.find(member => member.user_id === currentUserId);
+        setUserProjectRole(userMember?.role || null);
+      }
+    } catch (error) {
+      console.error('Failed to load user project role:', error);
+    }
+  };
+
   // Permission check functions
   const canAddRisks = () => {
-    if (!currentUser) return false;
-    return currentUser.role === 'sys_admin' || currentUser.role === 'admin' || currentUser.role === 'doctor';
+    if (!currentUser || !userProjectRole) return false;
+    // System admin can always manage risks
+    if (currentUser.role === 'SYS_ADMIN') return true;
+    // In project: admin and doctor can manage risks
+    return userProjectRole === 'admin' || userProjectRole === 'doctor';
   };
 
   const canEditRisks = () => {
-    if (!currentUser) return false;
-    return currentUser.role === 'sys_admin' || currentUser.role === 'admin' || currentUser.role === 'doctor';
+    if (!currentUser || !userProjectRole) return false;
+    // System admin can always manage risks
+    if (currentUser.role === 'SYS_ADMIN') return true;
+    // In project: admin and doctor can manage risks
+    return userProjectRole === 'admin' || userProjectRole === 'doctor';
   };
 
   const canDeleteRisks = () => {
-    if (!currentUser) return false;
-    return currentUser.role === 'sys_admin' || currentUser.role === 'admin' || currentUser.role === 'doctor';
+    if (!currentUser || !userProjectRole) return false;
+    // System admin can always manage risks
+    if (currentUser.role === 'SYS_ADMIN') return true;
+    // In project: admin and doctor can manage risks
+    return userProjectRole === 'admin' || userProjectRole === 'doctor';
   };
 
   useEffect(() => {

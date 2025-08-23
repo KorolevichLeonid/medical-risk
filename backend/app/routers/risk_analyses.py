@@ -155,6 +155,24 @@ async def create_risk_analysis(
     db.commit()
     db.refresh(db_analysis)
     
+    # Log risk analysis creation
+    analysis_data = {
+        "has_body_contact": db_analysis.has_body_contact,
+        "contact_type": db_analysis.contact_type,
+        "analyst_id": db_analysis.analyst_id,
+        "risk_factors_count": len(db_analysis.risk_factors)
+    }
+    
+    await log_risk_created(
+        db=db,
+        user=current_user,
+        project_id=project_id,
+        project_name=db_project.name,
+        risk_id=db_analysis.id,
+        risk_description=f"Анализ рисков для проекта {db_project.name}",
+        risk_data=analysis_data
+    )
+    
     # Calculate statistics
     stats = calculate_analysis_statistics(db_analysis.risk_factors)
     
@@ -255,13 +273,13 @@ async def add_risk_factor(
         "risk_score": db_factor.risk_score
     }
     
-    log_risk_created(
+    await log_risk_created(
         db=db,
         user=current_user,
         project_id=db_analysis.project_id,
         project_name=db_analysis.project.name,
         risk_id=db_factor.id,
-        risk_name=db_factor.hazard_name,
+        risk_description=db_factor.hazard_name,
         risk_data=risk_data,
         request=request
     )
@@ -322,13 +340,13 @@ async def update_risk_factor(
     }
     
     # Log risk update
-    log_risk_updated(
+    await log_risk_updated(
         db=db,
         user=current_user,
         project_id=db_factor.analysis.project_id,
         project_name=db_factor.analysis.project.name,
         risk_id=db_factor.id,
-        risk_name=db_factor.hazard_name,
+        risk_description=db_factor.hazard_name,
         old_data=old_values,
         new_data=new_values,
         request=request
@@ -372,13 +390,13 @@ async def delete_risk_factor(
     db.commit()
     
     # Log risk deletion
-    log_risk_deleted(
+    await log_risk_deleted(
         db=db,
         user=current_user,
         project_id=project_id,
         project_name=project_name,
         risk_id=factor_id,
-        risk_name=risk_name,
+        risk_description=risk_name,
         risk_data=risk_data,
         request=request
     )

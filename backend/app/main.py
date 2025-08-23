@@ -45,10 +45,12 @@ app.include_router(admin_auth.router, tags=["admin"])
 @app.get("/")
 async def root():
     """Root endpoint"""
+    print("🔥 DEBUG: Root endpoint called - server is running with new code!")
     return {
         "message": "Medical Risk Analysis API",
-        "version": "1.0.0",
-        "docs": "/docs"
+        "version": "1.0.1",  # Увеличили версию
+        "docs": "/docs",
+        "debug": "Server updated with new code"
     }
 
 @app.get("/health")

@@ -150,7 +150,7 @@ async def azure_login(
         
         # Log user login
         print("📝 Logging user login")
-        log_user_login(db=db, user=user, request=request)
+        await log_user_login(db=db, user=user, request=request)
         
         # Create local token
         print("🎫 Creating local token")
