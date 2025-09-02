@@ -4,6 +4,7 @@ import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import HomePage from './pages/HomePage';
+import ProductsPage from './pages/ProductsPage';
 import AuthPage from './pages/AuthPage';
 import AuthErrorPage from './pages/AuthErrorPage';
 import Dashboard from './pages/Dashboard';
@@ -36,6 +37,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/products" element={<ProductsPage />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/auth-error" element={<AuthErrorPage />} />
         <Route path="/dashboard" element={

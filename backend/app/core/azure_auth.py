@@ -67,9 +67,7 @@ def find_key_by_kid(jwks_data: Dict[str, Any], kid: str) -> Optional[Dict[str, A
 async def verify_azure_token(token: str) -> Dict[str, Any]:
     """Verify Azure Entra ID token and extract user information"""
     try:
-        # For development/testing: decode token without verification
-        # In production, you should enable full verification
-        print(f"🔍 Decoding Azure token (development mode)...")
+        
         
         # Decode without verification for testing
         unverified_payload = jwt.get_unverified_claims(token)
