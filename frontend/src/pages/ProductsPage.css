@@ -251,32 +251,37 @@
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
-/* Floating Support */
-.floating-support {
+
+
+/* Floating Back Button */
+.floating-back {
   position: fixed;
   bottom: 30px;
-  right: 30px;
-  width: 60px;
-  height: 60px;
+  left: 30px;
   background-color: #D9D9D9;
+  color: #131313;
+  border: none;
+  padding: 15px;
   border-radius: 50%;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: all 0.3s ease;
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  z-index: 1000;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  text-decoration: none;
 }
 
-.floating-support:hover {
-  transform: scale(1.1);
+.floating-back:hover {
+  transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-}
-
-.floating-support-icon {
-  font-size: 24px;
-  color: white;
+  color: #131313;
+  text-decoration: none;
 }
 
 /* Responsive Design */
@@ -297,4 +302,15 @@
   .price {
     font-size: 24px;
   }
+
+  .floating-back {
+    left: 20px;
+    width: 45px;
+    height: 45px;
+    font-size: 18px;
+    padding: 12px;
+  }
+
 }
+
+

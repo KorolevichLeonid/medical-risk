@@ -126,10 +126,10 @@ const ProductsPage = () => {
         </div>
       </div>
 
-      {/* Floating Support */}
-      <div className="floating-support">
-        <div className="floating-support-icon">💬</div>
-      </div>
+      {/* Floating Back Button */}
+      <Link to="/" className="floating-back">
+        ‹
+      </Link>
     </div>
   );
 };

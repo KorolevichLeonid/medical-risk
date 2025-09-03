@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
+import SupportButton from './SupportButton';
 import './Layout.css';
 
 const Layout = ({ children }) => {
@@ -44,12 +45,20 @@ const Layout = ({ children }) => {
     // Clear authentication data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Logout from Azure
-    instance.logoutRedirect().catch(error => {
+    
+    // Try Azure logout first, but always redirect to home
+    try {
+      instance.logoutRedirect({
+        postLogoutRedirectUri: window.location.origin + '/'
+      });
+    } catch (error) {
       console.error('Logout error:', error);
-      // Fallback - just redirect to home
+    }
+    
+    // Always redirect to home page as fallback
+    setTimeout(() => {
       navigate('/');
-    });
+    }, 100);
   };
 
   return (
@@ -115,6 +124,9 @@ const Layout = ({ children }) => {
           {children}
         </div>
       </div>
+
+      {/* Support Button - доступен на всех страницах с Layout */}
+      <SupportButton />
     </div>
   );
 };

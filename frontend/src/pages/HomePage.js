@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useMsal } from '@azure/msal-react';
 import { ReactComponent as Logo } from '../logo.svg';
 import './HomePage.css';
 
@@ -9,8 +10,17 @@ const HomePage = () => {
   const [firstScreenAnimated, setFirstScreenAnimated] = useState(false);
   const [firstScreenVisible, setFirstScreenVisible] = useState(true);
   const [secondScreenVisible, setSecondScreenVisible] = useState(false);
+  const [user, setUser] = useState(null);
+  const { instance } = useMsal();
 
   useEffect(() => {
+    // Загружаем данные пользователя из localStorage
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+    }
+
     const handleScroll = () => {
       const scrollTop = window.pageYOffset;
       setShowReturn(scrollTop > 100);
@@ -55,11 +65,27 @@ const HomePage = () => {
           <div className="nav-left">
             <Link to="/products" className="nav-btn">Products</Link>
             <button className="nav-btn" onClick={() => document.querySelector('.second-screen').scrollIntoView({ behavior: 'smooth' })}>About us</button>
-            <button className="nav-btn">Contacts</button>
+            <button className="nav-btn" onClick={() => document.querySelector('.third-screen').scrollIntoView({ behavior: 'smooth' })}>Contacts</button>
           </div>
           <div className="nav-right">
-            <Link to="/login" className="nav-auth-btn nav-signin">Sign In</Link>
-            <Link to="/register" className="nav-auth-btn nav-signup">Sign Up</Link>
+            {user ? (
+              <Link to="/account" className="nav-user-info">
+                <div className="nav-user-avatar">
+                  <span className="nav-user-icon">👤</span>
+                </div>
+                <div className="nav-user-details">
+                  <span className="nav-user-name">{user.first_name} {user.last_name}</span>
+                  <span className="nav-user-status">✓ Signed in</span>
+                </div>
+              </Link>
+            ) : (
+              <div className="nav-auth-section">
+                <div className="nav-account-icon">
+                  <span className="nav-account-symbol">👤</span>
+                </div>
+                <Link to="/login" className="nav-auth-btn nav-signin">Sign In</Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -131,9 +157,6 @@ const HomePage = () => {
       </div>
 
       {/* Плавающие элементы */}
-      <div className="floating-support">
-        <div className="floating-support-icon">💬</div>
-      </div>
 
       <button 
         className={`floating-return ${showReturn ? 'visible' : ''}`}

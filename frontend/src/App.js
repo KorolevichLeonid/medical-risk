@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import SupportButton from './components/SupportButton';
 import HomePage from './pages/HomePage';
 import ProductsPage from './pages/ProductsPage';
 import AuthPage from './pages/AuthPage';
@@ -33,11 +34,26 @@ function App() {
     });
   }, [instance]);
 
+  const PublicPageWrapper = ({ children }) => (
+    <>
+      {children}
+      <SupportButton />
+    </>
+  );
+
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/" element={
+          <PublicPageWrapper>
+            <HomePage />
+          </PublicPageWrapper>
+        } />
+        <Route path="/products" element={
+          <PublicPageWrapper>
+            <ProductsPage />
+          </PublicPageWrapper>
+        } />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/auth-error" element={<AuthErrorPage />} />
         <Route path="/dashboard" element={

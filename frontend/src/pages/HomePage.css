@@ -76,20 +76,112 @@
 }
 
 .nav-signin {
-  background-color: #D9D9D9;
-  color: #131313;
-  animation-delay: 0.4s;
-}
-
-.nav-signup {
   background-color: #4A4A4A;
   color: white;
-  animation-delay: 0.5s;
+  animation-delay: 0.4s;
 }
 
 .nav-auth-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* User Info Styles */
+.nav-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  transform: translateY(-20px);
+  animation: fadeInUp 0.6s ease forwards;
+  animation-delay: 0.4s;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 8px 12px;
+  border-radius: 25px;
+}
+
+.nav-user-info:hover {
+  background-color: rgba(217, 217, 217, 0.2);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.nav-user-avatar {
+  width: 40px;
+  height: 40px;
+  background-color: #8A8A8A;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.nav-user-info:hover .nav-user-avatar {
+  background-color: #9A9A9A;
+  transform: scale(1.05);
+}
+
+.nav-user-icon {
+  font-size: 20px;
+  color: white;
+}
+
+.nav-user-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.nav-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #131313;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.nav-user-status {
+  font-size: 14px;
+  color: #4A4A4A;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Auth Section Styles */
+.nav-auth-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-account-icon {
+  width: 40px;
+  height: 40px;
+  background-color: #D9D9D9;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(-20px);
+  animation: fadeInUp 0.6s ease forwards;
+  animation-delay: 0.3s;
+  transition: all 0.3s ease;
+}
+
+.nav-account-icon:hover {
+  background-color: #C0C0C0;
+  transform: translateY(-2px);
+}
+
+.nav-account-symbol {
+  font-size: 20px;
+  color: #131313;
 }
 
 @keyframes fadeInUp {
@@ -417,35 +509,43 @@
   .image-content p {
     font-size: 16px;
   }
+
+  .nav-user-info {
+    gap: 8px;
+  }
+
+  .nav-user-avatar {
+    width: 35px;
+    height: 35px;
+  }
+
+  .nav-user-icon {
+    font-size: 18px;
+  }
+
+  .nav-user-name {
+    font-size: 14px;
+  }
+
+  .nav-user-status {
+    font-size: 12px;
+  }
+
+  .nav-auth-section {
+    gap: 8px;
+  }
+
+  .nav-account-icon {
+    width: 35px;
+    height: 35px;
+  }
+
+  .nav-account-symbol {
+    font-size: 18px;
+  }
 }
 
 /* Плавающие элементы */
-.floating-support {
-  position: fixed;
-  bottom: 30px;
-  right: 30px;
-  width: 60px;
-  height: 60px;
-  background-color: #D9D9D9;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  z-index: 1000;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.floating-support:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-}
-
-.floating-support-icon {
-  font-size: 24px;
-  color: white;
-}
 
 .floating-return {
   position: fixed;
