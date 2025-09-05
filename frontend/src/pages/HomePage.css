@@ -607,56 +607,56 @@
 }
 
 /* Анимации для первого экрана */
-.main-content {
+.home-page .main-content {
   opacity: 0;
   transform: translateX(-50px);
   transition: all 0.8s ease;
 }
 
-.main-content.animate {
+.home-page .main-content.animate {
   opacity: 1;
   transform: translateX(0);
 }
 
-.main-content:not(.animate) {
+.home-page .main-content:not(.animate) {
   opacity: 0;
   transform: translateX(-50px);
 }
 
-.image-shapes {
+.home-page .image-shapes {
   opacity: 0;
   transform: translateX(50px);
   transition: all 0.8s ease;
 }
 
-.image-shapes.animate {
+.home-page .image-shapes.animate {
   opacity: 1;
   transform: translateX(0);
 }
 
-.image-shapes:not(.animate) {
+.home-page .image-shapes:not(.animate) {
   opacity: 0;
   transform: translateX(50px);
 }
 
 /* Анимации для второго экрана */
-.why-us-content {
+.home-page .why-us-content {
   opacity: 0;
   transform: translateX(-50px);
   transition: all 0.8s ease;
 }
 
-.why-us-content.animate {
+.home-page .why-us-content.animate {
   opacity: 1;
   transform: translateX(0);
 }
 
-.why-us-content:not(.animate) {
+.home-page .why-us-content:not(.animate) {
   opacity: 0;
   transform: translateX(-50px);
 }
 
-.why-us-cards {
+.home-page .why-us-cards {
   opacity: 0;
   transform: translateX(50px);
   transition: all 0.8s ease;
@@ -667,12 +667,12 @@
   margin-left: 50px;
 }
 
-.why-us-cards.animate {
+.home-page .why-us-cards.animate {
   opacity: 1;
   transform: translateX(0);
 }
 
-.why-us-cards:not(.animate) {
+.home-page .why-us-cards:not(.animate) {
   opacity: 0;
   transform: translateX(50px);
 }
