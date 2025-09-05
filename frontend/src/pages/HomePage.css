@@ -547,16 +547,16 @@
 
 /* Плавающие элементы */
 
-.floating-return {
+.home-floating-return {
   position: fixed;
   bottom: 30px;
-  left: 30px;
+  left: 30px; /* same inset as support button (right: 30px) */
   background-color: #D9D9D9;
   color: #131313;
   border: none;
-  padding: 15px;
+  padding: 0;
   border-radius: 50%;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
@@ -564,19 +564,19 @@
   transition: all 0.3s ease;
   opacity: 0;
   visibility: hidden;
-  width: 50px;
-  height: 50px;
+  width: 60px; /* match support button size */
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.floating-return.visible {
+.home-floating-return.visible {
   opacity: 1;
   visibility: visible;
 }
 
-.floating-return:hover {
+.home-floating-return:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }

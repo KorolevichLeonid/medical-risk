@@ -159,7 +159,7 @@ const HomePage = () => {
       {/* Плавающие элементы */}
 
       <button 
-        className={`floating-return ${showReturn ? 'visible' : ''}`}
+        className={`home-floating-return ${showReturn ? 'visible' : ''}`}
         onClick={scrollToTop}
       >
         ↑

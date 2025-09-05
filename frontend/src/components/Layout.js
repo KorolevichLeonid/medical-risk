@@ -9,6 +9,7 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
   const { instance } = useMsal();
   const [user, setUser] = useState(null);
+  const [showReturn, setShowReturn] = useState(false);
 
   useEffect(() => {
     // Load user data from localStorage
@@ -22,7 +23,17 @@ const Layout = ({ children }) => {
         avatar: parsedUser.avatar_url || '/api/placeholder/50/50'
       });
     }
+    const onScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      setShowReturn(scrollTop > 100);
+    };
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const getMenuItems = () => {
     const baseItems = [
@@ -67,16 +78,18 @@ const Layout = ({ children }) => {
       <div className="sidebar">
         {/* User Profile */}
         <div className="user-profile">
-          <div className="user-avatar">
-            <img src={user?.avatar || '/api/placeholder/50/50'} alt={user?.name || 'User'} />
+          <div className={`user-avatar ${(!user?.avatar || String(user?.avatar).includes('/api/placeholder')) ? 'default-avatar' : ''}`}>
+            {(!user?.avatar || String(user?.avatar).includes('/api/placeholder')) ? (
+              <div className="avatar-circle"><div className="avatar-person"></div></div>
+            ) : (
+              <img src={user?.avatar} alt={user?.name || 'User'} />
+            )}
           </div>
           <div className="user-info">
             <h3>{user?.name || 'Loading...'}</h3>
             <p>Role: {user?.role || 'Роль не назначена'}</p>
           </div>
-          <button className="change-account-btn" onClick={handleLogout}>
-            🚪 Logout
-          </button>
+          <button className="change-account-btn" onClick={handleLogout}>Logout</button>
         </div>
 
         {/* Navigation Menu */}
@@ -93,6 +106,9 @@ const Layout = ({ children }) => {
           ))}
         </nav>
 
+        {/* Return to site button under Changelog */}
+        <button onClick={() => navigate('/')} className="back-btn">Return to site</button>
+
         {/* Support */}
         <div className="support-section">
           <div className="support-icon">?</div>
@@ -100,26 +116,10 @@ const Layout = ({ children }) => {
         </div>
 
         {/* Logout */}
-        <button className="logout-btn" onClick={handleLogout}>
-          return
-        </button>
       </div>
 
       {/* Main Content */}
       <div className="main-content">
-        <div className="content-header">
-          <div className="breadcrumb">
-            <button onClick={() => navigate(-1)} className="back-btn">
-              ← return
-            </button>
-          </div>
-          <div className="user-actions">
-            <div className="notification-icon">🔔</div>
-            <div className="user-menu">
-              <img src={user?.avatar || '/api/placeholder/50/50'} alt={user?.name || 'User'} className="user-avatar-small" />
-            </div>
-          </div>
-        </div>
         <div className="content-body">
           {children}
         </div>
@@ -127,6 +127,11 @@ const Layout = ({ children }) => {
 
       {/* Support Button - доступен на всех страницах с Layout */}
       <SupportButton />
+
+      {/* floating return in cabinet убран по требованию */}
+
+      {/* Fixed top controls */}
+      <div className="notification-icon"></div>
     </div>
   );
 };

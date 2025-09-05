@@ -3,6 +3,7 @@ import './PersonalAccount.css';
 
 const PersonalAccount = () => {
   const [user, setUser] = useState(null);
+  const [showReturn, setShowReturn] = useState(false);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -26,7 +27,21 @@ const PersonalAccount = () => {
   useEffect(() => {
     loadUserData();
     loadStatistics();
+    const content = document.querySelector('.content-body');
+    const onScroll = () => {
+      const scrollTop = content ? content.scrollTop : (window.pageYOffset || document.documentElement.scrollTop);
+      setShowReturn(scrollTop > 100);
+    };
+    (content || window).addEventListener('scroll', onScroll);
+    onScroll();
+    return () => (content || window).removeEventListener('scroll', onScroll);
   }, []);
+
+  const scrollToTop = () => {
+    const content = document.querySelector('.content-body');
+    if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const loadUserData = async () => {
     setLoading(true);
@@ -174,11 +189,10 @@ const PersonalAccount = () => {
 
   const getRoleBadge = (role) => {
     const roleConfig = {
-      SYS_ADMIN: { label: 'Системный администратор', className: 'role-sys-admin' },
-      USER: { label: 'Пользователь', className: 'role-user' },
+      SYS_ADMIN: { label: 'System Admin', className: 'role-sys-admin' },
+      USER: { label: 'User', className: 'role-user' },
     };
-    
-    const config = roleConfig[role] || { label: 'Пользователь', className: 'role-user' };
+    const config = roleConfig[role] || { label: 'User', className: 'role-user' };
     return <span className={`role-badge ${config.className}`}>{config.label}</span>;
   };
 
@@ -205,9 +219,15 @@ const PersonalAccount = () => {
     <div className="personal-account">
       {/* Profile Header */}
       <div className="profile-header">
-        <div className="profile-info">
-          <div className="profile-avatar">
-            <img src={user.avatar} alt={`${user.firstName} ${user.lastName}`} />
+        <div className="profile-left">
+          <h2 className="greeting-title">Hi, {user.firstName || user.lastName ? `${user.firstName}` : 'User'}</h2>
+          <div className="profile-info">
+          <div className={`profile-avatar ${(!user.avatar || String(user.avatar).includes('/api/placeholder')) ? 'default-avatar' : ''}`}>
+            {(!user.avatar || String(user.avatar).includes('/api/placeholder')) ? (
+              <div className="avatar-circle"><div className="avatar-person"></div></div>
+            ) : (
+              <img src={user.avatar} alt={`${user.firstName} ${user.lastName}`} />
+            )}
             <button className="avatar-edit-btn">📷</button>
           </div>
           <div className="profile-details">
@@ -216,24 +236,24 @@ const PersonalAccount = () => {
             <div className="profile-meta">
               <div className="role-info">
                 {getRoleBadge(user.role)}
-                <div className="role-description">{getRoleDescription(user.role)}</div>
               </div>
               <span className="profile-department">{user.department}</span>
             </div>
           </div>
+          </div>
         </div>
         
-        <div className="profile-actions">
-          <button 
+      </div>
+
+      <div className="account-content">
+        <div className="profile-edit-top">
+          <button
             className="btn btn-primary"
             onClick={() => setIsEditing(!isEditing)}
           >
             {isEditing ? 'Cancel' : 'Edit Profile'}
           </button>
         </div>
-      </div>
-
-      <div className="account-content">
         {/* Personal Information */}
         <div className="info-section">
           <h2>Personal Information</h2>
@@ -540,7 +560,14 @@ const PersonalAccount = () => {
         </div>
       </div>
 
-
+      {/* Floating return button inside Personal Account */}
+      <button
+        className={`floating-return ${showReturn ? 'visible' : ''}`}
+        onClick={scrollToTop}
+        aria-label="Return to top"
+      >
+        ↑
+      </button>
     </div>
   );
 };

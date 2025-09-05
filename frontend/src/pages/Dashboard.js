@@ -10,11 +10,20 @@ const Dashboard = () => {
   const [filterRole, setFilterRole] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const [showReturn, setShowReturn] = useState(false);
 
   // Load real projects from API
   useEffect(() => {
     loadProjects();
     loadCurrentUser();
+    const onScroll = () => {
+      const content = document.querySelector('.content-body');
+      const scrollTop = content ? content.scrollTop : (window.pageYOffset || document.documentElement.scrollTop);
+      setShowReturn(scrollTop > 100);
+    };
+    (window).addEventListener('scroll', onScroll);
+    onScroll();
+    return () => (window).removeEventListener('scroll', onScroll);
   }, []);
 
   const loadCurrentUser = () => {
@@ -119,6 +128,12 @@ const Dashboard = () => {
 
   const handleProjectClick = (projectId) => {
     navigate(`/project/${projectId}`);
+  };
+
+  const scrollToTop = () => {
+    const content = document.querySelector('.content-body');
+    if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -282,6 +297,13 @@ const Dashboard = () => {
           ))
         )}
       </div>
+      <button 
+        className={`floating-return ${showReturn ? 'visible' : ''}`} 
+        onClick={scrollToTop} 
+        aria-label="Return to top"
+      >
+        ↑
+      </button>
     </div>
   );
 };

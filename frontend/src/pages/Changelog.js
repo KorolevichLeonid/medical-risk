@@ -4,6 +4,7 @@ import './Changelog.css';
 
 const Changelog = () => {
     const [projects, setProjects] = useState([]);
+    const [showReturn, setShowReturn] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [user, setUser] = useState(null);
@@ -21,6 +22,14 @@ const Changelog = () => {
         }
 
         fetchProjectsChangelog();
+        const onScroll = () => {
+            const content = document.querySelector('.content-body');
+            const scrollTop = content ? content.scrollTop : (window.pageYOffset || document.documentElement.scrollTop);
+            setShowReturn(scrollTop > 100);
+        };
+        (window).addEventListener('scroll', onScroll);
+        onScroll();
+        return () => (window).removeEventListener('scroll', onScroll);
     }, []);
 
     const fetchProjectsChangelog = async () => {
@@ -235,6 +244,14 @@ const Changelog = () => {
                     </div>
                 </div>
             )}
+
+            <button
+                className={`floating-return ${showReturn ? 'visible' : ''}`}
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                aria-label="Return to top"
+            >
+                ↑
+            </button>
         </div>
     );
 };
