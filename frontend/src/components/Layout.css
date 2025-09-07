@@ -27,8 +27,8 @@
 }
 
 .user-avatar {
-  width: 120px; /* match right avatar */
-  height: 120px;
+  width: 160px; /* match profile header avatar visually */
+  height: 160px;
   background-color: transparent;
   border-radius: 50%;
   display: flex;
@@ -72,7 +72,7 @@
 
 .user-info {
   text-align: center;
-  margin-top: 8px;
+  margin-top: 1px; /* push nickname down */
   margin-bottom: 15px;
 }
 

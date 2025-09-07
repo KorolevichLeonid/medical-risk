@@ -284,19 +284,23 @@
 
 .project-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  flex: 0 0 50%; /* occupy half of the white footer strip */
+  justify-content: space-between;
 }
 
 .action-btn {
   background-color: #D9D9D9;
   border: none;
-  border-radius: 20px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: 30px;
+  padding: 16px 0; /* taller button, width via flex */
+  font-size: 16px;
+  font-weight: 700;
   color: #131313;
   cursor: pointer;
   transition: background-color 0.2s;
+  flex: 1; /* each button takes half of the 50% area */
+  text-align: center;
 }
 
 .action-btn:hover {

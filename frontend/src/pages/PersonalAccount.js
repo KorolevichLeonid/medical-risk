@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './PersonalAccount.css';
 
 const PersonalAccount = () => {
@@ -7,6 +8,7 @@ const PersonalAccount = () => {
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -168,20 +170,20 @@ const PersonalAccount = () => {
 
       if (response.ok) {
         const updatedUser = await response.json();
-        // Обновляем localStorage
+        // Update localStorage
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        // Перезагружаем данные пользователя и статистику
+        // Reload user data and statistics
         loadUserData();
         loadStatistics();
         setIsEditing(false);
-        alert('Профиль успешно обновлен!');
+        alert('Profile updated successfully!');
       } else {
         console.error('Failed to update profile:', response.status);
-        alert('Ошибка при обновлении профиля');
+        alert('Error updating profile');
       }
     } catch (error) {
       console.error('Failed to update profile:', error);
-      alert('Ошибка соединения с сервером');
+      alert('Server connection error');
     }
   };
 
@@ -369,6 +371,13 @@ const PersonalAccount = () => {
               </div>
 
               <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsEditing(false)}
+                >
+                  Cancel
+                </button>
                 <button type="submit" className="btn btn-primary">
                   Save Changes
                 </button>
@@ -422,28 +431,21 @@ const PersonalAccount = () => {
               {user.role === 'SYS_ADMIN' ? (
                 // Sys Admin Statistics
                 <>
-                  <div className="stat-card">
+                  <div className="stat-card clickable" onClick={() => navigate('/dashboard')}>
                     <div className="stat-icon">📊</div>
                     <div className="stat-info">
                       <div className="stat-number">{statistics.total_projects}</div>
                       <div className="stat-label">Total Projects</div>
                     </div>
                   </div>
-                  <div className="stat-card">
+                  <div className="stat-card clickable" onClick={() => navigate('/roles')}>
                     <div className="stat-icon">👥</div>
                     <div className="stat-info">
                       <div className="stat-number">{statistics.total_users}</div>
                       <div className="stat-label">Total Users</div>
                     </div>
                   </div>
-                  <div className="stat-card">
-                    <div className="stat-icon">⚠️</div>
-                    <div className="stat-info">
-                      <div className="stat-number">{statistics.total_risk_analyses}</div>
-                      <div className="stat-label">Total Risks Analyzed</div>
-                    </div>
-                  </div>
-                  <div className="stat-card">
+                  <div className="stat-card clickable" onClick={() => navigate('/dashboard')}>
                     <div className="stat-icon">🚀</div>
                     <div className="stat-info">
                       <div className="stat-number">{statistics.active_projects}</div>
@@ -454,18 +456,11 @@ const PersonalAccount = () => {
               ) : (
                 // User Statistics
                 <>
-                  <div className="stat-card">
+                  <div className="stat-card clickable" onClick={() => navigate('/dashboard')}>
                     <div className="stat-icon">📊</div>
                     <div className="stat-info">
                       <div className="stat-number">{statistics.user_projects}</div>
                       <div className="stat-label">My Projects</div>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-icon">⚠️</div>
-                    <div className="stat-info">
-                      <div className="stat-number">{statistics.user_risk_analyses}</div>
-                      <div className="stat-label">My Risks Analyzed</div>
                     </div>
                   </div>
                   <div className="stat-card">
@@ -542,22 +537,7 @@ const PersonalAccount = () => {
           )}
         </div>
 
-        {/* Recent Activity */}
-        <div className="activity-section">
-          <h2>Recent Activity</h2>
-          <div className="activity-list">
-            {user.recentActivity.map(activity => (
-              <div key={activity.id} className="activity-item">
-                <div className="activity-content">
-                  <div className="activity-action">{activity.action}</div>
-                  <div className="activity-time">
-                    {new Date(activity.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Recent Activity removed as requested */}
       </div>
 
       {/* Floating return button inside Personal Account */}

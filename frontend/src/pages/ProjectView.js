@@ -231,12 +231,12 @@ const ProjectView = () => {
 
   const getProjectRoleBadge = (role) => {
     const roleConfig = {
-      admin: { label: 'Админ проекта', className: 'project-role-admin' },
-      manager: { label: 'Менеджер', className: 'project-role-manager' },
-      doctor: { label: 'Доктор', className: 'project-role-doctor' }
+      admin: { label: 'Project Admin', className: 'project-role-admin' },
+      manager: { label: 'Manager', className: 'project-role-manager' },
+      doctor: { label: 'Doctor', className: 'project-role-doctor' }
     };
     
-    const config = roleConfig[role] || { label: 'Участник', className: 'project-role-member' };
+    const config = roleConfig[role] || { label: 'Member', className: 'project-role-member' };
     return <span className={`project-role-badge ${config.className}`}>{config.label}</span>;
   };
 
@@ -449,7 +449,7 @@ const ProjectView = () => {
                   <button 
                     className="remove-member-btn"
                     onClick={() => handleRemoveMember(member.id)}
-                    title="Удалить из проекта"
+                    title="Remove from project"
                   >
                     ×
                   </button>
@@ -463,36 +463,15 @@ const ProjectView = () => {
               className="add-member-btn"
               onClick={() => setShowAddMember(true)}
             >
-              ➕ Добавить участника
+              ➕ Add member
             </button>
           )}
         </div>
 
-        {/* Recent Activity */}
-        <div className="activity-section">
-          <h3>Recent Activity</h3>
-          <div className="activity-list">
-            {project.recentActivity.map(activity => (
-              <div key={activity.id} className="activity-item">
-                <div className={`activity-icon ${activity.type}`}>
-                  {activity.type === 'update' && '📝'}
-                  {activity.type === 'team' && '👥'}
-                  {activity.type === 'approval' && '✅'}
-                  {activity.type === 'risk' && '⚠️'}
-                </div>
-                <div className="activity-content">
-                  <div className="activity-action">{activity.action}</div>
-                  <div className="activity-meta">
-                    by {activity.user} • {new Date(activity.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Recent Activity removed as requested */}
       </div>
 
-      {/* Project Metadata */}
+      {/* Metadata */}
       <div className="metadata-section">
         <div className="metadata-item">
           <label>Created:</label>
@@ -509,7 +488,7 @@ const ProjectView = () => {
         <div className="modal-overlay" onClick={() => setShowAddMember(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Добавить участника проекта</h2>
+              <h2>Add project member</h2>
               <button 
                 className="close-btn"
                 onClick={() => setShowAddMember(false)}
@@ -520,13 +499,13 @@ const ProjectView = () => {
             
             <div className="modal-body">
               <div className="form-group">
-                <label>Выберите пользователя</label>
+                <label>Select user</label>
                 <select
                   value={selectedUser}
                   onChange={(e) => setSelectedUser(e.target.value)}
                   className="form-select"
                 >
-                  <option value="">Выберите пользователя...</option>
+                  <option value="">Select a user...</option>
                   {availableUsers
                     .filter(user => !project.team.some(member => member.id === user.id))
                     .map(user => (
@@ -539,18 +518,18 @@ const ProjectView = () => {
               </div>
               
               <div className="form-group">
-                <label>Роль в проекте</label>
+                <label>Project role</label>
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
                   className="form-select"
                 >
-                  <option value="doctor">Доктор - управление рисками</option>
-                  <option value="manager">Менеджер - управление проектом и пользователями</option>
+                  <option value="doctor">Doctor - risk management</option>
+                  <option value="manager">Manager - project and users management</option>
                 </select>
                 <small className="role-description">
-                  {selectedRole === 'doctor' && 'Может добавлять, редактировать и удалять риски'}
-                  {selectedRole === 'manager' && 'Может редактировать проект и управлять участниками'}
+                  {selectedRole === 'doctor' && 'Can add, edit and delete risks'}
+                  {selectedRole === 'manager' && 'Can edit project and manage members'}
                 </small>
               </div>
             </div>
@@ -561,7 +540,7 @@ const ProjectView = () => {
                 className="btn btn-secondary" 
                 onClick={() => setShowAddMember(false)}
               >
-                Отмена
+                Cancel
               </button>
               <button 
                 type="button" 
@@ -569,12 +548,25 @@ const ProjectView = () => {
                 onClick={handleAddMember}
                 disabled={!selectedUser || addingMember}
               >
-                {addingMember ? 'Добавление...' : 'Добавить участника'}
+                {addingMember ? 'Adding...' : 'Add member'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Floating return button like Personal Account */}
+      <button
+        className={`floating-return visible`}
+        onClick={() => {
+          const content = document.querySelector('.content-body');
+          if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+          else window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        aria-label="Return to top"
+      >
+        ↑
+      </button>
     </div>
   );
 };

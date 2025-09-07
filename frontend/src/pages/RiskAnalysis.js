@@ -902,6 +902,21 @@ const RiskAnalysis = () => {
           </div>
         </div>
       )}
+
+      {/* Floating return button like Personal Account (hidden when any modal is open) */}
+      {!showAddRisk && !showEditRisk && !showViewRisk && (
+        <button
+          className={`floating-return visible`}
+          onClick={() => {
+            const content = document.querySelector('.content-body');
+            if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+            else window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          aria-label="Return to top"
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 };

@@ -87,7 +87,7 @@ const Layout = ({ children }) => {
           </div>
           <div className="user-info">
             <h3>{user?.name || 'Loading...'}</h3>
-            <p>Role: {user?.role || 'Роль не назначена'}</p>
+            <p>Role: {user?.role || 'Role not set'}</p>
           </div>
           <button className="change-account-btn" onClick={handleLogout}>Logout</button>
         </div>

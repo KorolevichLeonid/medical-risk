@@ -61,7 +61,7 @@ const ChangelogDetail = () => {
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleString('ru-RU', {
+        return date.toLocaleString('en-GB', {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
@@ -70,6 +70,21 @@ const ChangelogDetail = () => {
             minute: '2-digit',
             second: '2-digit'
         });
+    };
+
+    const translateRuToEn = (text) => {
+        if (!text || typeof text !== 'string') return text;
+        const replacements = [
+            [/(Обновлен|Обновлён) проект/gi, 'Project updated'],
+            [/(Изменен|Изменён) статус проекта/gi, 'Project status changed'],
+            [/Изменены поля:/gi, 'Changed fields:'],
+            [/Создан риск/gi, 'Risk created'],
+            [/(Обновлен|Обновлён) риск/gi, 'Risk updated'],
+            [/Создан проект/gi, 'Project created'],
+            [/Создан новый проект/gi, 'New project created'],
+            [/в проекте/gi, 'in project'],
+        ];
+        return replacements.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), text);
     };
 
     const renderValueComparison = (oldValues, newValues) => {
@@ -97,8 +112,8 @@ const ChangelogDetail = () => {
 
         return (
             <div className="value-comparison">
-                {renderObject(oldValues, 'Старые значения')}
-                {renderObject(newValues, 'Новые значения')}
+                {renderObject(oldValues, 'Old values')}
+                {renderObject(newValues, 'New values')}
             </div>
         );
     };
@@ -108,7 +123,7 @@ const ChangelogDetail = () => {
 
         return (
             <div className="metadata-section">
-                <h4>Дополнительная информация</h4>
+                <h4>Additional information</h4>
                 <div className="metadata-content">
                     {Object.entries(metadata).map(([key, value]) => (
                         <div key={key} className="metadata-item">
@@ -126,7 +141,7 @@ const ChangelogDetail = () => {
     if (loading) {
         return (
             <div className="changelog-detail-container">
-                <div className="loading">Загрузка...</div>
+                <div className="loading">Loading...</div>
             </div>
         );
     }
@@ -136,10 +151,10 @@ const ChangelogDetail = () => {
             <div className="changelog-detail-container">
                 <div className="error-message">
                     <div className="error-icon">❌</div>
-                    <h3>Ошибка</h3>
+                    <h3>Error</h3>
                     <p>{error}</p>
                     <button className="back-btn" onClick={handleBack}>
-                        Назад
+                        Back
                     </button>
                 </div>
             </div>
@@ -150,9 +165,9 @@ const ChangelogDetail = () => {
         return (
             <div className="changelog-detail-container">
                 <div className="error-message">
-                    <h3>Запись не найдена</h3>
+                    <h3>Entry not found</h3>
                     <button className="back-btn" onClick={handleBack}>
-                        Назад
+                        Back
                     </button>
                 </div>
             </div>
@@ -163,29 +178,29 @@ const ChangelogDetail = () => {
         <div className="changelog-detail-container">
             <div className="changelog-detail-header">
                 <button className="back-btn" onClick={handleBack}>
-                    ← Назад
+                    ← Back
                 </button>
-                <h1>Детали изменения</h1>
+                <h1>Change details</h1>
             </div>
 
             <div className="changelog-detail-content">
                 <div className="main-info-card">
                     <div className="action-header">
-                        <h2>{changelog.action_display_name}</h2>
+                        <h2>{translateRuToEn(changelog.action_display_name)}</h2>
                         <div className="action-date">{formatDate(changelog.created_at)}</div>
                     </div>
                     
                     <div className="action-description">
-                        <p>{changelog.action_description}</p>
+                        <p>{translateRuToEn(changelog.action_description)}</p>
                     </div>
                 </div>
 
                 <div className="details-grid">
                     <div className="detail-card">
-                        <h3>Информация о пользователе</h3>
+                        <h3>User information</h3>
                         <div className="user-info">
                             <div className="info-item">
-                                <span className="info-label">Имя:</span>
+                                <span className="info-label">Name:</span>
                                 <span className="info-value">{changelog.user_name}</span>
                             </div>
                             <div className="info-item">
@@ -193,12 +208,12 @@ const ChangelogDetail = () => {
                                 <span className="info-value">{changelog.user_email}</span>
                             </div>
                             <div className="info-item">
-                                <span className="info-label">Роль:</span>
+                                <span className="info-label">Role:</span>
                                 <span className="info-value">{changelog.user_role}</span>
                             </div>
                             {changelog.user_position && (
                                 <div className="info-item">
-                                    <span className="info-label">Должность:</span>
+                                    <span className="info-label">Position:</span>
                                     <span className="info-value">{changelog.user_position}</span>
                                 </div>
                             )}
@@ -207,23 +222,23 @@ const ChangelogDetail = () => {
 
                     {(changelog.target_type || changelog.target_name || changelog.project_name) && (
                         <div className="detail-card">
-                            <h3>Информация об объекте</h3>
+                            <h3>Target information</h3>
                             <div className="target-info">
                                 {changelog.target_type && (
                                     <div className="info-item">
-                                        <span className="info-label">Тип объекта:</span>
+                                        <span className="info-label">Target type:</span>
                                         <span className="info-value">{changelog.target_type}</span>
                                     </div>
                                 )}
                                 {changelog.target_name && (
                                     <div className="info-item">
-                                        <span className="info-label">Название:</span>
+                                        <span className="info-label">Name:</span>
                                         <span className="info-value">{changelog.target_name}</span>
                                     </div>
                                 )}
                                 {changelog.project_name && (
                                     <div className="info-item">
-                                        <span className="info-label">Проект:</span>
+                                        <span className="info-label">Project:</span>
                                         <span className="info-value">{changelog.project_name}</span>
                                     </div>
                                 )}
@@ -233,11 +248,11 @@ const ChangelogDetail = () => {
 
                     {(changelog.ip_address || changelog.user_agent) && (
                         <div className="detail-card">
-                            <h3>Техническая информация</h3>
+                            <h3>Technical information</h3>
                             <div className="technical-info">
                                 {changelog.ip_address && (
                                     <div className="info-item">
-                                        <span className="info-label">IP адрес:</span>
+                                        <span className="info-label">IP address:</span>
                                         <span className="info-value">{changelog.ip_address}</span>
                                     </div>
                                 )}
@@ -254,7 +269,7 @@ const ChangelogDetail = () => {
 
                 {(changelog.old_values || changelog.new_values) && (
                     <div className="changes-card">
-                        <h3>Детали изменений</h3>
+                        <h3>Change details</h3>
                         {renderValueComparison(changelog.old_values, changelog.new_values)}
                     </div>
                 )}

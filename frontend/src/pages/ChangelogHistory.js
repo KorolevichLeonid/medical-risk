@@ -98,7 +98,7 @@ const ChangelogHistory = () => {
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleString('ru-RU', {
+        return date.toLocaleString('en-GB', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -107,9 +107,24 @@ const ChangelogHistory = () => {
         });
     };
 
+    const translateRuToEn = (text) => {
+        if (!text || typeof text !== 'string') return text;
+        const replacements = [
+            [/(Обновлен|Обновлён) проект/gi, 'Project updated'],
+            [/(Изменен|Изменён) статус проекта/gi, 'Project status changed'],
+            [/Изменены поля:/gi, 'Changed fields:'],
+            [/Создан риск/gi, 'Risk created'],
+            [/(Обновлен|Обновлён) риск/gi, 'Risk updated'],
+            [/Создан проект/gi, 'Project created'],
+            [/Создан новый проект/gi, 'New project created'],
+            [/в проекте/gi, 'in project'],
+        ];
+        return replacements.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), text);
+    };
+
     const formatDateShort = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('ru-RU', {
+        return date.toLocaleDateString('en-GB', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
@@ -121,11 +136,11 @@ const ChangelogHistory = () => {
             <div className="changelog-history-container">
                 <div className="changelog-history-header">
                     <button className="back-btn" onClick={handleBackToChangelog}>
-                        ← Назад к Changelog
+                        ← Back to Changelog
                     </button>
-                    <h1>История изменений</h1>
+                    <h1>Change history</h1>
                 </div>
-                <div className="loading">Загрузка...</div>
+                <div className="loading">Loading...</div>
             </div>
         );
     }
@@ -135,13 +150,13 @@ const ChangelogHistory = () => {
             <div className="changelog-history-container">
                 <div className="changelog-history-header">
                     <button className="back-btn" onClick={handleBackToChangelog}>
-                        ← Назад к Changelog
+                        ← Back to Changelog
                     </button>
-                    <h1>История изменений</h1>
+                    <h1>Change history</h1>
                 </div>
                 <div className="error-message">
                     <div className="error-icon">❌</div>
-                    <h3>Ошибка</h3>
+                    <h3>Error</h3>
                     <p>{error}</p>
                 </div>
             </div>
@@ -152,14 +167,14 @@ const ChangelogHistory = () => {
         <div className="changelog-history-container">
             <div className="changelog-history-header">
                 <button className="back-btn" onClick={handleBackToChangelog}>
-                    ← Назад к Changelog
+                    ← Back to Changelog
                 </button>
                 <div className="header-content">
-                    <h1>История изменений</h1>
+                    <h1>Change history</h1>
                     {project && (
-                        <p className="project-name">Проект: {project.name}</p>
+                        <p className="project-name">Project: {project.name}</p>
                     )}
-                    <p className="total-changes">Всего изменений: {total}</p>
+                    <p className="total-changes">Total changes: {total}</p>
                 </div>
             </div>
 
@@ -185,7 +200,7 @@ const ChangelogHistory = () => {
                                 
                                 <div className="timeline-content">
                                     <div className="change-header">
-                                        <h3 className="change-action">{change.action_display_name}</h3>
+                                        <h3 className="change-action">{translateRuToEn(change.action_display_name)}</h3>
                                         <span className="change-date">{formatDate(change.created_at)}</span>
                                     </div>
                                     
@@ -195,18 +210,18 @@ const ChangelogHistory = () => {
                                             <span className="user-role">({change.user_role})</span>
                                         </div>
                                         
-                                        <p className="change-description">{change.action_description}</p>
+                                        <p className="change-description">{translateRuToEn(change.action_description)}</p>
                                         
                                         {change.target_name && (
                                             <div className="change-target">
-                                                <span className="target-label">Объект:</span>
+                                                <span className="target-label">Target:</span>
                                                 <span className="target-name">{change.target_name}</span>
                                             </div>
                                         )}
                                     </div>
                                     
                                     <div className="view-details-hint">
-                                        <span>Нажмите для просмотра деталей →</span>
+                                        <span>Click to view details →</span>
                                     </div>
                                 </div>
                             </div>

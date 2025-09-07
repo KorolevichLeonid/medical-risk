@@ -63,7 +63,7 @@ const Changelog = () => {
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleString('ru-RU', {
+        return date.toLocaleString('en-GB', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -85,11 +85,11 @@ const Changelog = () => {
 
     const getStatusText = (status) => {
         const statusTexts = {
-            'draft': 'Черновик',
-            'in_progress': 'В работе',
-            'review': 'На проверке',
-            'completed': 'Завершен',
-            'archived': 'Архив'
+            'draft': 'Draft',
+            'in_progress': 'In progress',
+            'review': 'Under review',
+            'completed': 'Completed',
+            'archived': 'Archived'
         };
         return statusTexts[status] || status;
     };
@@ -103,13 +103,28 @@ const Changelog = () => {
         navigate(`/changelog/change/${changeId}`);
     };
 
+    const translateRuToEn = (text) => {
+        if (!text || typeof text !== 'string') return text;
+        const replacements = [
+            [/(Обновлен|Обновлён) проект/gi, 'Project updated'],
+            [/(Изменен|Изменён) статус проекта/gi, 'Project status changed'],
+            [/Изменены поля:/gi, 'Changed fields:'],
+            [/Создан риск/gi, 'Risk created'],
+            [/(Обновлен|Обновлён) риск/gi, 'Risk updated'],
+            [/Создан проект/gi, 'Project created'],
+            [/Создан новый проект/gi, 'New project created'],
+            [/в проекте/gi, 'in project'],
+        ];
+        return replacements.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), text);
+    };
+
     if (loading) {
         return (
             <div className="changelog-container">
                 <div className="changelog-header">
                     <h1>Changelog</h1>
                 </div>
-                <div className="loading">Загрузка...</div>
+                <div className="loading">Loading...</div>
             </div>
         );
     }
@@ -122,9 +137,9 @@ const Changelog = () => {
                 </div>
                 <div className="error-message">
                     <div className="error-icon">🚫</div>
-                    <h3>Доступ запрещен</h3>
+                    <h3>Access denied</h3>
                     <p>{error}</p>
-                    <p>Вы можете просматривать только логи созданных вами проектов.</p>
+                    <p>You can only view logs of the projects you created.</p>
                 </div>
             </div>
         );
@@ -136,8 +151,8 @@ const Changelog = () => {
                 <h1>Changelog</h1>
                 <p>
                     {user?.role === 'SYS_ADMIN' 
-                        ? 'История изменений по всем проектам системы'
-                        : 'История изменений по вашим проектам'
+                        ? 'Change history for all system projects'
+                        : 'Change history for your projects'
                     }
                 </p>
             </div>
@@ -157,10 +172,10 @@ const Changelog = () => {
                                 <div className="project-details">
                                     <h3 className="project-name">{project.project_name}</h3>
                                     <p className="project-description">
-                                        {project.project_description || 'Описание проекта отсутствует'}
+                                        {project.project_description || 'No project description'}
                                     </p>
                                     <div className="project-device">
-                                        <span className="device-label">Устройство:</span>
+                                        <span className="device-label">Device:</span>
                                         <span className="device-name">{project.device_name}</span>
                                     </div>
                                     <div className="project-meta">
@@ -174,11 +189,11 @@ const Changelog = () => {
                                         </div>
                                         <div className="project-stats">
                                             <div className="stat-item">
-                                                <span className="stat-label">Участников:</span>
+                                                <span className="stat-label">Members:</span>
                                                 <span className="stat-value">{project.members_count}</span>
                                             </div>
                                             <div className="stat-item">
-                                                <span className="stat-label">Обновлено:</span>
+                                                <span className="stat-label">Updated:</span>
                                                 <span className="stat-value">{formatDate(project.last_updated)}</span>
                                             </div>
                                         </div>
@@ -188,11 +203,11 @@ const Changelog = () => {
                         </div>
 
                         <div className="project-changelog">
-                            <h4>Последние изменения</h4>
+                            <h4>Recent changes</h4>
                             <div className="recent-changes">
                                 {project.recent_changes.length === 0 ? (
                                     <div className="no-changes">
-                                        <p>Изменений пока нет</p>
+                                        <p>No changes yet</p>
                                     </div>
                                 ) : (
                                     <div className="changes-list">
@@ -207,7 +222,7 @@ const Changelog = () => {
                                                         <span className="user-name">{change.user_name}</span>
                                                         <span className="user-role">({change.user_role})</span>
                                                     </div>
-                                                    <div className="change-action">{change.action_display_name}</div>
+                                                    <div className="change-action">{translateRuToEn(change.action_display_name)}</div>
                                                     <div className="change-time">{formatDate(change.created_at)}</div>
                                                 </div>
                                             </div>
@@ -222,7 +237,7 @@ const Changelog = () => {
                                         className="view-history-btn"
                                         onClick={() => handleViewFullHistory(project.project_id)}
                                     >
-                                        Посмотреть историю изменений ({project.total_changes})
+                                        View change history ({project.total_changes})
                                     </button>
                                 </div>
                             )}
@@ -234,11 +249,11 @@ const Changelog = () => {
             {projects.length === 0 && (
                 <div className="no-projects">
                     <div className="no-projects-message">
-                        <h3>Проекты для просмотра логов не найдены</h3>
+                        <h3>No projects available for logs</h3>
                         <p>
                             {user?.role === 'SYS_ADMIN' 
-                                ? 'В системе пока нет проектов с изменениями.'
-                                : 'У вас нет прав администратора ни в одном проекте. Логи доступны только администраторам проектов.'
+                                ? 'There are no projects with changes in the system.'
+                                : 'You do not have admin rights in any project. Logs are only available to project admins.'
                             }
                         </p>
                     </div>

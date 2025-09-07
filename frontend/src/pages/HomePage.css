@@ -687,6 +687,10 @@
 }
 
 /* Стили для второго экрана */
+.why-us-content {
+  padding-right: 40px; /* align right spacing with first screen */
+  padding-left: 40px; /* align left start with first screen */
+}
 .why-us-title {
   font-size: 96px;
   font-weight: 700;

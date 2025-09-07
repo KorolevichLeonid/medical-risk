@@ -18,9 +18,9 @@ export default function ProtectedPage() {
 
   return (
     <div>
-      <h1>Защищённая страница</h1>
-      <p>Добро пожаловать, {account.name}</p>
-      <p>Почта: {account.username}</p>
+      <h1>Protected page</h1>
+      <p>Welcome, {account.name}</p>
+      <p>Email: {account.username}</p>
     </div>
   );
 }

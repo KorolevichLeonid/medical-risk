@@ -29,15 +29,20 @@
 
 /* Header */
 .management-header {
-  background: white;
-  border-radius: 15px;
-  padding: 30px;
+  background: transparent; /* remove white background */
+  border-radius: 0;
+  padding: 0 0 20px 0; /* compact spacing */
   margin-bottom: 30px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  box-shadow: none; /* remove shadow */
+  display: block !important; /* force stacking */
 }
+.management-header .header-content {
+  display: block;           /* stack */
+  text-align: left;
+  padding-left: 25px;       /* align with inner padding of cards */
+}
+.management-header .header-content h1 { margin: 0 0 6px 0; }
+.management-header .header-content p { margin: 0; }
 
 .header-content h1 {
   font-size: 32px;
@@ -49,7 +54,7 @@
 .header-content p {
   font-size: 18px;
   color: #4A4A4A;
-  margin: 0;
+  margin: 6px 0 0 0; /* place under title */
 }
 
 .btn {
@@ -239,12 +244,16 @@
 
 .user-details {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* center name and role for consistency */
 }
 
 .user-name {
   font-weight: 600;
   color: #131313;
   margin-bottom: 2px;
+  text-align: center;
 }
 
 .user-id {
@@ -652,6 +661,7 @@
 .user-meta {
   display: flex;
   align-items: center;
+  justify-content: center; /* center the role badge under the name */
   gap: 8px;
   margin-top: 4px;
 }

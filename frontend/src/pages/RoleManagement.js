@@ -5,6 +5,7 @@ const RoleManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
   const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [selectedUserProjects, setSelectedUserProjects] = useState([]);
@@ -92,27 +93,33 @@ const RoleManagement = () => {
       user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const roleIsAll = filterRole === 'all';
+    const matchesSystemRole = user.systemRole === filterRole;
+    const matchesProjectRole = (user.projects || []).some(p => p.role === filterRole);
+
+    const matchesRole = roleIsAll || matchesSystemRole || matchesProjectRole;
     
-    return matchesSearch;
+    return matchesSearch && matchesRole;
   });
 
   const getSystemRoleBadge = (role) => {
     if (!role) return null; // Don't show system role for regular users
     
     const roleConfig = {
-      SYS_ADMIN: { label: 'Системный администратор', className: 'role-sys-admin' },
-      USER: { label: 'Пользователь', className: 'role-user' },
+      SYS_ADMIN: { label: 'System Administrator', className: 'role-sys-admin' },
+      USER: { label: 'User', className: 'role-user' },
     };
     
-    const config = roleConfig[role] || { label: 'Пользователь', className: 'role-user' };
+    const config = roleConfig[role] || { label: 'User', className: 'role-user' };
     return <span className={`role-badge ${config.className}`}>{config.label}</span>;
   };
 
   const getProjectRoleBadge = (role) => {
     const roleConfig = {
-      admin: { label: 'Админ', className: 'project-role-admin' },
-      manager: { label: 'Менеджер', className: 'project-role-manager' },
-      doctor: { label: 'Врач', className: 'project-role-doctor' }
+      admin: { label: 'Admin', className: 'project-role-admin' },
+      manager: { label: 'Manager', className: 'project-role-manager' },
+      doctor: { label: 'Doctor', className: 'project-role-doctor' }
     };
     
     const config = roleConfig[role] || { label: role, className: 'project-role-unknown' };
@@ -125,7 +132,7 @@ const RoleManagement = () => {
   };
   const renderProjectsColumn = (user) => {
     if (!user.projects || user.projects.length === 0) {
-      return <span className="no-projects">Нет проектов</span>;
+      return <span className="no-projects">No projects</span>;
     }
 
     const visibleProjects = user.projects.slice(0, 3);
@@ -153,7 +160,7 @@ const RoleManagement = () => {
   };
 
   const handlePromoteToAdmin = async (userId) => {
-    if (!window.confirm('Повысить пользователя до системного администратора?')) {
+    if (!window.confirm('Promote user to System Administrator?')) {
       return;
     }
 
@@ -172,14 +179,14 @@ const RoleManagement = () => {
 
       if (response.ok) {
         loadUsers(); // Reload users to get updated data
-        alert('Пользователь успешно повышен до системного администратора');
+        alert('User successfully promoted to System Administrator');
       } else {
         const errorData = await response.json();
-        alert(`Ошибка: ${errorData.detail || 'Неизвестная ошибка'}`);
+        alert(`Error: ${errorData.detail || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Failed to promote user:', error);
-      alert('Ошибка соединения с сервером');
+      alert('Server connection error');
     }
   };
 
@@ -188,7 +195,7 @@ const RoleManagement = () => {
       <div className="role-management">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Загрузка пользователей...</p>
+          <p>Loading users...</p>
         </div>
       </div>
     );
@@ -199,31 +206,31 @@ const RoleManagement = () => {
       {/* Header */}
       <div className="management-header">
         <div className="header-content">
-          <h1>Управление пользователями</h1>
+          <h1>User Management</h1>
           <p>
             {currentUser?.role === 'SYS_ADMIN' 
-              ? 'Просмотр всех пользователей системы и их ролей в проектах'
-              : 'Участники ваших проектов'
+              ? 'View all users and their roles in projects'
+              : 'Members of your projects'
             }
           </p>
         </div>
       </div>
 
-      {/* User Statistics - только для SYS_ADMIN */}
+      {/* User Statistics - only for SYS_ADMIN */}
       {currentUser?.role === 'SYS_ADMIN' && (
         <div className="user-stats">
           <div className="stat-card">
             <div className="stat-number">{users.length}</div>
-            <div className="stat-label">Всего пользователей</div>
+            <div className="stat-label">Total users</div>
           </div>
 
           <div className="stat-card">
             <div className="stat-number">{users.filter(u => u.systemRole === 'SYS_ADMIN').length}</div>
-            <div className="stat-label">Сис админов</div>
+            <div className="stat-label">System admins</div>
           </div>
           <div className="stat-card">
             <div className="stat-number">{users.filter(u => u.systemRole === 'USER').length}</div>
-            <div className="stat-label">Пользователей</div>
+            <div className="stat-label">Users</div>
           </div>
         </div>
       )}
@@ -233,11 +240,26 @@ const RoleManagement = () => {
         <div className="search-section">
           <input
             type="text"
-            placeholder="Поиск пользователей..."
+            placeholder="Search users..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
+        </div>
+        <div className="filter-section">
+          <label>Role</label>
+          <select
+            className="filter-select"
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value)}
+          >
+            <option value="all">All roles</option>
+            <option value="SYS_ADMIN">System admin</option>
+            <option value="USER">System user</option>
+            <option value="admin">Project admin</option>
+            <option value="manager">Project manager</option>
+            <option value="doctor">Project doctor</option>
+          </select>
         </div>
       </div>
 
@@ -246,11 +268,11 @@ const RoleManagement = () => {
         <table className="users-table">
           <thead>
             <tr>
-              <th>Пользователь</th>
+              <th>User</th>
               <th>Email</th>
-              <th>Проекты</th>
-              <th>Последний вход</th>
-              {currentUser?.role === 'SYS_ADMIN' && <th>Действия</th>}
+              <th>Projects</th>
+              <th>Last login</th>
+              {currentUser?.role === 'SYS_ADMIN' && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -274,7 +296,7 @@ const RoleManagement = () => {
                   {renderProjectsColumn(user)}
                 </td>
                 <td className="login-cell">
-                  {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Никогда'}
+                  {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
                 </td>
                 {currentUser?.role === 'SYS_ADMIN' && (
                   <td className="actions-cell">
@@ -282,9 +304,9 @@ const RoleManagement = () => {
                       <button 
                         className="action-btn promote"
                         onClick={() => handlePromoteToAdmin(user.id)}
-                        title="Повысить до системного администратора"
+                        title="Promote to System Administrator"
                       >
-                        ⬆️ Повысить
+                        ⬆️ Promote
                       </button>
                     )}
                   </td>
@@ -298,11 +320,11 @@ const RoleManagement = () => {
       {filteredUsers.length === 0 && (
         <div className="empty-state">
           <div className="empty-icon">👥</div>
-          <h3>Пользователи не найдены</h3>
+          <h3>No users found</h3>
           <p>
             {currentUser?.role === 'SYS_ADMIN' 
-              ? 'Нет пользователей в системе'
-              : 'Нет участников в ваших проектах'
+              ? 'No users in the system'
+              : 'No members in your projects'
             }
           </p>
         </div>
@@ -313,7 +335,7 @@ const RoleManagement = () => {
         <div className="modal-overlay" onClick={() => setShowProjectsModal(false)}>
           <div className="modal-content projects-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Все проекты пользователя</h2>
+              <h2>All user projects</h2>
               <button 
                 className="close-btn"
                 onClick={() => setShowProjectsModal(false)}
@@ -343,7 +365,7 @@ const RoleManagement = () => {
                 className="btn btn-secondary"
                 onClick={() => setShowProjectsModal(false)}
               >
-                Закрыть
+                Close
               </button>
             </div>
           </div>

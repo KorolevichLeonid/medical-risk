@@ -31,12 +31,22 @@
 .analysis-header {
   background: white;
   border-radius: 15px;
-  padding: 30px;
+  padding: 30px 30px 30px 25px; /* align text with inner edge of white block */
   margin-bottom: 30px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start; /* keep left block flush left */
   align-items: center;
+}
+
+/* Ensure header texts align left and stack vertically */
+.analysis-header .header-content {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-left: 0;
+  margin-left: 0; /* align with start of white block */
 }
 
 .header-content h1 {
@@ -55,6 +65,7 @@
 .header-actions {
   display: flex;
   gap: 15px;
+  margin-left: auto; /* push buttons to the far right */
 }
 
 .btn {
@@ -101,7 +112,7 @@
   padding: 25px;
   text-align: center;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  border: 2px solid transparent;
+  border: 2px solid #000000; /* black outline for default (Total Risks) */
   transition: all 0.3s ease;
 }
 
@@ -369,15 +380,16 @@
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+  overflow-y: auto; /* allow page-level scroll, not inside modal */
 }
 
 .modal-content {
   background: white;
   border-radius: 15px;
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
+  width: 70vw; /* wider to fit content vertically */
+  max-width: 1200px;
+  max-height: 56vh; /* ~1.5x smaller vertically */
+  overflow-y: auto; /* scroll inside if still needed */
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
@@ -385,7 +397,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 25px 30px;
+  padding: 20px 24px; /* tighter to save vertical space */
   border-bottom: 1px solid #E8E8E8;
 }
 
@@ -404,6 +416,7 @@
   cursor: pointer;
   padding: 5px;
   transition: color 0.2s;
+  margin-top: 8px; /* place a bit lower so it doesn't overlap */
 }
 
 .close-btn:hover {
@@ -412,20 +425,55 @@
 
 /* Risk Form */
 .risk-form {
-  padding: 30px;
+  padding: 20px; /* tighter */
+  padding-bottom: 24px; /* compact space below form; buttons are fixed */
+}
+
+/* View Risk Details styling */
+.risk-details {
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: 1fr 2fr; /* labels and values */
+  gap: 12px 20px;
+}
+
+.risk-details .detail-row {
+  display: contents; /* let children participate in the grid */
+}
+
+.risk-details .detail-row label {
+  font-weight: 600;
+  color: #131313;
+}
+
+.risk-details .detail-row span {
+  color: #4A4A4A;
+}
+
+/* Compact circular badge for risk score inside the details modal */
+.risk-details .risk-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 700;
+  color: #FFFFFF;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .form-group label {
@@ -455,16 +503,29 @@
 
 .form-group textarea {
   resize: vertical;
-  min-height: 60px;
+  min-height: 48px;
 }
 
 .modal-actions {
   display: flex;
-  gap: 15px;
-  justify-content: flex-end;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #E8E8E8;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  position: fixed; /* float with user */
+  left: 50%;
+  bottom: 10px; /* lowered closer to the bottom */
+  transform: translateX(-50%);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  z-index: 1101; /* above overlay content */
+}
+
+/* Center text inside modal action buttons */
+.risk-analysis .modal-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Responsive Design */
@@ -532,6 +593,27 @@
   
   .modal-actions {
     flex-direction: column;
+  }
+
+  /* On small screens keep modal nearly full width */
+  .modal-content {
+    width: 95vw;
+    max-width: 95vw;
+  }
+}
+
+/* Ensure larger modal specifically on the Risk Analysis page, overriding generic styles */
+.risk-analysis .modal-content {
+  width: 80vw;
+  max-width: 1400px;
+  max-height: 80vh; /* increased size ~2x from previous */
+  overflow-y: auto; /* enable scrolling within the modal */
+}
+
+@media (max-width: 1024px) {
+  .risk-analysis .modal-content {
+    width: 90vw;
+    max-width: 90vw;
   }
 }
 

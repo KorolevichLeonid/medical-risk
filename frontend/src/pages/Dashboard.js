@@ -109,9 +109,9 @@ const Dashboard = () => {
 
   const getRoleBadge = (role) => {
     const roleConfig = {
-      admin: { label: 'Администратор', className: 'role-admin' },
-      manager: { label: 'Менеджер', className: 'role-manager' },
-      doctor: { label: 'Врач', className: 'role-doctor' }
+      admin: { label: 'Admin', className: 'role-admin' },
+      manager: { label: 'Manager', className: 'role-manager' },
+      doctor: { label: 'Doctor', className: 'role-doctor' }
     };
     
     const config = roleConfig[role] || { label: role, className: 'role-unknown' };
@@ -139,9 +139,7 @@ const Dashboard = () => {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>
-          {currentUser?.role === 'SYS_ADMIN' ? 'System Projects Dashboard' : 'My Projects Dashboard'}
-        </h1>
+        <h1>Projects Dashboard</h1>
         <p>
           {currentUser?.role === 'SYS_ADMIN' 
             ? 'Manage all medical device risk analysis projects in the system'
@@ -196,7 +194,7 @@ const Dashboard = () => {
         )}
 
         <Link to="/project/new" className="add-project-btn">
-          ➕ Создать проект
+          ➕ Create project
         </Link>
       </div>
 
