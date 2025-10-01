@@ -547,7 +547,7 @@ const ProjectForm = () => {
               >
                 <option value="temporary">Temporary (≤ 24h)</option>
                 <option value="short_term">Short Term (24h - 30 days)</option>
-                <option value="long_term">Long Term (> 30 days)</option>
+                <option value="long_term">Long Term ( 30 days+)</option>
               </select>
             </div>
           </div>

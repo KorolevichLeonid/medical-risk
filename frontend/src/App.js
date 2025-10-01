@@ -10,6 +10,7 @@ import AuthPage from './pages/AuthPage';
 import AuthErrorPage from './pages/AuthErrorPage';
 import Dashboard from './pages/Dashboard';
 import ProjectView from './pages/ProjectView';
+import ProjectTable from './pages/ProjectTable';
 import ProjectForm from './pages/ProjectForm';
 import RiskAnalysis from './pages/RiskAnalysis';
 import RoleManagement from './pages/RoleManagement';
@@ -67,6 +68,13 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <ProjectView />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/project/:id/table" element={
+          <ProtectedRoute>
+            <Layout>
+              <ProjectTable />
             </Layout>
           </ProtectedRoute>
         } />

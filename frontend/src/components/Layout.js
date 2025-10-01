@@ -109,6 +109,18 @@ const Layout = ({ children }) => {
         {/* Return to site button under Changelog */}
         <button onClick={() => navigate('/')} className="back-btn">Return to site</button>
 
+        {/* Project View toggle button - only on project pages */}
+        {location.pathname.match(/^\/project\/[^\/]+$/) && (
+          <button onClick={() => navigate(`${location.pathname}/table`)} className="back-btn project-table-btn">
+            📊 View as Table
+          </button>
+        )}
+        {location.pathname.includes('/table') && (
+          <button onClick={() => navigate(location.pathname.replace('/table', ''))} className="back-btn project-table-btn">
+            👁️ View Details
+          </button>
+        )}
+
         {/* Support */}
         <div className="support-section">
           <div className="support-icon">?</div>
