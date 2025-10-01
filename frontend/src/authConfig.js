@@ -6,8 +6,8 @@ export const msalConfig = {
     //redirectUri: "http://localhost:3000",
     //postLogoutRedirectUri: "http://localhost:3000"
     // Production URLs (update when deploying):
-    redirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net",
-    postLogoutRedirectUri: "https://brave-grass-08892c503.1.azurestaticapps.net"
+    redirectUri: "https://polite-desert-0c5ab6400.2.azurestaticapps.net",
+    postLogoutRedirectUri: "https://polite-desert-0c5ab6400.2.azurestaticapps.net"
   },
   cache: {
     cacheLocation: "localStorage",
