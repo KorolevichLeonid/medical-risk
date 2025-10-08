@@ -1,0 +1,708 @@
+/* Full screen container */
+.excel-table-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #8b9dc3 0%, #9fa8b4 100%);
+  z-index: 1000;
+}
+
+/* Container */
+.excel-table-container {
+  background: #f8f9fa;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Toolbar */
+.excel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: linear-gradient(to right, #8b9dc3, #9fa8b4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.excel-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.excel-toolbar-left h2 {
+  margin: 0;
+  font-size: 22px;
+  color: white;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.changes-indicator {
+  color: #c62828;
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 4px 12px;
+  border-radius: 20px;
+  animation: blink 1.5s ease-in-out infinite;
+  box-shadow: 0 2px 6px rgba(198, 40, 40, 0.3);
+}
+
+@keyframes blink {
+  0%, 100% { 
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.85);
+  }
+  50% { 
+    opacity: 0.6;
+    background: rgba(198, 40, 40, 0.1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.excel-toolbar-right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Color picker in toolbar */
+.toolbar-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.color-picker-label {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.toolbar-color-option {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-color-option:hover {
+  transform: scale(1.2);
+  border-color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Buttons */
+.excel-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.excel-btn-save {
+  background: linear-gradient(135deg, #4caf50, #45a049);
+  color: white;
+}
+
+.excel-btn-save:hover:not(:disabled) {
+  background: linear-gradient(135deg, #45a049, #3d8b40);
+  box-shadow: 0 6px 12px rgba(76, 175, 80, 0.4);
+  transform: translateY(-2px);
+}
+
+.excel-btn-save:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.excel-btn-close {
+  background: linear-gradient(135deg, #f44336, #da190b);
+  color: white;
+}
+
+.excel-btn-close:hover {
+  background: linear-gradient(135deg, #da190b, #c41700);
+  box-shadow: 0 6px 12px rgba(244, 67, 54, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Tabs */
+.excel-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px;
+  background: white;
+  border-bottom: 3px solid #e0e0e0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #8b9dc3 #f1f1f1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.excel-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.excel-tabs::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.excel-tabs::-webkit-scrollbar-thumb {
+  background: linear-gradient(to right, #8b9dc3, #9fa8b4);
+  border-radius: 10px;
+}
+
+.excel-tabs::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to right, #7a8db0, #8e97a3);
+}
+
+.excel-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  position: relative;
+  font-weight: 500;
+}
+
+.excel-tab:hover {
+  background: #e8e8e8;
+  transform: translateY(-2px);
+}
+
+.excel-tab.active {
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 8px rgba(139, 157, 195, 0.3);
+  transform: translateY(-2px);
+}
+
+.tab-icon {
+  font-size: 16px;
+}
+
+.tab-name {
+  font-size: 14px;
+}
+
+/* Sheet name input */
+.sheet-name-input {
+  padding: 4px 8px;
+  border: 1px solid #1976d2;
+  border-radius: 3px;
+  font-size: 14px;
+  outline: none;
+  min-width: 100px;
+}
+
+/* Add sheet button */
+.add-sheet-btn {
+  border: 2px dashed #8b9dc3 !important;
+  background: rgba(139, 157, 195, 0.05) !important;
+  color: #8b9dc3 !important;
+  padding: 10px 16px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+}
+
+.add-sheet-btn:hover {
+  background: rgba(139, 157, 195, 0.15) !important;
+  border-color: #9fa8b4 !important;
+  color: #9fa8b4 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 8px rgba(139, 157, 195, 0.3) !important;
+}
+
+/* Delete sheet button */
+.delete-sheet-btn {
+  background: linear-gradient(135deg, #f44336, #da190b);
+  color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  padding: 0;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  opacity: 0;
+  box-shadow: 0 2px 6px rgba(244, 67, 54, 0.4);
+}
+
+.excel-tab:hover .delete-sheet-btn {
+  opacity: 1;
+}
+
+.delete-sheet-btn:hover {
+  background: linear-gradient(135deg, #da190b, #c41700);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.6);
+}
+
+/* Table scroll container */
+.excel-table-scroll {
+  flex: 1;
+  overflow: auto;
+  background: white;
+  margin: 0 12px 12px 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Table */
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.excel-table th,
+.excel-table td {
+  border: 1px solid #e0e0e0;
+  padding: 0;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  word-wrap: break-word;
+}
+
+.excel-table th {
+  background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+  font-weight: 600;
+  color: #495057;
+  height: 42px;
+  border-bottom: 2px solid #8b9dc3;
+}
+
+.excel-table td {
+  background: white;
+  min-height: 42px;
+  transition: all 0.2s ease;
+}
+
+.excel-table td.editable:hover {
+  background: #f0f4ff;
+  box-shadow: inset 0 0 0 2px #8b9dc3;
+}
+
+/* Column letters row */
+.column-letters-row {
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4) !important;
+}
+
+.column-letter {
+  text-align: center;
+  font-weight: 700;
+  color: white;
+  padding: 10px !important;
+  min-width: 60px;
+  position: relative !important;
+  cursor: pointer !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.column-letter:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.column-letter-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize !important;
+  background: transparent;
+  z-index: 10;
+}
+
+.column-letter-resizer:hover {
+  background: rgba(25, 118, 210, 0.3);
+}
+
+/* Delete column button */
+.delete-column-btn {
+  background: linear-gradient(135deg, #f44336, #da190b);
+  color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  padding: 0;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 100;
+  box-shadow: 0 2px 6px rgba(244, 67, 54, 0.4);
+}
+
+.column-letter.show-delete .delete-column-btn {
+  display: inline-flex;
+}
+
+.delete-column-btn:hover {
+  background: linear-gradient(135deg, #da190b, #c41700);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.6);
+}
+
+/* Column header */
+.column-header {
+  padding: 8px !important;
+}
+
+.column-header-content {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  padding: 4px;
+}
+
+/* Column label input */
+.column-label-input {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #1976d2;
+  border-radius: 3px;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Row number header */
+.row-number-header {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  text-align: center;
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4) !important;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Row number cell */
+.row-number-cell {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  text-align: center;
+  background: linear-gradient(to right, #f8f9fa, #e9ecef);
+  font-weight: 600;
+  color: #8b9dc3;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.row-number-cell:hover {
+  background: linear-gradient(to right, #e9ecef, #dee2e6);
+}
+
+.row-number-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  position: relative;
+}
+
+/* Row resizer */
+.row-resizer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  cursor: row-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.row-resizer:hover {
+  background: rgba(25, 118, 210, 0.3);
+}
+
+/* Delete row button */
+.delete-row-btn {
+  background: linear-gradient(135deg, #f44336, #da190b);
+  color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  padding: 0;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 100;
+  box-shadow: 0 2px 6px rgba(244, 67, 54, 0.4);
+}
+
+.row-number-cell.show-delete .delete-row-btn {
+  display: inline-flex;
+}
+
+.delete-row-btn:hover {
+  background: linear-gradient(135deg, #da190b, #c41700);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.6);
+}
+
+/* Cell wrapper */
+.excel-cell-wrapper {
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Cell content */
+.excel-cell-content {
+  flex: 1;
+  padding: 8px;
+  cursor: inherit;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Cell input */
+.excel-cell-input {
+  width: 100%;
+  padding: 8px;
+  border: 3px solid #8b9dc3;
+  border-radius: 0;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  min-height: 42px;
+  resize: none;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  background: #f0f4ff;
+  transition: all 0.2s ease;
+}
+
+.excel-cell-input:focus {
+  border-color: #9fa8b4;
+  box-shadow: 0 0 0 3px rgba(139, 157, 195, 0.2);
+}
+
+/* Add column cell */
+.add-column-cell {
+  width: 50px;
+  min-width: 50px;
+  background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.add-column-btn {
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(139, 157, 195, 0.4);
+}
+
+.add-column-btn:hover {
+  background: linear-gradient(135deg, #7a8db0, #8e97a3);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(139, 157, 195, 0.6);
+}
+
+/* Add row button cell */
+.add-row-cell {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  text-align: center;
+  background: linear-gradient(to right, #f8f9fa, #e9ecef);
+  vertical-align: middle;
+  border: 2px solid #e0e0e0;
+}
+
+.add-row-btn-icon {
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  padding: 0;
+  margin: 0 auto;
+  box-shadow: 0 2px 6px rgba(139, 157, 195, 0.4);
+}
+
+.add-row-btn-icon:hover {
+  background: linear-gradient(135deg, #7a8db0, #8e97a3);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(139, 157, 195, 0.6);
+}
+
+/* Loading state */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #8b9dc3;
+}
+
+.loading-spinner {
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #8b9dc3;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 8px rgba(139, 157, 195, 0.2);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Risk level colors */
+.risk-level-low {
+  background-color: #c8e6c9 !important;
+}
+
+.risk-level-medium {
+  background-color: #fff9c4 !important;
+}
+
+.risk-level-high {
+  background-color: #ffccbc !important;
+}
+
+.risk-level-critical {
+  background-color: #ffcdd2 !important;
+}
+
+/* Scrollbar styling */
+.excel-table-scroll::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.excel-table-scroll::-webkit-scrollbar-track {
+  background: #f8f9fa;
+  border-radius: 10px;
+}
+
+.excel-table-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4);
+  border-radius: 10px;
+  border: 3px solid #f8f9fa;
+}
+
+.excel-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #7a8db0, #8e97a3);
+}
+
+.excel-table-scroll::-webkit-scrollbar-corner {
+  background: #f8f9fa;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .excel-table-container {
+    width: 100%;
+    height: 95vh;
+  }
+
+  .excel-toolbar {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .excel-toolbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+

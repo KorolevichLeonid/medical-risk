@@ -21,30 +21,30 @@ def create_admin_user():
         # Check if any admin user exists
         admin_count = db.query(User).filter(User.role == UserRole.SYS_ADMIN).count()
         if admin_count == 0:
-            print("⚠️  No system administrator found!")
+            print("[!] No system administrator found!")
             print("   After first Azure login, manually assign sys_admin role:")
             print("   UPDATE users SET role = 'sys_admin' WHERE email = 'your-admin-email@domain.com';")
         else:
-            print(f"ℹ️  Found {admin_count} system administrator(s)")
+            print(f"[i] Found {admin_count} system administrator(s)")
     finally:
         db.close()
 
 
 def init_database():
     """Initialize the database with tables and sample data"""
-    print("🔧 Initializing database...")
+    print("[*] Initializing database...")
     
     # Create tables
     create_tables()
-    print("✅ Database tables created")
+    print("[+] Database tables created")
     
     # Check admin user status (Azure auth system)
     create_admin_user()
     
     # Users are created automatically through Azure authentication
-    print("ℹ️ Users will be created automatically through Azure authentication")
+    print("[i] Users will be created automatically through Azure authentication")
     
-    print("🎉 Database initialization completed!")
+    print("[+] Database initialization completed!")
 
 
 if __name__ == "__main__":
