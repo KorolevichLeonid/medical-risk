@@ -185,7 +185,7 @@ const ProjectView = () => {
   const loadAvailableUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/users/', {
+      const response = await fetch('http://localhost:8000/api/users/project-members/selectable', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -193,18 +193,14 @@ const ProjectView = () => {
 
       if (response.ok) {
         const usersData = await response.json();
-        const formattedUsers = usersData
-          .filter(user => user.is_active)
-          .map(user => ({
-            id: user.id,
-            name: `${user.first_name} ${user.last_name}`.trim() || user.email,
-            email: user.email,
-            role: user.role
-          }));
-        setAvailableUsers(formattedUsers);
+        setAvailableUsers(usersData); // Data is already formatted correctly
+      } else {
+        console.error('Failed to load users:', response.status);
+        setAvailableUsers([]);
       }
     } catch (error) {
       console.error('Failed to load users:', error);
+      setAvailableUsers([]);
     }
   };
 

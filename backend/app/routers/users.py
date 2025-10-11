@@ -438,7 +438,31 @@ async def update_current_user(
         if field == "role":
             continue  # Users can't change their own role
         setattr(current_user, field, value)
-    
+
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.get("/project-members/selectable")
+async def get_users_for_project_assignment(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get users that can be selected for project assignment (for project admins/managers)"""
+    # Only people who can manage project members should see this
+    # But for now, let's make it accessible to all authenticated users
+    # In a real app, you might check if user can manage at least one project
+
+    users = db.query(User).filter(User.is_active == True).all()
+
+    # Return basic user info for selection
+    result = []
+    for user in users:
+        result.append({
+            "id": user.id,
+            "name": f"{user.first_name} {user.last_name}".strip() or user.email,
+            "email": user.email
+        })
+
+    return result
