@@ -73,10 +73,33 @@ async def verify_azure_token(token: str) -> Dict[str, Any]:
         unverified_payload = jwt.get_unverified_claims(token)
         print(f"Token payload: {unverified_payload}")
         
+        # Extract email and clean it (remove domain part and decode if needed)
+        raw_email = (unverified_payload.get("email") or
+                    unverified_payload.get("preferred_username") or
+                    unverified_payload.get("upn"))
+
+        # Remove domain part (everything after @)
+        if raw_email and "@" in raw_email:
+            clean_email = raw_email.split("@")[0]
+            # Try to decode if it looks like base64 or UUID
+            if len(clean_email) > 0:
+                # Check if it's a UUID-like string (contains hyphens and looks like UUID)
+                if "-" in clean_email:
+                    try:
+                        # If it can be decoded as base64, do it
+                        import base64
+                        decoded = base64.b64decode(clean_email + "==").decode('utf-8')
+                        clean_email = decoded
+                    except:
+                        # If not base64, keep as is
+                        pass
+        else:
+            clean_email = raw_email
+
         # Extract user information
         user_info = {
             "object_id": unverified_payload.get("sub") or unverified_payload.get("oid") or "test-azure-id",
-            "email": unverified_payload.get("email") or unverified_payload.get("preferred_username") or unverified_payload.get("upn"),
+            "email": clean_email,
             "first_name": unverified_payload.get("given_name", ""),
             "last_name": unverified_payload.get("family_name", ""),
             "name": unverified_payload.get("name", ""),

@@ -19,19 +19,37 @@ async def verify_azure_token_mock(token: str) -> Dict[str, Any]:
         unverified_payload = jwt.get_unverified_claims(token)
         print(f"Token payload keys: {list(unverified_payload.keys())}")
         
-        # Extract user information with better fallbacks
-        email = (unverified_payload.get("email") or 
-                unverified_payload.get("preferred_username") or 
-                unverified_payload.get("upn") or 
-                unverified_payload.get("unique_name"))
-        
-        object_id = (unverified_payload.get("oid") or 
-                    unverified_payload.get("sub") or 
-                    f"mock-{hash(email or 'fallback')}")
-        
+        # Extract email and clean it (remove domain part and decode if needed)
+        raw_email = (unverified_payload.get("email") or
+                    unverified_payload.get("preferred_username") or
+                    unverified_payload.get("upn") or
+                    unverified_payload.get("unique_name"))
+
+        # Remove domain part (everything after @)
+        if raw_email and "@" in raw_email:
+            clean_email = raw_email.split("@")[0]
+            # Try to decode if it looks like base64 or UUID
+            if len(clean_email) > 0:
+                # Check if it's a UUID-like string (contains hyphens and looks like UUID)
+                if "-" in clean_email:
+                    try:
+                        # If it can be decoded as base64, do it
+                        import base64
+                        decoded = base64.b64decode(clean_email + "==").decode('utf-8')
+                        clean_email = decoded
+                    except:
+                        # If not base64, keep as is
+                        pass
+        else:
+            clean_email = raw_email
+
+        object_id = (unverified_payload.get("oid") or
+                    unverified_payload.get("sub") or
+                    f"mock-{hash(clean_email or 'fallback')}")
+
         first_name = unverified_payload.get("given_name") or ""
         last_name = unverified_payload.get("family_name") or ""
-        
+
         # If names are empty, try to parse from 'name' field
         if not first_name and not last_name:
             full_name = unverified_payload.get("name", "")
@@ -39,10 +57,10 @@ async def verify_azure_token_mock(token: str) -> Dict[str, Any]:
                 name_parts = full_name.split(" ", 1)
                 first_name = name_parts[0]
                 last_name = name_parts[1] if len(name_parts) > 1 else ""
-        
+
         user_info = {
             "object_id": object_id,
-            "email": email,
+            "email": clean_email,
             "first_name": first_name or "User",
             "last_name": last_name or "Azure",
             "name": unverified_payload.get("name", f"{first_name} {last_name}"),

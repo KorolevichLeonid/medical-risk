@@ -2,12 +2,92 @@
 Risk analysis models for medical devices
 """
 from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum, Boolean
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from enum import Enum as PyEnum
 from datetime import datetime
 
 from ..database import Base
+
+
+class RiskManagementTable(Base):
+    """Table for storing risk management table metadata for each project and sheet"""
+    __tablename__ = "risk_management_tables"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    sheet_id = Column(String, nullable=False)  # e.g., 'sheet1', 'custom_sheet_123'
+
+    # Metadata
+    name = Column(String, nullable=True)
+    icon = Column(String, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project", back_populates="risk_tables")
+    rows = relationship("RiskTableRow", back_populates="table", cascade="all, delete-orphan")
+    columns = relationship("RiskTableColumn", back_populates="table", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<RiskManagementTable(project_id={self.project_id}, sheet_id='{self.sheet_id}')>"
+
+
+class RiskTableRow(Base):
+    """Individual rows in risk management tables with flexible data storage"""
+    __tablename__ = "risk_table_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    table_id = Column(Integer, ForeignKey("risk_management_tables.id"), nullable=False)
+
+    # Row metadata
+    row_number = Column(Integer, nullable=False)
+    row_index = Column(Integer, nullable=False)  # position in table (0-based)
+
+    # Flexible data storage using JSONB (stores all column values)
+    data = Column(JSONB, nullable=False, default=dict)
+
+    # Cell colors (optional)
+    cell_colors = Column(JSONB, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    table = relationship("RiskManagementTable", back_populates="rows")
+
+    def __repr__(self):
+        return f"<RiskTableRow(table_id={self.table_id}, row_number={self.row_number})>"
+
+
+class RiskTableColumn(Base):
+    """Column definitions for risk management tables"""
+    __tablename__ = "risk_table_columns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    table_id = Column(Integer, ForeignKey("risk_management_tables.id"), nullable=False)
+
+    # Column metadata
+    key = Column(String, nullable=False)  # column key identifier
+    label = Column(String, nullable=False)  # display name
+    width = Column(String, nullable=True, default="150px")  # width as CSS value
+
+    # Column position
+    column_index = Column(Integer, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    table = relationship("RiskManagementTable", back_populates="columns")
+
+    def __repr__(self):
+        return f"<RiskTableColumn(table_id={self.table_id}, key='{self.key}', label='{self.label}')>"
 
 
 class LifecycleStage(PyEnum):
@@ -95,4 +175,3 @@ class RiskFactor(Base):
 
     def __repr__(self):
         return f"<RiskFactor(hazard_name='{self.hazard_name}', risk_score={self.risk_score})>"
-

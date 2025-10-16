@@ -350,48 +350,61 @@ const ExcelTable = ({ projectId, onClose }) => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Для всех листов используем localStorage
-      const storageKey = `project_${projectId}_${activeSheet}`;
-      const savedData = localStorage.getItem(storageKey);
-      
-      // Загружаем пользовательские имена
+      // Загружаем пользовательские имена и настройки из localStorage (временно)
       const savedSheetNames = localStorage.getItem(`project_${projectId}_sheet_names`);
       if (savedSheetNames) {
         setCustomSheetNames(JSON.parse(savedSheetNames));
       }
-      
+
       const savedColumnLabels = localStorage.getItem(`project_${projectId}_column_labels`);
       if (savedColumnLabels) {
         setCustomColumnLabels(JSON.parse(savedColumnLabels));
       }
-      
+
       const savedCustomSheets = localStorage.getItem(`project_${projectId}_custom_sheets`);
       if (savedCustomSheets) {
         setCustomSheets(JSON.parse(savedCustomSheets));
       }
-      
-      const savedCellColors = localStorage.getItem(`project_${projectId}_cell_colors`);
-      if (savedCellColors) {
-        setCellColors(JSON.parse(savedCellColors));
-      }
-      
+
       const savedColumnWidths = localStorage.getItem(`project_${projectId}_column_widths`);
       if (savedColumnWidths) {
         setColumnWidths(JSON.parse(savedColumnWidths));
       }
-      
+
       const savedRowHeights = localStorage.getItem(`project_${projectId}_row_heights`);
       if (savedRowHeights) {
         setRowHeights(JSON.parse(savedRowHeights));
       }
-      
-      if (savedData) {
-        setData(JSON.parse(savedData));
-      } else {
-        // Создаем пустые строки
+
+      // Загружаем данные таблицы из API без авторизации (тест)
+      const response = await fetch(`http://localhost:8000/api/risk-tables/project/${projectId}/sheets/${activeSheet}`); // Убираем Authorization header
+
+      if (response.ok) {
+        const tableData = await response.json();
+
+        // Преобразуем данные из API в формат компонента
+        const formattedData = tableData.rows.map((row, index) => ({
+          ...row.data,
+          number: row.row_number,
+          id: row.id,
+          // Сохраняем cell_colors отдельно для совместимости
+          cell_colors: row.cell_colors,
+        }));
+
+        setData(formattedData);
+        setCellColors(formattedData.reduce((acc, row, index) => {
+          if (row.cell_colors) {
+            Object.entries(row.cell_colors).forEach(([colKey, color]) => {
+              acc[`${activeSheet}_${index}_${colKey}`] = color;
+            });
+          }
+          return acc;
+        }, {}));
+      } else if (response.status === 404) {
+        // Таблица не существует, создаем пустые данные
         const emptyData = [];
         const cols = getColumns(activeSheet);
-        
+
         for (let i = 0; i < 20; i++) {
           const row = { number: i + 1, id: null, isNew: true };
           cols.forEach(col => {
@@ -401,12 +414,14 @@ const ExcelTable = ({ projectId, onClose }) => {
           });
           emptyData.push(row);
         }
-        
+
         setData(emptyData);
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      alert('Ошибка при загрузке данных');
+      alert('Ошибка при загрузке данных. Проверьте подключение к серверу.');
     } finally {
       setLoading(false);
     }
@@ -451,21 +466,71 @@ const ExcelTable = ({ projectId, onClose }) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Сохраняем в localStorage
-      const storageKey = `project_${projectId}_${activeSheet}`;
-      localStorage.setItem(storageKey, JSON.stringify(data));
+      // Подготавливаем данные для отправки на API
+      const columnDefinitions = columns.map((col, index) => ({
+        key: col.key,
+        label: col.label,
+        width: col.width,
+        column_index: index
+      }));
+
+      const rowData = data.map((row, index) => {
+        // Извлекаем данные строки, исключая вспомогательные поля
+        const rowDataOnly = { ...row };
+        delete rowDataOnly.number;
+        delete rowDataOnly.id;
+        delete rowDataOnly.isNew;
+        delete rowDataOnly.cell_colors;
+
+        // Получаем цвета ячеек для конкретной строки
+        const cellColorsForRow = {};
+        Object.entries(cellColors)
+          .filter(([key, color]) => key.startsWith(`${activeSheet}_${index}_`))
+          .forEach(([key, color]) => {
+            const parts = key.split('_');
+            const columnKey = parts.slice(2).join('_');
+            cellColorsForRow[columnKey] = color;
+          });
+
+        return {
+          row_number: row.number,
+          row_index: index,
+          data: rowDataOnly,
+          cell_colors: Object.keys(cellColorsForRow).length > 0 ? cellColorsForRow : null
+        };
+      });
+
+      // Отправляем данные на API без авторизации (тест)
+      const response = await fetch(`http://localhost:8000/api/risk-tables/project/${projectId}/sheets/${activeSheet}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+        body: JSON.stringify({
+          sheet_name: customSheetNames[activeSheet] || null,
+          sheet_icon: sheets.find(s => s.id === activeSheet)?.icon || null,
+          columns: columnDefinitions,
+          rows: rowData
+        }),
+      }); // Убираем Authorization header
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Сохраняем настройки UI в localStorage (пока оставляем для совместимости)
       localStorage.setItem(`project_${projectId}_sheet_names`, JSON.stringify(customSheetNames));
       localStorage.setItem(`project_${projectId}_column_labels`, JSON.stringify(customColumnLabels));
       localStorage.setItem(`project_${projectId}_custom_sheets`, JSON.stringify(customSheets));
-      localStorage.setItem(`project_${projectId}_cell_colors`, JSON.stringify(cellColors));
       localStorage.setItem(`project_${projectId}_column_widths`, JSON.stringify(columnWidths));
       localStorage.setItem(`project_${projectId}_row_heights`, JSON.stringify(rowHeights));
-      
-      alert('Данные успешно сохранены в LocalStorage!');
+
+      alert('Данные успешно сохранены на сервере!');
       setHasChanges(false);
     } catch (error) {
       console.error('Failed to save:', error);
-      alert('Ошибка при сохранении данных');
+      alert('Ошибка при сохранении данных. Проверьте подключение к серверу.');
     } finally {
       setSaving(false);
     }
@@ -864,5 +929,3 @@ const ExcelTable = ({ projectId, onClose }) => {
 };
 
 export default ExcelTable;
-
-

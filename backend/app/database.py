@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database URL from environment variable
+# Используем SQLite для простоты пока
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
+    "DATABASE_URL",
     "sqlite:///./medical_risk.db"
 )
 
@@ -19,7 +20,15 @@ DATABASE_URL = os.getenv(
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(DATABASE_URL)
+    # PostgreSQL specific configuration
+    engine = create_engine(
+        DATABASE_URL,
+        client_encoding='utf8',
+        connect_args={
+            'client_encoding': 'utf8',
+            'options': '-c timezone=utc'
+        }
+    )
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
