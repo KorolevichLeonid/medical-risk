@@ -515,9 +515,9 @@ async def delete_project(
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     check_project_delete_permission(db_project, current_user, db)
-    
+
     # Store project data for logging before deletion
     project_data = {
         "name": db_project.name,
@@ -527,10 +527,60 @@ async def delete_project(
         "owner_id": db_project.owner_id
     }
     project_name = db_project.name
-    
-    db.delete(db_project)
-    db.commit()
-    
+
+    # Delete related records in correct order to avoid foreign key constraint errors
+    try:
+        # 1. Delete project members (except owner - they will be handled by project deletion)
+        db.query(ProjectMember).filter(ProjectMember.project_id == project_id).delete()
+
+        # 2. Delete risk analyses and their related risk factors
+        from ..models.risk_analysis import RiskAnalysis, RiskFactor
+        risk_analyses = db.query(RiskAnalysis).filter(RiskAnalysis.project_id == project_id).all()
+        for analysis in risk_analyses:
+            # Delete risk factors first
+            db.query(RiskFactor).filter(RiskFactor.analysis_id == analysis.id).delete()
+            # Then delete the analysis
+            db.delete(analysis)
+
+        # 3. Delete risk management tables and their related data
+        from ..models.risk_analysis import RiskManagementTable, RiskTableRow, RiskTableColumn
+        tables = db.query(RiskManagementTable).filter(RiskManagementTable.project_id == project_id).all()
+        for table in tables:
+            # Delete rows first
+            db.query(RiskTableRow).filter(RiskTableRow.table_id == table.id).delete()
+            # Delete columns
+            db.query(RiskTableColumn).filter(RiskTableColumn.table_id == table.id).delete()
+            # Then delete the table
+            db.delete(table)
+
+        # 4. Delete project versions
+        db.query(ProjectVersion).filter(ProjectVersion.project_id == project_id).delete()
+
+        # 5. Delete changelog entries for this project
+        from ..models.changelog import ChangeLog
+        db.query(ChangeLog).filter(ChangeLog.project_id == project_id).delete()
+
+        # 6. Delete project invitations (if the table exists)
+        try:
+            # Try to delete from project_invitations table if it exists
+            from sqlalchemy import text
+            db.execute(text("DELETE FROM project_invitations WHERE project_id = :project_id"), {"project_id": project_id})
+        except Exception:
+            # Table might not exist, continue silently
+            pass
+
+        # 7. Finally, delete the project itself
+        db.delete(db_project)
+
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting project: {str(e)}"
+        )
+
     # Log project deletion
     await log_project_deleted(
         db=db,
@@ -540,7 +590,7 @@ async def delete_project(
         project_data=project_data,
         request=request
     )
-    
+
     return {"message": "Project deleted successfully"}
 
 
@@ -743,9 +793,9 @@ async def create_project_version(
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     check_project_edit_permission(db_project, current_user, db)
-    
+
     # Check if version already exists
     existing_version = db.query(ProjectVersion).filter(
         ProjectVersion.project_id == project_id,
@@ -753,10 +803,10 @@ async def create_project_version(
     ).first()
     if existing_version:
         raise HTTPException(status_code=400, detail="Version already exists")
-    
+
     # Set all other versions as not current
     db.query(ProjectVersion).filter(ProjectVersion.project_id == project_id).update({"is_current": False})
-    
+
     db_version = ProjectVersion(
         project_id=project_id,
         version=version.version,
@@ -766,5 +816,49 @@ async def create_project_version(
     db.add(db_version)
     db.commit()
     db.refresh(db_version)
-    
+
     return db_version
+
+
+@router.get("/{project_id}/my-role")
+async def get_my_project_role(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get current user's role in the project"""
+    db_project = get_project(db, project_id=project_id)
+    if db_project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not check_project_access(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to access this project"
+        )
+
+    # Determine user's role in this project
+    user_role = None
+    if current_user.role == UserRole.SYS_ADMIN:
+        # Sys admin is always admin in every project
+        user_role = "admin"
+    else:
+        # Check if user is owner (project creator = admin)
+        if db_project.owner_id == current_user.id:
+            user_role = "admin"
+        else:
+            # Check if user is member and get their role
+            member = db.query(ProjectMember).filter(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == current_user.id
+            ).first()
+            if member:
+                user_role = member.role.value
+
+    return {
+        "project_id": project_id,
+        "user_id": current_user.id,
+        "user_role": user_role,
+        "user_name": f"{current_user.first_name} {current_user.last_name}",
+        "project_name": db_project.name
+    }

@@ -29,6 +29,14 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.excel-toolbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin: 0 20px;
+}
+
 .excel-toolbar-left {
   display: flex;
   align-items: center;
@@ -686,6 +694,42 @@
   background: #f8f9fa;
 }
 
+/* User role indicator */
+.user-role-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 25px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.role-label {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.role-badge {
+  padding: 4px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+.role-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .excel-table-container {
@@ -699,10 +743,27 @@
     align-items: flex-start;
   }
 
+  .excel-toolbar-center {
+    margin: 0;
+    width: 100%;
+    justify-content: center;
+  }
+
   .excel-toolbar-right {
     width: 100%;
     justify-content: flex-end;
   }
+
+  .user-role-indicator {
+    padding: 6px 12px;
+  }
+
+  .role-label {
+    font-size: 12px;
+  }
+
+  .role-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+  }
 }
-
-

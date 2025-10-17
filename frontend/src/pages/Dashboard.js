@@ -126,8 +126,52 @@ const Dashboard = () => {
     return project.userRole === 'admin' || project.userRole === 'manager';
   };
 
+  const canDeleteProject = (project) => {
+    // Доступ к удалению проекта:
+    // - admin: полный доступ (владелец проекта или участник с ролью admin)
+    // - manager: НЕ может удалять
+    // - doctor: НЕ может удалять
+    return project.userRole === 'admin';
+  };
+
   const handleProjectClick = (projectId) => {
     navigate(`/project/${projectId}`);
+  };
+
+  const handleDeleteProject = async (projectId, projectName, e) => {
+    e.stopPropagation();
+
+    if (!window.confirm(`Вы уверены, что хотите удалить проект "${projectName}"?\n\nЭто действие нельзя отменить!`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8000/api/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        // Удаляем проект из локального состояния
+        const updatedProjects = projects.filter(p => p.id !== projectId);
+        setProjects(updatedProjects);
+        alert('Проект успешно удален');
+      } else if (response.status === 403) {
+        alert('У вас нет прав для удаления этого проекта');
+      } else if (response.status === 404) {
+        alert('Проект не найден');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(`Ошибка при удалении проекта: ${errorData.detail || response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      alert('Ошибка при удалении проекта. Проверьте подключение к серверу.');
+    }
   };
 
   const scrollToTop = () => {
@@ -270,7 +314,7 @@ const Dashboard = () => {
                 </span>
                 <div className="project-actions">
                   {canEditProject(project) && (
-                    <button 
+                    <button
                       className="action-btn edit-btn"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -280,7 +324,7 @@ const Dashboard = () => {
                       Edit
                     </button>
                   )}
-                  <button 
+                  <button
                     className="action-btn"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -289,6 +333,15 @@ const Dashboard = () => {
                   >
                     Risks
                   </button>
+                  {canDeleteProject(project) && (
+                    <button
+                      className="action-btn delete-btn"
+                      onClick={(e) => handleDeleteProject(project.id, project.name, e)}
+                      title="Удалить проект"
+                    >
+                      🗑️ Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

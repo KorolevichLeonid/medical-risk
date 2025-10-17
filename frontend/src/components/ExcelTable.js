@@ -15,6 +15,10 @@ const ExcelTable = ({ projectId, onClose }) => {
   const [resizing, setResizing] = useState(null);
   const [showDeleteColumn, setShowDeleteColumn] = useState(null);
   const [showDeleteRow, setShowDeleteRow] = useState(null);
+
+  // Состояние для роли пользователя в проекте
+  const [userRole, setUserRole] = useState(null);
+  const [loadingRole, setLoadingRole] = useState(true);
   
   // Для редактирования названий листов и столбцов
   const [editingSheetId, setEditingSheetId] = useState(null);
@@ -347,6 +351,85 @@ const ExcelTable = ({ projectId, onClose }) => {
     loadData();
   }, [projectId, activeSheet]);
 
+  // Загрузка роли пользователя при монтировании компонента
+  useEffect(() => {
+    loadUserRole();
+  }, [projectId]);
+
+  const loadUserRole = async () => {
+    setLoadingRole(true);
+    try {
+      // Пробуем разные ключи для токена
+      const possibleTokens = [
+        localStorage.getItem('auth_token'),
+        localStorage.getItem('token'),
+        localStorage.getItem('access_token'),
+        localStorage.getItem('jwt_token'),
+        localStorage.getItem('accessToken'),
+        localStorage.getItem('id_token')
+      ];
+
+      const token = possibleTokens.find(t => t !== null);
+
+      if (!token) {
+        console.warn('Токен авторизации не найден в localStorage');
+        console.log('Доступные ключи в localStorage:', Object.keys(localStorage));
+        // Пробуем получить токен из sessionStorage тоже
+        const sessionTokens = [
+          sessionStorage.getItem('auth_token'),
+          sessionStorage.getItem('token'),
+          sessionStorage.getItem('access_token'),
+          sessionStorage.getItem('jwt_token')
+        ];
+        const sessionToken = sessionTokens.find(t => t !== null);
+        if (sessionToken) {
+          console.log('Найден токен в sessionStorage');
+        } else {
+          console.warn('Токен не найден ни в localStorage, ни в sessionStorage');
+          setUserRole('guest');
+          setLoadingRole(false);
+          return;
+        }
+      }
+
+      const finalToken = token || sessionToken;
+      console.log('Найден токен, загружаем роль пользователя для проекта:', projectId);
+
+      // Загружаем роль пользователя в проекте из API
+      const response = await fetch(`http://localhost:8000/api/projects/${projectId}/my-role`, {
+        headers: {
+          'Authorization': `Bearer ${finalToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Ответ сервера роли:', response.status, response.statusText);
+
+      if (response.ok) {
+        const roleData = await response.json();
+        console.log('Данные роли пользователя в проекте:', roleData);
+        setUserRole(roleData.user_role);
+      } else if (response.status === 401) {
+        console.warn('Ошибка авторизации - токен недействителен');
+        setUserRole('guest');
+      } else if (response.status === 403) {
+        console.warn('Доступ запрещен - недостаточно прав');
+        setUserRole('guest');
+      } else if (response.status === 404) {
+        console.warn('Проект не найден или пользователь не является участником проекта');
+        setUserRole('guest');
+      } else {
+        console.warn('Не удалось загрузить роль пользователя:', response.statusText);
+        setUserRole('guest');
+      }
+    } catch (error) {
+      console.error('Failed to load user role:', error);
+      setUserRole('guest');
+    } finally {
+      setLoadingRole(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -628,12 +711,77 @@ const ExcelTable = ({ projectId, onClose }) => {
     return '#00FF00';                   // Зеленый - минимальный риск
   };
 
+  // Получить отображаемое название роли
+  const getRoleDisplayName = (role) => {
+    switch(role) {
+      case 'admin': return 'Администратор';
+      case 'manager': return 'Менеджер';
+      case 'doctor': return 'Врач';
+      case 'guest': return 'Гость';
+      default: return 'Неизвестная роль';
+    }
+  };
+
+  // Получить цвет для роли
+  const getRoleColor = (role) => {
+    switch(role) {
+      case 'admin': return '#FF4444';     // Красный для администратора
+      case 'manager': return '#FF8800';   // Оранжевый для менеджера
+      case 'doctor': return '#4444FF';    // Синий для врача
+      case 'guest': return '#888888';     // Серый для гостя
+      default: return '#666666';          // Серый по умолчанию
+    }
+  };
+
+  // Проверить, может ли пользователь редактировать данный столбец
+  const canEditColumn = (columnKey) => {
+    // Пользователи с ролью DOCTOR могут редактировать только определенные столбцы
+    if (userRole === 'doctor') {
+      const editableColumns = ['severity_score', 'probability_score', 'risk_score'];
+      return editableColumns.includes(columnKey);
+    }
+    // Администраторы и менеджеры могут редактировать все столбцы
+    return true;
+  };
+
+  // Получить стиль для ячейки в зависимости от прав доступа
+  const getCellStyle = (columnKey, cellColor) => {
+    const canEdit = canEditColumn(columnKey);
+    const baseColor = cellColor;
+
+    if (!canEdit && userRole === 'doctor') {
+      // Для пользователей DOCTOR недоступные для редактирования ячейки выделяем серым
+      return {
+        backgroundColor: '#f5f5f5',
+        color: '#999',
+        cursor: 'not-allowed',
+        opacity: 0.7
+      };
+    }
+
+    return { backgroundColor: baseColor };
+  };
+
+  // Проверить, может ли пользователь добавлять новые элементы
+  const canAddElements = () => {
+    // Только администраторы и менеджеры могут добавлять новые элементы
+    return userRole !== 'doctor' && userRole !== 'guest';
+  };
+
+  // Проверить, может ли пользователь удалять элементы
+  const canDeleteElements = () => {
+    // Только администраторы могут удалять элементы
+    return userRole === 'admin';
+  };
+
   const renderCell = (row, column, rowIndex) => {
     const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
     const value = row[column.key] || '';
     const cellColor = getCellColor(rowIndex, column.key);
+    const canEdit = canEditColumn(column.key);
+    const cellStyle = getCellStyle(column.key, cellColor);
 
-    if (isEditing) {
+    if (isEditing && canEdit) {
       return (
         <input
           type="text"
@@ -643,7 +791,7 @@ const ExcelTable = ({ projectId, onClose }) => {
           onBlur={handleCellBlur}
           onKeyDown={handleKeyDown}
           autoFocus
-          style={{ 
+          style={{
             backgroundColor: cellColor,
             width: '100%',
             height: '100%',
@@ -657,13 +805,13 @@ const ExcelTable = ({ projectId, onClose }) => {
     }
 
     return (
-      <div 
+      <div
         className="excel-cell-content"
-        style={{ backgroundColor: cellColor }}
+        style={cellStyle}
         onClick={(e) => {
           e.stopPropagation();
-          // Одинарный клик для редактирования
-          if (!isEditing) {
+          // Одинарный клик для редактирования только если пользователь может редактировать
+          if (!isEditing && canEdit) {
             handleCellDoubleClick(rowIndex, column.key);
           }
           // Также устанавливаем выбранную ячейку для палитры цветов
@@ -696,6 +844,25 @@ const ExcelTable = ({ projectId, onClose }) => {
           <div className="excel-toolbar-left">
             <h2>Таблица управления рисками</h2>
             {hasChanges && <span className="changes-indicator">● Есть несохраненные изменения</span>}
+          </div>
+          <div className="excel-toolbar-center">
+            {/* Индикатор роли пользователя */}
+            {userRole && !loadingRole && (
+              <div className="user-role-indicator">
+                <span className="role-label">Ваша роль:</span>
+                <span
+                  className="role-badge"
+                  style={{ backgroundColor: getRoleColor(userRole) }}
+                >
+                  {getRoleDisplayName(userRole)}
+                </span>
+              </div>
+            )}
+            {loadingRole && (
+              <div className="user-role-indicator">
+                <span className="role-label">Загрузка роли...</span>
+              </div>
+            )}
           </div>
           <div className="excel-toolbar-right">
             {/* Палитра цветов */}
@@ -781,13 +948,15 @@ const ExcelTable = ({ projectId, onClose }) => {
           ))}
           
           {/* Кнопка добавления нового листа */}
-          <button 
-            className="excel-tab add-sheet-btn" 
-            onClick={handleAddNewSheet}
-            title="Добавить новый лист"
-          >
-            <span className="tab-icon">➕</span>
-          </button>
+          {canAddElements() && (
+            <button
+              className="excel-tab add-sheet-btn"
+              onClick={handleAddNewSheet}
+              title="Добавить новый лист"
+            >
+              <span className="tab-icon">➕</span>
+            </button>
+          )}
         </div>
 
         {/* Таблица */}
@@ -805,17 +974,21 @@ const ExcelTable = ({ projectId, onClose }) => {
                     onClick={() => setShowDeleteColumn(showDeleteColumn === column.key ? null : column.key)}
                   >
                     {getColumnLetter(index)}
-                    <button 
-                      className="delete-column-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteColumn(column.key);
-                        setShowDeleteColumn(null);
-                      }}
-                      title="Удалить столбец"
-                    >
-                      ✕
-                    </button>
+                    {canDeleteElements() ? (
+                      <button
+                        className="delete-column-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteColumn(column.key);
+                          setShowDeleteColumn(null);
+                        }}
+                        title="Удалить столбец"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <div style={{ width: '20px', height: '20px' }}></div>
+                    )}
                     <div 
                       className="column-letter-resizer"
                       onMouseDown={(e) => handleColumnResizeStart(column.key, e)}
@@ -823,9 +996,15 @@ const ExcelTable = ({ projectId, onClose }) => {
                   </th>
                 ))}
                 <th className="add-column-cell">
-                  <button className="add-column-btn" onClick={handleAddNewColumn} title="Добавить столбец">
-                    ➕
-                  </button>
+                  {canAddElements() ? (
+                    <button className="add-column-btn" onClick={handleAddNewColumn} title="Добавить столбец">
+                      ➕
+                    </button>
+                  ) : (
+                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '12px' }}>
+                      Нет прав
+                    </div>
+                  )}
                 </th>
               </tr>
 
@@ -877,17 +1056,21 @@ const ExcelTable = ({ projectId, onClose }) => {
                   >
                     <div className="row-number-content">
                       {row.number}
-                      <button 
-                        className="delete-row-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteRow(rowIndex);
-                          setShowDeleteRow(null);
-                        }}
-                        title="Удалить строку"
-                      >
-                        ✕
-                      </button>
+                      {canDeleteElements() ? (
+                        <button
+                          className="delete-row-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRow(rowIndex);
+                            setShowDeleteRow(null);
+                          }}
+                          title="Удалить строку"
+                        >
+                          ✕
+                        </button>
+                      ) : (
+                        <div style={{ width: '20px', height: '20px' }}></div>
+                      )}
                     </div>
                     <div 
                       className="row-resizer"
@@ -911,9 +1094,15 @@ const ExcelTable = ({ projectId, onClose }) => {
               {/* Строка с кнопкой добавления */}
               <tr>
                 <td className="add-row-cell">
-                  <button className="add-row-btn-icon" onClick={handleAddNewRow} title="Добавить строку">
-                    ➕
-                  </button>
+                  {canAddElements() ? (
+                    <button className="add-row-btn-icon" onClick={handleAddNewRow} title="Добавить строку">
+                      ➕
+                    </button>
+                  ) : (
+                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '12px' }}>
+                      Нет прав
+                    </div>
+                  )}
                 </td>
                 {columns.map(column => (
                   <td key={`add-${column.key}`}></td>

@@ -307,6 +307,16 @@
   background-color: #C0C0C0;
 }
 
+.delete-btn {
+  background-color: #FF4444 !important;
+  color: white !important;
+}
+
+.delete-btn:hover {
+  background-color: #CC0000 !important;
+  transform: scale(1.05);
+}
+
 .empty-state {
   grid-column: 1 / -1;
   display: flex;
@@ -441,4 +451,3 @@
   gap: 8px;
   align-items: flex-end;
 }
-
