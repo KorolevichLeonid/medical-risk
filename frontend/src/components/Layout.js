@@ -142,8 +142,7 @@ const Layout = ({ children }) => {
 
       {/* floating return in cabinet убран по требованию */}
 
-      {/* Fixed top controls */}
-      <div className="notification-icon"></div>
+
     </div>
   );
 };

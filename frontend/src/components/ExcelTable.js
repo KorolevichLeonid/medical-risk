@@ -10,6 +10,7 @@ const ExcelTable = ({ projectId, onClose }) => {
   const [activeSheet, setActiveSheet] = useState('sheet1');
   const [cellColors, setCellColors] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
+  const [modifiedCells, setModifiedCells] = useState(new Set());
   const [columnWidths, setColumnWidths] = useState({});
   const [rowHeights, setRowHeights] = useState({});
   const [resizing, setResizing] = useState(null);
@@ -42,13 +43,13 @@ const ExcelTable = ({ projectId, onClose }) => {
 
   // Определение всех листов из Excel файла + пользовательские
   const baseSheets = [
-    { id: 'sheet1', name: 'Энергетические опасности', icon: '⚡' },
-    { id: 'sheet2', name: 'Биохимические опасности', icon: '🧬' },
-    { id: 'sheet3', name: 'Эксплуатационные и информ', icon: '⚙️' },
-    { id: 'sheet4', name: 'Программные', icon: '💻' },
-    { id: 'sheet5', name: '14931', icon: '📄' },
-    { id: 'sheet6', name: 'Определения 62366', icon: '📖' },
-    { id: 'sheet7', name: 'Заключения-Выводы', icon: '📝' }
+    { id: 'sheet1', name: 'Энергетические опасности', icon: '' },
+    { id: 'sheet2', name: 'Биохимические опасности', icon: '' },
+    { id: 'sheet3', name: 'Эксплуатационные и информ', icon: '' },
+    { id: 'sheet4', name: 'Программные', icon: '' },
+    { id: 'sheet5', name: '14931', icon: '' },
+    { id: 'sheet6', name: 'Определения 62366', icon: '' },
+    { id: 'sheet7', name: 'Заключения-Выводы', icon: '' }
   ];
   
   const sheets = [...baseSheets, ...customSheets];
@@ -205,7 +206,7 @@ const ExcelTable = ({ projectId, onClose }) => {
     const newSheet = {
       id: newSheetId,
       name: sheetName.trim(),
-      icon: '📄'
+      icon: ''
     };
     
     const updatedCustomSheets = [...customSheets, newSheet];
@@ -511,6 +512,26 @@ const ExcelTable = ({ projectId, onClose }) => {
   };
 
   const handleCellChange = (rowIndex, columnKey, value) => {
+    // Валидация для столбцов с ограничением 0-10
+    if (columnKey === 'severity_score' || columnKey === 'probability_score') {
+      // Разрешаем только цифры
+      const numericValue = value.replace(/[^0-9]/g, '');
+
+      // Ограничиваем диапазон 0-10
+      const numValue = parseInt(numericValue);
+      if (numericValue !== '' && (isNaN(numValue) || numValue < 0 || numValue > 10)) {
+        alert(`Значение для "${columnKey === 'severity_score' ? 'Тяжесть вреда' : 'Вероятность причинения вреда'}" должно быть цифрой в диапазоне 0-10`);
+        return;
+      }
+
+      // Если значение пустое, устанавливаем пустую строку
+      if (numericValue === '') {
+        value = '';
+      } else {
+        value = numericValue;
+      }
+    }
+
     const newData = [...data];
     newData[rowIndex] = {
       ...newData[rowIndex],
@@ -534,6 +555,11 @@ const ExcelTable = ({ projectId, onClose }) => {
     }
 
     setData(newData);
+
+    // Отслеживаем измененные ячейки
+    const cellKey = `${activeSheet}_${rowIndex}_${columnKey}`;
+    setModifiedCells(prev => new Set([...prev, cellKey]));
+
     setHasChanges(true);
   };
 
@@ -611,6 +637,7 @@ const ExcelTable = ({ projectId, onClose }) => {
 
       alert('Данные успешно сохранены на сервере!');
       setHasChanges(false);
+      setModifiedCells(new Set());
     } catch (error) {
       console.error('Failed to save:', error);
       alert('Ошибка при сохранении данных. Проверьте подключение к серверу.');
@@ -629,14 +656,22 @@ const ExcelTable = ({ projectId, onClose }) => {
     });
     setData([...data, newRow]);
     setHasChanges(true);
+
+    // Помечаем новую строку как измененную
+    cols.forEach(col => {
+      if (col.key !== 'number') {
+        const cellKey = `${activeSheet}_${data.length}_${col.key}`;
+        setModifiedCells(prev => new Set([...prev, cellKey]));
+      }
+    });
   };
 
   const handleAddNewColumn = () => {
     const columnName = prompt('Введите название нового столбца:', 'Новый столбец');
     if (!columnName || !columnName.trim()) return;
-    
+
     const newColumnKey = `custom_col_${Date.now()}`;
-    
+
     // Добавляем пользовательское название столбца
     const customKey = `${activeSheet}_${newColumnKey}`;
     const newCustomLabels = {
@@ -645,15 +680,21 @@ const ExcelTable = ({ projectId, onClose }) => {
     };
     setCustomColumnLabels(newCustomLabels);
     localStorage.setItem(`project_${projectId}_column_labels`, JSON.stringify(newCustomLabels));
-    
+
     // Добавляем новую колонку во все строки
     const newData = data.map(row => ({
       ...row,
       [newColumnKey]: ''
     }));
-    
+
     setData(newData);
     setHasChanges(true);
+
+    // Помечаем все ячейки новой колонки как измененные
+    data.forEach((_, rowIndex) => {
+      const cellKey = `${activeSheet}_${rowIndex}_${newColumnKey}`;
+      setModifiedCells(prev => new Set([...prev, cellKey]));
+    });
   };
 
   const handleDeleteColumn = (columnKey) => {
@@ -747,7 +788,6 @@ const ExcelTable = ({ projectId, onClose }) => {
   // Получить стиль для ячейки в зависимости от прав доступа
   const getCellStyle = (columnKey, cellColor) => {
     const canEdit = canEditColumn(columnKey);
-    const baseColor = cellColor;
 
     if (!canEdit && userRole === 'doctor') {
       // Для пользователей DOCTOR недоступные для редактирования ячейки выделяем серым
@@ -759,7 +799,10 @@ const ExcelTable = ({ projectId, onClose }) => {
       };
     }
 
-    return { backgroundColor: baseColor };
+    // Цвет фона теперь управляется только через cellColors state
+    return {
+      backgroundColor: 'transparent'
+    };
   };
 
   // Проверить, может ли пользователь добавлять новые элементы
@@ -781,45 +824,61 @@ const ExcelTable = ({ projectId, onClose }) => {
     const canEdit = canEditColumn(column.key);
     const cellStyle = getCellStyle(column.key, cellColor);
 
-    if (isEditing && canEdit) {
-      return (
-        <input
-          type="text"
-          className="excel-cell-input"
-          value={value}
-          onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
-          onBlur={handleCellBlur}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          style={{
-            backgroundColor: cellColor,
-            width: '100%',
-            height: '100%',
-            boxSizing: 'border-box',
-            wordWrap: 'break-word',
-            overflowWrap: 'break-word',
-            whiteSpace: 'normal'
-          }}
-        />
-      );
-    }
+    // Проверяем, является ли ячейка измененной
+    const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
+    const isModified = modifiedCells.has(cellKey);
 
     return (
-      <div
-        className="excel-cell-content"
-        style={cellStyle}
-        onClick={(e) => {
-          e.stopPropagation();
-          // Одинарный клик для редактирования только если пользователь может редактировать
-          if (!isEditing && canEdit) {
-            handleCellDoubleClick(rowIndex, column.key);
-          }
-          // Также устанавливаем выбранную ячейку для палитры цветов
-          setSelectedCell({ rowIndex, columnKey: column.key });
-        }}
-      >
-        {value || ''}
-      </div>
+      <>
+        {/* Цветной фон всегда показывается */}
+        <div
+          className={`excel-cell-colored ${isModified ? 'modified-cell' : ''}`}
+          style={{ backgroundColor: cellColor }}
+        />
+        {isEditing && canEdit ? (
+          <input
+            type="text"
+            className="excel-cell-input"
+            value={value}
+            onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
+            onBlur={handleCellBlur}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            style={{
+              backgroundColor: 'transparent',
+              width: '100%',
+              height: '100%',
+              boxSizing: 'border-box',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+              whiteSpace: 'normal',
+              position: 'relative',
+              zIndex: 2
+            }}
+          />
+        ) : (
+          <div
+            className={`excel-cell-content ${isModified ? 'modified-cell' : ''}`}
+            style={{
+              ...cellStyle,
+              backgroundColor: 'transparent',
+              position: 'relative',
+              zIndex: 2
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              // Одинарный клик для редактирования только если пользователь может редактировать
+              if (!isEditing && canEdit) {
+                handleCellDoubleClick(rowIndex, column.key);
+              }
+              // Всегда устанавливаем выбранную ячейку для палитры цветов
+              setSelectedCell({ rowIndex, columnKey: column.key });
+            }}
+          >
+            {value || ''}
+          </div>
+        )}
+      </>
     );
   };
 
@@ -869,6 +928,17 @@ const ExcelTable = ({ projectId, onClose }) => {
             {selectedCell && (
               <div className="toolbar-color-picker">
                 <span className="color-picker-label">Цвет ячейки:</span>
+                <div
+                  className="toolbar-color-option color-reset-btn"
+                  style={{ backgroundColor: '#FFFFFF', border: '2px solid #ccc' }}
+                  onClick={() => {
+                    handleCellColorChange(selectedCell.rowIndex, selectedCell.columnKey, '#FFFFFF');
+                    setSelectedCell(null);
+                  }}
+                  title="Сбросить цвет"
+                >
+                  Сброс
+                </div>
                 {colors.map(color => (
                   <div
                     key={color.value}
@@ -883,18 +953,18 @@ const ExcelTable = ({ projectId, onClose }) => {
                 ))}
               </div>
             )}
-            <button 
-              className="excel-btn excel-btn-save" 
+            <button
+              className="excel-btn excel-btn-save"
               onClick={handleSave}
               disabled={saving || !hasChanges}
             >
-              {saving ? '💾 Сохранение...' : '💾 Сохранить'}
+              {saving ? 'Сохранение...' : 'Сохранить'}
             </button>
-            <button 
-              className="excel-btn excel-btn-close" 
+            <button
+              className="excel-btn excel-btn-close"
               onClick={onClose}
             >
-              ✕ Закрыть
+              Закрыть
             </button>
           </div>
         </div>
@@ -936,12 +1006,12 @@ const ExcelTable = ({ projectId, onClose }) => {
               
               {/* Кнопка удаления для пользовательских листов */}
               {sheet.id.startsWith('custom_sheet_') && (
-                <button 
+                <button
                   className="delete-sheet-btn"
                   onClick={(e) => handleDeleteSheet(sheet.id, e)}
                   title="Удалить лист"
                 >
-                  ✕
+                  Удалить
                 </button>
               )}
             </div>
@@ -954,7 +1024,7 @@ const ExcelTable = ({ projectId, onClose }) => {
               onClick={handleAddNewSheet}
               title="Добавить новый лист"
             >
-              <span className="tab-icon">➕</span>
+              <span className="tab-icon">+</span>
             </button>
           )}
         </div>
@@ -984,7 +1054,7 @@ const ExcelTable = ({ projectId, onClose }) => {
                         }}
                         title="Удалить столбец"
                       >
-                        ✕
+                        Удалить
                       </button>
                     ) : (
                       <div style={{ width: '20px', height: '20px' }}></div>
@@ -1066,7 +1136,7 @@ const ExcelTable = ({ projectId, onClose }) => {
                           }}
                           title="Удалить строку"
                         >
-                          ✕
+                          Удалить
                         </button>
                       ) : (
                         <div style={{ width: '20px', height: '20px' }}></div>

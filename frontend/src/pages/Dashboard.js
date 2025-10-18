@@ -337,9 +337,9 @@ const Dashboard = () => {
                     <button
                       className="action-btn delete-btn"
                       onClick={(e) => handleDeleteProject(project.id, project.name, e)}
-                      title="Удалить проект"
+                      title="Delete project"
                     >
-                      🗑️ Delete
+                      Delete
                     </button>
                   )}
                 </div>

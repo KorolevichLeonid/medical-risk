@@ -2,7 +2,7 @@
 Risk analysis models for medical devices
 """
 from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKey, Enum, Boolean
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from enum import Enum as PyEnum
@@ -47,11 +47,11 @@ class RiskTableRow(Base):
     row_number = Column(Integer, nullable=False)
     row_index = Column(Integer, nullable=False)  # position in table (0-based)
 
-    # Flexible data storage using JSONB (stores all column values)
-    data = Column(JSONB, nullable=False, default=dict)
+    # Flexible data storage using JSON (stores all column values)
+    data = Column(JSON, nullable=False, default=dict)
 
     # Cell colors (optional)
-    cell_colors = Column(JSONB, nullable=True)
+    cell_colors = Column(JSON, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
