@@ -960,7 +960,18 @@ const ExcelTable = ({ projectId, onClose }) => {
             </button>
             <button
               className="excel-btn excel-btn-close"
-              onClick={onClose}
+              onClick={() => {
+                if (hasChanges) {
+                  const confirmClose = window.confirm(
+                    'У вас есть несохраненные изменения. Вы действительно хотите закрыть таблицу без сохранения?'
+                  );
+                  if (confirmClose) {
+                    onClose();
+                  }
+                } else {
+                  onClose();
+                }
+              }}
             >
               Закрыть
             </button>
@@ -1009,7 +1020,7 @@ const ExcelTable = ({ projectId, onClose }) => {
                   onClick={(e) => handleDeleteSheet(sheet.id, e)}
                   title="Удалить лист"
                 >
-                  Удалить
+                  ×
                 </button>
               )}
             </div>
@@ -1052,7 +1063,7 @@ const ExcelTable = ({ projectId, onClose }) => {
                         }}
                         title="Удалить столбец"
                       >
-                        Удалить
+                        ×
                       </button>
                     ) : (
                       <div style={{ width: '20px', height: '20px' }}></div>
@@ -1134,7 +1145,7 @@ const ExcelTable = ({ projectId, onClose }) => {
                           }}
                           title="Удалить строку"
                         >
-                          Удалить
+                          ×
                         </button>
                       ) : (
                         <div style={{ width: '20px', height: '20px' }}></div>
