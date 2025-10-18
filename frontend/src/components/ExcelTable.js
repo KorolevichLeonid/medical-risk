@@ -828,13 +828,11 @@ const ExcelTable = ({ projectId, onClose }) => {
     const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
     const isModified = modifiedCells.has(cellKey);
 
+    // Определяем стиль для всей ячейки
+    const cellBackgroundStyle = cellColor && cellColor !== '#FFFFFF' ? { backgroundColor: cellColor } : {};
+
     return (
-      <>
-        {/* Цветной фон всегда показывается */}
-        <div
-          className={`excel-cell-colored ${isModified ? 'modified-cell' : ''}`}
-          style={{ backgroundColor: cellColor }}
-        />
+      <div className="excel-cell-wrapper" style={{ height: '100%', width: '100%', position: 'relative' }}>
         {isEditing && canEdit ? (
           <input
             type="text"
@@ -858,7 +856,7 @@ const ExcelTable = ({ projectId, onClose }) => {
           />
         ) : (
           <div
-            className={`excel-cell-content ${isModified ? 'modified-cell' : ''}`}
+            className="excel-cell-content"
             style={{
               ...cellStyle,
               backgroundColor: 'transparent',
@@ -878,7 +876,7 @@ const ExcelTable = ({ projectId, onClose }) => {
             {value || ''}
           </div>
         )}
-      </>
+      </div>
     );
   };
 
@@ -1147,17 +1145,28 @@ const ExcelTable = ({ projectId, onClose }) => {
                       onMouseDown={(e) => handleRowResizeStart(rowIndex, e)}
                     />
                   </td>
-                  {columns.map(column => (
-                    <td 
-                      key={column.key} 
-                      className="editable"
-                      style={{ width: getColumnWidth(column.key), minWidth: '60px' }}
-                    >
-                      <div className="excel-cell-wrapper">
-                        {renderCell(row, column, rowIndex)}
-                      </div>
-                    </td>
-                  ))}
+                  {columns.map(column => {
+                    const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
+                    const cellColor = cellColors[cellKey];
+                    const cellBgColor = cellColor && cellColor !== '#FFFFFF' ? cellColor : 'transparent';
+                    const isModified = modifiedCells.has(cellKey);
+
+                    return (
+                      <td
+                        key={column.key}
+                        className={`editable ${isModified ? 'modified-cell' : ''}`}
+                        style={{
+                          width: getColumnWidth(column.key),
+                          minWidth: '60px',
+                          backgroundColor: cellBgColor
+                        }}
+                      >
+                        <div className="excel-cell-wrapper">
+                          {renderCell(row, column, rowIndex)}
+                        </div>
+                      </td>
+                    );
+                  })}
                   <td></td>
                 </tr>
               ))}
