@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User, UserRole
 from ..models.project import Project, ProjectMember, ProjectRole
-from ..models.risk_analysis import RiskAnalysis, RiskFactor
+from ..models.risk_analysis import RiskAnalysis, RiskFactor, RiskManagementTable, RiskTableRow, RiskTableColumn
 from ..schemas.risk_analysis import (
     RiskAnalysisCreate, RiskAnalysisUpdate, RiskAnalysisResponse, RiskAnalysisSummary,
     RiskFactorCreate, RiskFactorUpdate, RiskFactorResponse
@@ -18,6 +18,103 @@ from ..routers.projects import get_project, check_project_access
 from ..core.logging import log_risk_created, log_risk_updated, log_risk_deleted
 
 router = APIRouter()
+
+
+# Mapping of hazard categories to sheet IDs
+CATEGORY_TO_SHEET = {
+    "energy_functional": "sheet1",
+    "biological_chemical": "sheet2",
+    "operational_informational": "sheet3",
+    "software": "sheet4"
+}
+
+
+async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: int):
+    """
+    Sync a single risk factor to the risk management table.
+    Creates or updates a row in the appropriate sheet based on hazard_category.
+    """
+    sheet_id = CATEGORY_TO_SHEET.get(risk_factor.hazard_category.value, "sheet1")
+    
+    # Get or create table for this sheet
+    table = db.query(RiskManagementTable).filter(
+        RiskManagementTable.project_id == project_id,
+        RiskManagementTable.sheet_id == sheet_id
+    ).first()
+    
+    if not table:
+        # Create table if doesn't exist
+        table = RiskManagementTable(
+            project_id=project_id,
+            sheet_id=sheet_id,
+            name=f"Risk Table - {sheet_id}"
+        )
+        db.add(table)
+        db.flush()
+        
+        # Create columns for this sheet
+        columns_def = [
+            {"key": "risk_id", "label": "Risk ID", "width": "100px", "index": 0},
+            {"key": "lifecycle_stage", "label": "Lifecycle Stage", "width": "180px", "index": 1},
+            {"key": "hazard_name", "label": "Hazard Name", "width": "200px", "index": 2},
+            {"key": "event_sequence", "label": "Event Sequence", "width": "200px", "index": 3},
+            {"key": "hazardous_situation", "label": "Hazardous Situation", "width": "200px", "index": 4},
+            {"key": "harm", "label": "Harm", "width": "150px", "index": 5},
+            {"key": "severity_score", "label": "Severity Score", "width": "120px", "index": 6},
+            {"key": "probability_score", "label": "Probability Score", "width": "150px", "index": 7},
+            {"key": "risk_score", "label": "Risk Score", "width": "100px", "index": 8},
+        ]
+        
+        for col_def in columns_def:
+            column = RiskTableColumn(
+                table_id=table.id,
+                key=col_def["key"],
+                label=col_def["label"],
+                width=col_def["width"],
+                column_index=col_def["index"]
+            )
+            db.add(column)
+    
+    # Check if this risk already exists in the table
+    # For SQLite, we need to search through all rows manually
+    existing_row = None
+    all_rows = db.query(RiskTableRow).filter(RiskTableRow.table_id == table.id).all()
+    for row in all_rows:
+        if row.data.get("risk_id") == str(risk_factor.id):
+            existing_row = row
+            break
+    
+    # Prepare row data
+    row_data = {
+        "risk_id": str(risk_factor.id),
+        "lifecycle_stage": risk_factor.lifecycle_stage.value if risk_factor.lifecycle_stage else "",
+        "hazard_name": risk_factor.hazard_name or "",
+        "event_sequence": risk_factor.sequence_of_events or "",
+        "hazardous_situation": risk_factor.hazardous_situation or "",
+        "harm": risk_factor.harm or "",
+        "severity_score": str(risk_factor.severity_score) if risk_factor.severity_score is not None else "",
+        "probability_score": str(risk_factor.probability_score) if risk_factor.probability_score is not None else "",
+        "risk_score": str(risk_factor.risk_score) if risk_factor.risk_score is not None else ""
+    }
+    
+    if existing_row:
+        # Update existing row
+        existing_row.data = row_data
+    else:
+        # Create new row
+        row_count = db.query(RiskTableRow).filter(
+            RiskTableRow.table_id == table.id
+        ).count()
+        
+        new_row = RiskTableRow(
+            table_id=table.id,
+            row_number=row_count + 1,
+            row_index=row_count,
+            data=row_data
+        )
+        db.add(new_row)
+    
+    db.commit()
 
 
 def get_risk_analysis(db: Session, analysis_id: int) -> RiskAnalysis:
@@ -33,15 +130,17 @@ def calculate_risk_score(severity: int, probability: int) -> int:
 def calculate_analysis_statistics(risk_factors: List[RiskFactor]) -> dict:
     """Calculate statistics for risk analysis"""
     total_factors = len(risk_factors)
-    high_risk = sum(1 for factor in risk_factors if factor.risk_score >= 15)
-    medium_risk = sum(1 for factor in risk_factors if 10 <= factor.risk_score < 15)
-    low_risk = sum(1 for factor in risk_factors if factor.risk_score < 10)
+    high_risk = sum(1 for factor in risk_factors if factor.risk_score is not None and factor.risk_score >= 15)
+    medium_risk = sum(1 for factor in risk_factors if factor.risk_score is not None and 10 <= factor.risk_score < 15)
+    low_risk = sum(1 for factor in risk_factors if factor.risk_score is not None and factor.risk_score < 10)
+    not_evaluated = sum(1 for factor in risk_factors if factor.risk_score is None)
     
     return {
         "total_risk_factors": total_factors,
         "high_risk_count": high_risk,
         "medium_risk_count": medium_risk,
-        "low_risk_count": low_risk
+        "low_risk_count": low_risk,
+        "not_evaluated_count": not_evaluated
     }
 
 
@@ -55,13 +154,14 @@ def check_risk_edit_permission(project: Project, user: User, db: Session):
     if project.owner_id == user.id:
         return True
     
-    # Check if user is a project member with doctor role (can edit risks)
+    # Check if user is a project member with manager role (can edit risks)
+    # Doctor can only view and edit risk table, but cannot add/edit/delete risks
     member = db.query(ProjectMember).filter(
         ProjectMember.project_id == project.id,
         ProjectMember.user_id == user.id
     ).first()
     
-    if member and member.role == ProjectRole.DOCTOR:
+    if member and member.role == ProjectRole.MANAGER:
         return True
     
     raise HTTPException(
@@ -135,7 +235,10 @@ async def create_risk_analysis(
     
     # Create risk factors
     for factor_data in analysis.risk_factors:
-        risk_score = calculate_risk_score(factor_data.severity_score, factor_data.probability_score)
+        # Risk score is optional now, calculated only if both severity and probability are provided
+        risk_score = None
+        if factor_data.severity_score is not None and factor_data.probability_score is not None:
+            risk_score = calculate_risk_score(factor_data.severity_score, factor_data.probability_score)
         
         db_factor = RiskFactor(
             analysis_id=db_analysis.id,
@@ -158,7 +261,7 @@ async def create_risk_analysis(
     # Log risk analysis creation
     analysis_data = {
         "has_body_contact": db_analysis.has_body_contact,
-        "contact_type": db_analysis.contact_type,
+        "contact_type": db_analysis.contact_type.value if db_analysis.contact_type else None,
         "analyst_id": db_analysis.analyst_id,
         "risk_factors_count": len(db_analysis.risk_factors)
     }
@@ -242,7 +345,10 @@ async def add_risk_factor(
     # Check risk edit permission
     check_risk_edit_permission(db_analysis.project, current_user, db)
     
-    risk_score = calculate_risk_score(factor.severity_score, factor.probability_score)
+    # Risk score is optional now, calculated only if both severity and probability are provided
+    risk_score = None
+    if factor.severity_score is not None and factor.probability_score is not None:
+        risk_score = calculate_risk_score(factor.severity_score, factor.probability_score)
     
     db_factor = RiskFactor(
         analysis_id=analysis_id,
@@ -284,6 +390,9 @@ async def add_risk_factor(
         request=request
     )
     
+    # Auto-sync risk to risk management table
+    await sync_risk_to_table(db, db_factor, db_analysis.project_id)
+    
     return db_factor
 
 
@@ -322,10 +431,14 @@ async def update_risk_factor(
     
     # Recalculate risk score if severity or probability changed
     if "severity_score" in update_data or "probability_score" in update_data:
-        db_factor.risk_score = calculate_risk_score(db_factor.severity_score, db_factor.probability_score)
+        if db_factor.severity_score is not None and db_factor.probability_score is not None:
+            db_factor.risk_score = calculate_risk_score(db_factor.severity_score, db_factor.probability_score)
     
     db.commit()
     db.refresh(db_factor)
+    
+    # Sync updated risk to risk management table
+    await sync_risk_to_table(db, db_factor, db_factor.analysis.project_id)
     
     # Store new values for logging
     new_values = {
@@ -385,6 +498,35 @@ async def delete_risk_factor(
     project_id = db_factor.analysis.project_id
     project_name = db_factor.analysis.project.name
     risk_name = db_factor.hazard_name
+    
+    # Delete from risk management table
+    sheet_id = CATEGORY_TO_SHEET.get(db_factor.hazard_category.value, "sheet1")
+    table = db.query(RiskManagementTable).filter(
+        RiskManagementTable.project_id == project_id,
+        RiskManagementTable.sheet_id == sheet_id
+    ).first()
+    
+    if table:
+        # Find and delete the row with this risk_id (SQLite compatible)
+        all_rows = db.query(RiskTableRow).filter(RiskTableRow.table_id == table.id).order_by(RiskTableRow.row_index).all()
+        deleted_row = None
+        for row in all_rows:
+            if row.data.get("risk_id") == str(factor_id):
+                deleted_row = row
+                db.delete(row)
+                break
+        
+        # Reindex remaining rows if a row was deleted
+        if deleted_row:
+            db.flush()  # Ensure deletion is processed
+            remaining_rows = db.query(RiskTableRow).filter(
+                RiskTableRow.table_id == table.id
+            ).order_by(RiskTableRow.row_index).all()
+            
+            # Update row numbers and indices
+            for idx, row in enumerate(remaining_rows):
+                row.row_number = idx + 1
+                row.row_index = idx
     
     db.delete(db_factor)
     db.commit()

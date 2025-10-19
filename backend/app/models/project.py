@@ -13,8 +13,8 @@ from ..database import Base
 class ProjectRole(PyEnum):
     """Project-level user roles"""
     ADMIN = "admin"      # Project creator/owner - full project control
-    MANAGER = "manager"  # Project management, user management, no risk editing
-    DOCTOR = "doctor"    # Risk management only
+    MANAGER = "manager"  # Project management, user management, risk editing
+    DOCTOR = "doctor"    # View risks and edit risk evaluation table only
 
 
 class ProjectStatus(PyEnum):

@@ -1,6 +1,7 @@
 """
 Risk management table API router
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -9,7 +10,7 @@ from ..database import get_db
 from ..models.user import User
 from ..models.project import Project, ProjectMember, ProjectRole
 from ..models.risk_analysis import (
-    RiskManagementTable, RiskTableRow, RiskTableColumn
+    RiskManagementTable, RiskTableRow, RiskTableColumn, RiskFactor, RiskAnalysis, HazardCategory
 )
 from ..schemas.risk_analysis import (
     RiskManagementTableResponse, RiskManagementTableCreate,
@@ -20,6 +21,83 @@ from ..routers.auth import get_current_active_user
 from ..routers.projects import get_project, check_project_access
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Mapping from sheet_id to hazard_category
+SHEET_TO_CATEGORY = {
+    "sheet1": HazardCategory.ENERGY_FUNCTIONAL,
+    "sheet2": HazardCategory.BIOLOGICAL_CHEMICAL,
+    "sheet3": HazardCategory.OPERATIONAL_INFORMATIONAL,
+    "sheet4": HazardCategory.SOFTWARE
+}
+
+
+def clean_orphaned_rows(db: Session, table: RiskManagementTable, project_id: int, sheet_id: str):
+    """
+    Remove rows from risk table that don't correspond to existing risk factors.
+    Only applies to auto-managed sheets (sheet1-4).
+    """
+    # Only clean auto-managed sheets
+    if sheet_id not in SHEET_TO_CATEGORY:
+        return
+    
+    logger.info(f"Cleaning orphaned rows for project {project_id}, sheet {sheet_id}")
+    
+    # Get the hazard category for this sheet
+    hazard_category = SHEET_TO_CATEGORY[sheet_id]
+    
+    # Get all risk factor IDs for this category in this project
+    valid_risk_ids = set()
+    risk_factors = db.query(RiskFactor).join(
+        RiskAnalysis, RiskFactor.analysis_id == RiskAnalysis.id
+    ).filter(
+        RiskAnalysis.project_id == project_id,
+        RiskFactor.hazard_category == hazard_category
+    ).all()
+    
+    for factor in risk_factors:
+        valid_risk_ids.add(str(factor.id))
+    
+    logger.info(f"Valid risk IDs for {sheet_id}: {valid_risk_ids}")
+    
+    # Get all rows in the table
+    all_rows = db.query(RiskTableRow).filter(
+        RiskTableRow.table_id == table.id
+    ).order_by(RiskTableRow.row_index).all()
+    
+    logger.info(f"Total rows in table: {len(all_rows)}")
+    
+    # Find and delete orphaned rows
+    rows_to_delete = []
+    for row in all_rows:
+        risk_id = row.data.get("risk_id")
+        if not risk_id or risk_id not in valid_risk_ids:
+            rows_to_delete.append(row)
+            logger.info(f"Marking row for deletion: risk_id={risk_id}")
+    
+    # Delete orphaned rows
+    for row in rows_to_delete:
+        db.delete(row)
+    
+    if rows_to_delete:
+        logger.info(f"Deleting {len(rows_to_delete)} orphaned rows")
+        db.flush()
+        
+        # Reindex remaining rows
+        remaining_rows = db.query(RiskTableRow).filter(
+            RiskTableRow.table_id == table.id
+        ).order_by(RiskTableRow.row_index).all()
+        
+        logger.info(f"Reindexing {len(remaining_rows)} remaining rows")
+        
+        for idx, row in enumerate(remaining_rows):
+            row.row_number = idx + 1
+            row.row_index = idx
+        
+        db.commit()
+        logger.info("Cleanup complete")
+    else:
+        logger.info("No orphaned rows found")
 
 
 def get_risk_table(db: Session, table_id: int) -> RiskManagementTable:
@@ -76,6 +154,12 @@ async def get_project_sheet(
 
     if not table:
         raise HTTPException(status_code=404, detail="Risk management table not found")
+
+    # Clean orphaned rows for auto-managed sheets (sheet1-4)
+    clean_orphaned_rows(db, table, project_id, sheet_id)
+    
+    # Refresh table to get updated data
+    db.refresh(table)
 
     return table
 
@@ -143,8 +227,59 @@ async def create_or_update_table(
 
     db.commit()
     db.refresh(table)
+    
+    # Sync scores back to risk factors if sheet is auto-managed (sheets 1-4)
+    if sheet_id in ['sheet1', 'sheet2', 'sheet3', 'sheet4']:
+        await sync_table_to_risks(db, table, project_id)
 
     return table
+
+
+async def sync_table_to_risks(db: Session, table: RiskManagementTable, project_id: int):
+    """
+    Sync risk scores from table back to risk_factors.
+    Updates severity_score, probability_score, and risk_score in risk_factors table.
+    """
+    from ..models.risk_analysis import RiskFactor
+    
+    # Get all rows from this table
+    rows = db.query(RiskTableRow).filter(
+        RiskTableRow.table_id == table.id
+    ).all()
+    
+    for row in rows:
+        risk_id_str = row.data.get("risk_id")
+        if not risk_id_str:
+            continue
+        
+        try:
+            risk_id = int(risk_id_str)
+        except (ValueError, TypeError):
+            continue
+        
+        # Get the risk factor
+        risk_factor = db.query(RiskFactor).filter(RiskFactor.id == risk_id).first()
+        if not risk_factor:
+            continue
+        
+        # Update scores from table
+        severity_str = row.data.get("severity_score", "")
+        probability_str = row.data.get("probability_score", "")
+        
+        try:
+            if severity_str and severity_str.strip():
+                risk_factor.severity_score = int(severity_str)
+            
+            if probability_str and probability_str.strip():
+                risk_factor.probability_score = int(probability_str)
+            
+            # Recalculate risk score
+            if risk_factor.severity_score is not None and risk_factor.probability_score is not None:
+                risk_factor.risk_score = risk_factor.severity_score * risk_factor.probability_score
+        except (ValueError, TypeError):
+            pass  # Skip invalid scores
+    
+    db.commit()
 
 
 @router.delete("/project/{project_id}/sheets/{sheet_id}")
@@ -299,3 +434,128 @@ async def get_project_tables(
     return db.query(RiskManagementTable).filter(
         RiskManagementTable.project_id == project_id
     ).all()
+
+
+@router.post("/project/{project_id}/sync-risks")
+async def sync_risks_to_table(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Synchronize all risk factors from risk_analyses to risk management tables.
+    Creates or updates rows in the appropriate sheet based on hazard_category.
+    """
+    from ..models.risk_analysis import RiskFactor, RiskAnalysis
+    
+    # Mapping of hazard categories to sheet IDs
+    CATEGORY_TO_SHEET = {
+        "energy_functional": "sheet1",
+        "biological_chemical": "sheet2",
+        "operational_informational": "sheet3",
+        "software": "sheet4"
+    }
+    
+    # Get project
+    db_project = get_project(db, project_id=project_id)
+    if db_project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get all risk factors for this project
+    risk_factors = db.query(RiskFactor).join(RiskAnalysis).filter(
+        RiskAnalysis.project_id == project_id
+    ).all()
+    
+    if not risk_factors:
+        return {"message": "No risks to synchronize", "synced_count": 0}
+    
+    synced_count = 0
+    
+    # Group risks by category
+    for factor in risk_factors:
+        sheet_id = CATEGORY_TO_SHEET.get(factor.hazard_category.value, "sheet1")
+        
+        # Get or create table for this sheet
+        table = db.query(RiskManagementTable).filter(
+            RiskManagementTable.project_id == project_id,
+            RiskManagementTable.sheet_id == sheet_id
+        ).first()
+        
+        if not table:
+            # Create table if doesn't exist
+            table = RiskManagementTable(
+                project_id=project_id,
+                sheet_id=sheet_id,
+                name=f"Risk Table - {sheet_id}"
+            )
+            db.add(table)
+            db.flush()
+            
+            # Create columns for this sheet
+            columns_def = [
+                {"key": "risk_id", "label": "Risk ID", "width": "100px", "index": 0},
+                {"key": "lifecycle_stage", "label": "Lifecycle Stage", "width": "180px", "index": 1},
+                {"key": "hazard_name", "label": "Hazard Name", "width": "200px", "index": 2},
+                {"key": "event_sequence", "label": "Event Sequence", "width": "200px", "index": 3},
+                {"key": "hazardous_situation", "label": "Hazardous Situation", "width": "200px", "index": 4},
+                {"key": "harm", "label": "Harm", "width": "150px", "index": 5},
+                {"key": "severity_score", "label": "Severity Score", "width": "120px", "index": 6},
+                {"key": "probability_score", "label": "Probability Score", "width": "150px", "index": 7},
+                {"key": "risk_score", "label": "Risk Score", "width": "100px", "index": 8},
+            ]
+            
+            for col_def in columns_def:
+                column = RiskTableColumn(
+                    table_id=table.id,
+                    key=col_def["key"],
+                    label=col_def["label"],
+                    width=col_def["width"],
+                    column_index=col_def["index"]
+                )
+                db.add(column)
+        
+        # Check if this risk already exists in the table (SQLite compatible)
+        existing_row = None
+        all_rows = db.query(RiskTableRow).filter(RiskTableRow.table_id == table.id).all()
+        for row in all_rows:
+            if row.data.get("risk_id") == str(factor.id):
+                existing_row = row
+                break
+        
+        # Prepare row data
+        row_data = {
+            "risk_id": str(factor.id),
+            "lifecycle_stage": factor.lifecycle_stage.value if factor.lifecycle_stage else "",
+            "hazard_name": factor.hazard_name or "",
+            "event_sequence": factor.sequence_of_events or "",
+            "hazardous_situation": factor.hazardous_situation or "",
+            "harm": factor.harm or "",
+            "severity_score": str(factor.severity_score) if factor.severity_score is not None else "",
+            "probability_score": str(factor.probability_score) if factor.probability_score is not None else "",
+            "risk_score": str(factor.risk_score) if factor.risk_score is not None else ""
+        }
+        
+        if existing_row:
+            # Update existing row
+            existing_row.data = row_data
+        else:
+            # Create new row
+            row_count = db.query(RiskTableRow).filter(
+                RiskTableRow.table_id == table.id
+            ).count()
+            
+            new_row = RiskTableRow(
+                table_id=table.id,
+                row_number=row_count + 1,
+                row_index=row_count,
+                data=row_data
+            )
+            db.add(new_row)
+        
+        synced_count += 1
+    
+    db.commit()
+    
+    return {
+        "message": "Risks synchronized successfully",
+        "synced_count": synced_count
+    }

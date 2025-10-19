@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import './ProjectView.css';
+import ExcelTable from '../components/ExcelTable';
 
 const ProjectView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -13,6 +15,7 @@ const ProjectView = () => {
   const [selectedRole, setSelectedRole] = useState('doctor');
   const [addingMember, setAddingMember] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showRiskTable, setShowRiskTable] = useState(false);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -139,7 +142,13 @@ const ProjectView = () => {
     loadCurrentUser();
     fetchProject();
     loadAvailableUsers();
-  }, [id]);
+    
+    // Check if we need to open risk table from URL params
+    const openRiskTable = searchParams.get('openRiskTable');
+    if (openRiskTable === 'true') {
+      setShowRiskTable(true);
+    }
+  }, [id, searchParams]);
 
   const loadCurrentUser = () => {
     const userData = localStorage.getItem('user');
@@ -177,8 +186,9 @@ const ProjectView = () => {
     if (currentUser.role === 'SYS_ADMIN') return true;
     // Project admins can manage risks
     if (project.team.some(member => member.id === currentUser.id && member.role === 'admin')) return true;
-    // Doctors can manage risks
-    if (project.team.some(member => member.id === currentUser.id && member.role === 'doctor')) return true;
+    // Project managers can manage risks
+    if (project.team.some(member => member.id === currentUser.id && member.role === 'manager')) return true;
+    // Doctors can only view risks, not manage them
     return false;
   };
 
@@ -340,6 +350,13 @@ const ProjectView = () => {
                Edit Project
              </Link>
            )}
+           <button 
+             className="btn btn-secondary"
+             onClick={() => setShowRiskTable(true)}
+             style={{ marginRight: '8px' }}
+           >
+             📊 Risk Management Table
+           </button>
            <Link to={`/project/${project.id}/risks`} className="btn btn-primary">
              {canManageRisks() ? 'Manage Risk Analysis' : 'View Risk Analysis'}
            </Link>
@@ -524,8 +541,8 @@ const ProjectView = () => {
                   <option value="manager">Manager - project and users management</option>
                 </select>
                 <small className="role-description">
-                  {selectedRole === 'doctor' && 'Can add, edit and delete risks'}
-                  {selectedRole === 'manager' && 'Can edit project and manage members'}
+                  {selectedRole === 'doctor' && 'Can view risks and edit risk evaluation table'}
+                  {selectedRole === 'manager' && 'Can edit project, manage members and risks'}
                 </small>
               </div>
             </div>
@@ -549,6 +566,22 @@ const ProjectView = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Risk Management Table Modal */}
+      {showRiskTable && (
+        <ExcelTable 
+          projectId={parseInt(id)} 
+          initialSheet={searchParams.get('sheet') || 'sheet1'}
+          onClose={() => {
+            setShowRiskTable(false);
+            // Clear URL params
+            searchParams.delete('openRiskTable');
+            searchParams.delete('sheet');
+            searchParams.delete('riskId');
+            setSearchParams(searchParams);
+          }}
+        />
       )}
 
       {/* Floating return button like Personal Account */}

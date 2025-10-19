@@ -15,9 +15,10 @@ class RiskFactorBase(BaseModel):
     sequence_of_events: str
     harm: str
     hazard_category: HazardCategory
-    severity_score: int  # 1-5
-    probability_score: int  # 1-5
-    control_measures: Optional[str] = None
+    # These fields are now optional - filled in the risk table
+    severity_score: Optional[int] = None  # 1-5, set in risk table
+    probability_score: Optional[int] = None  # 1-5, set in risk table
+    control_measures: Optional[str] = None  # Now managed in risk table
 
 
 class RiskFactorCreate(RiskFactorBase):
@@ -42,7 +43,7 @@ class RiskFactorResponse(RiskFactorBase):
     """Schema for risk factor response"""
     id: int
     analysis_id: int
-    risk_score: int
+    risk_score: Optional[int] = None  # Can be None until evaluated
     residual_risk_score: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None

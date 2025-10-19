@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import './RiskAnalysis.css';
 
 const RiskAnalysis = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [risks, setRisks] = useState([]);
   const [filteredRisks, setFilteredRisks] = useState([]);
@@ -23,10 +24,8 @@ const RiskAnalysis = () => {
     hazardousS: '',
     sequenceOfEvents: '',
     harm: '',
-    hazardCategory: 'biological_chemical',
-    severityScore: 1,
-    probabilityScore: 1,
-    controlMeasures: ''
+    hazardCategory: 'biological_chemical'
+    // severityScore, probabilityScore, and controlMeasures are now managed in the risk table
   });
 
   useEffect(() => {
@@ -45,48 +44,55 @@ const RiskAnalysis = () => {
   const loadUserProjectRole = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/projects/${id}`, {
+      const response = await fetch(`http://localhost:8000/api/projects/${id}/my-role`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
       if (response.ok) {
-        const projectData = await response.json();
-        const currentUserId = JSON.parse(localStorage.getItem('user'))?.id;
-        
-        // Find current user's role in this project
-        const userMember = projectData.members?.find(member => member.user_id === currentUserId);
-        setUserProjectRole(userMember?.role || null);
+        const roleData = await response.json();
+        console.log('Loaded user project role:', roleData);
+        setUserProjectRole(roleData.user_role);
+      } else {
+        console.error('Failed to load user project role - status:', response.status);
+        setUserProjectRole(null);
       }
     } catch (error) {
       console.error('Failed to load user project role:', error);
+      setUserProjectRole(null);
     }
   };
 
   // Permission check functions
   const canAddRisks = () => {
-    if (!currentUser || !userProjectRole) return false;
+    if (!currentUser || !userProjectRole) {
+      return false;
+    }
     // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // In project: admin and doctor can manage risks
-    return userProjectRole === 'admin' || userProjectRole === 'doctor';
+    // In project: only admin and manager can add risks (doctor can only view)
+    return userProjectRole === 'admin' || userProjectRole === 'manager';
   };
 
   const canEditRisks = () => {
-    if (!currentUser || !userProjectRole) return false;
+    if (!currentUser || !userProjectRole) {
+      return false;
+    }
     // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // In project: admin and doctor can manage risks
-    return userProjectRole === 'admin' || userProjectRole === 'doctor';
+    // In project: only admin and manager can edit risks (doctor can only view)
+    return userProjectRole === 'admin' || userProjectRole === 'manager';
   };
 
   const canDeleteRisks = () => {
-    if (!currentUser || !userProjectRole) return false;
+    if (!currentUser || !userProjectRole) {
+      return false;
+    }
     // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // In project: admin and doctor can manage risks
-    return userProjectRole === 'admin' || userProjectRole === 'doctor';
+    // In project: only admin and manager can delete risks (doctor can only view)
+    return userProjectRole === 'admin' || userProjectRole === 'manager';
   };
 
   useEffect(() => {
@@ -233,17 +239,15 @@ const RiskAnalysis = () => {
         }
       }
       
-      // Add risk factor
+      // Add risk factor (scores and control measures will be set in risk table)
       const riskFactorData = {
         lifecycle_stage: newRisk.lifecycleStage,
         hazard_name: newRisk.hazardName,
         hazardous_situation: newRisk.hazardousS,
         sequence_of_events: newRisk.sequenceOfEvents,
         harm: newRisk.harm,
-        hazard_category: newRisk.hazardCategory,
-        severity_score: newRisk.severityScore,
-        probability_score: newRisk.probabilityScore,
-        control_measures: newRisk.controlMeasures
+        hazard_category: newRisk.hazardCategory
+        // severity_score, probability_score, control_measures are now optional
       };
       
       const addRiskResponse = await fetch(`http://localhost:8000/api/risk-analyses/${analysisId}/factors`, {
@@ -268,10 +272,7 @@ const RiskAnalysis = () => {
           hazardousS: '',
           sequenceOfEvents: '',
           harm: '',
-          hazardCategory: 'biological_chemical',
-          severityScore: 1,
-          probabilityScore: 1,
-          controlMeasures: ''
+          hazardCategory: 'biological_chemical'
         });
         setShowAddRisk(false);
         
@@ -295,16 +296,15 @@ const RiskAnalysis = () => {
     try {
       const token = localStorage.getItem('token');
       
+      // Update risk factor (scores and control measures are managed in risk table)
       const riskFactorData = {
         lifecycle_stage: selectedRisk.lifecycleStage,
         hazard_name: selectedRisk.hazardName,
         hazardous_situation: selectedRisk.hazardousS,
         sequence_of_events: selectedRisk.sequenceOfEvents,
         harm: selectedRisk.harm,
-        hazard_category: selectedRisk.hazardCategory,
-        severity_score: selectedRisk.severityScore,
-        probability_score: selectedRisk.probabilityScore,
-        control_measures: selectedRisk.controlMeasures
+        hazard_category: selectedRisk.hazardCategory
+        // severity_score, probability_score, control_measures are optional
       };
       
       const updateRiskResponse = await fetch(`http://localhost:8000/api/risk-analyses/factors/${selectedRisk.id}`, {
@@ -413,21 +413,27 @@ const RiskAnalysis = () => {
         </div>
         <div className="summary-card high-risk">
           <div className="summary-number">
-            {risks.filter(r => getRiskLevel(r.riskScore).level === 'high').length}
+            {risks.filter(r => r.riskScore && getRiskLevel(r.riskScore).level === 'high').length}
           </div>
           <div className="summary-label">High Risk</div>
         </div>
         <div className="summary-card medium-risk">
           <div className="summary-number">
-            {risks.filter(r => getRiskLevel(r.riskScore).level === 'medium').length}
+            {risks.filter(r => r.riskScore && getRiskLevel(r.riskScore).level === 'medium').length}
           </div>
           <div className="summary-label">Medium Risk</div>
         </div>
         <div className="summary-card low-risk">
           <div className="summary-number">
-            {risks.filter(r => getRiskLevel(r.riskScore).level === 'low').length}
+            {risks.filter(r => r.riskScore && getRiskLevel(r.riskScore).level === 'low').length}
           </div>
           <div className="summary-label">Low Risk</div>
+        </div>
+        <div className="summary-card" style={{ backgroundColor: '#f5f5f5' }}>
+          <div className="summary-number">
+            {risks.filter(r => !r.riskScore).length}
+          </div>
+          <div className="summary-label">Not Evaluated</div>
         </div>
       </div>
 
@@ -474,43 +480,52 @@ const RiskAnalysis = () => {
         <table className="risk-table">
           <thead>
             <tr>
+              <th>Category</th>
+              <th>Lifecycle Stage</th>
               <th>Hazard</th>
+              <th>Sequence of Events</th>
               <th>Hazardous Situation</th>
               <th>Harm</th>
-              <th>Category</th>
-              <th>Severity</th>
-              <th>Probability</th>
               <th>Risk Score</th>
-              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredRisks.map(risk => {
-              const riskLevel = getRiskLevel(risk.riskScore);
+              const riskLevel = risk.riskScore ? getRiskLevel(risk.riskScore) : { level: 'unknown', color: '#9E9E9E' };
               return (
                 <tr key={risk.id} className="risk-row">
-                  <td className="hazard-cell">
-                    <div className="hazard-name">{risk.hazardName}</div>
-                    <div className="lifecycle-stage">{risk.lifecycleStage}</div>
-                  </td>
-                  <td className="situation-cell">{risk.hazardousS}</td>
-                  <td className="harm-cell">{risk.harm}</td>
                   <td className="category-cell">
                     {risk.hazardCategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </td>
-                  <td className="score-cell">{risk.severityScore}</td>
-                  <td className="score-cell">{risk.probabilityScore}</td>
-                  <td className="risk-score-cell">
-                    <span 
-                      className={`risk-score ${riskLevel.level}`}
-                      style={{ backgroundColor: riskLevel.color }}
-                    >
-                      {risk.riskScore}
-                    </span>
+                  <td className="lifecycle-cell">
+                    {risk.lifecycleStage}
                   </td>
-                  <td className="status-cell">
-                    {getStatusBadge(risk.status)}
+                  <td className="hazard-cell">
+                    {risk.hazardName}
+                  </td>
+                  <td className="sequence-cell">
+                    {risk.sequenceOfEvents}
+                  </td>
+                  <td className="situation-cell">
+                    {risk.hazardousS}
+                  </td>
+                  <td className="harm-cell">
+                    {risk.harm}
+                  </td>
+                  <td className="risk-score-cell">
+                    {risk.riskScore ? (
+                      <span 
+                        className={`risk-score ${riskLevel.level}`}
+                        style={{ backgroundColor: riskLevel.color }}
+                      >
+                        {risk.riskScore}
+                      </span>
+                    ) : (
+                      <span className="not-evaluated" style={{ color: '#999', fontStyle: 'italic' }}>
+                        Not evaluated
+                      </span>
+                    )}
                   </td>
                                      <td className="actions-cell">
                      {canEditRisks() && (
@@ -520,27 +535,31 @@ const RiskAnalysis = () => {
                            setSelectedRisk(risk);
                            setShowEditRisk(true);
                          }}
+                         title="Edit risk"
                        >
-                         Edit
+                         ✏️
                        </button>
                      )}
                      <button 
                        className="action-btn view"
                        onClick={() => {
-                         setSelectedRisk(risk);
-                         setShowViewRisk(true);
+                         const sheetMapping = {
+                           'energy_functional': 'sheet1',
+                           'biological_chemical': 'sheet2',
+                           'operational_informational': 'sheet3',
+                           'software': 'sheet4'
+                         };
+                         const sheetId = sheetMapping[risk.hazardCategory] || 'sheet1';
+                         
+                         sessionStorage.setItem('highlightRiskId', risk.id);
+                         sessionStorage.setItem('openSheet', sheetId);
+                         
+                         navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${risk.id}`);
                        }}
+                       title="Open in Risk Table"
                      >
-                       View
+                       📊
                      </button>
-                     {canDeleteRisks() && (
-                       <button 
-                         className="action-btn delete"
-                         onClick={() => handleDeleteRisk(risk.id)}
-                       >
-                         Delete
-                       </button>
-                     )}
                    </td>
                 </tr>
               );
@@ -566,6 +585,20 @@ const RiskAnalysis = () => {
             <form onSubmit={handleAddRisk} className="risk-form">
               <div className="form-row">
                 <div className="form-group">
+                  <label>Hazard Category</label>
+                  <select
+                    value={newRisk.hazardCategory}
+                    onChange={(e) => setNewRisk({...newRisk, hazardCategory: e.target.value})}
+                    required
+                  >
+                    <option value="biological_chemical">Biological/Chemical</option>
+                    <option value="operational_informational">Operational/Informational</option>
+                    <option value="software">Software</option>
+                    <option value="energy_functional">Energy/Functional</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
                   <label>Lifecycle Stage</label>
                   <select
                     value={newRisk.lifecycleStage}
@@ -577,20 +610,6 @@ const RiskAnalysis = () => {
                     <option value="storage">Storage</option>
                     <option value="transport">Transport</option>
                     <option value="disposal">Disposal</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label>Hazard Category</label>
-                  <select
-                    value={newRisk.hazardCategory}
-                    onChange={(e) => setNewRisk({...newRisk, hazardCategory: e.target.value})}
-                    required
-                  >
-                    <option value="biological_chemical">Biological/Chemical</option>
-                    <option value="operational_informational">Operational/Informational</option>
-                    <option value="software">Software</option>
-                    <option value="energy_functional">Energy/Functional</option>
                   </select>
                 </div>
               </div>
@@ -606,20 +625,20 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Hazardous Situation</label>
+                <label>Sequence of Events</label>
                 <textarea
-                  value={newRisk.hazardousS}
-                  onChange={(e) => setNewRisk({...newRisk, hazardousS: e.target.value})}
+                  value={newRisk.sequenceOfEvents}
+                  onChange={(e) => setNewRisk({...newRisk, sequenceOfEvents: e.target.value})}
                   rows="2"
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label>Sequence of Events</label>
+                <label>Hazardous Situation</label>
                 <textarea
-                  value={newRisk.sequenceOfEvents}
-                  onChange={(e) => setNewRisk({...newRisk, sequenceOfEvents: e.target.value})}
+                  value={newRisk.hazardousS}
+                  onChange={(e) => setNewRisk({...newRisk, hazardousS: e.target.value})}
                   rows="2"
                   required
                 />
@@ -635,46 +654,16 @@ const RiskAnalysis = () => {
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Severity Score (1-5)</label>
-                  <select
-                    value={newRisk.severityScore}
-                    onChange={(e) => setNewRisk({...newRisk, severityScore: parseInt(e.target.value)})}
-                    required
-                  >
-                    <option value="1">1 - Negligible</option>
-                    <option value="2">2 - Minor</option>
-                    <option value="3">3 - Serious</option>
-                    <option value="4">4 - Critical</option>
-                    <option value="5">5 - Catastrophic</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label>Probability Score (1-5)</label>
-                  <select
-                    value={newRisk.probabilityScore}
-                    onChange={(e) => setNewRisk({...newRisk, probabilityScore: parseInt(e.target.value)})}
-                    required
-                  >
-                    <option value="1">1 - Very Unlikely</option>
-                    <option value="2">2 - Unlikely</option>
-                    <option value="3">3 - Possible</option>
-                    <option value="4">4 - Likely</option>
-                    <option value="5">5 - Very Likely</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Control Measures</label>
-                <textarea
-                  value={newRisk.controlMeasures}
-                  onChange={(e) => setNewRisk({...newRisk, controlMeasures: e.target.value})}
-                  rows="2"
-                  placeholder="Describe control measures to mitigate this risk"
-                />
+              {/* Severity, Probability scores and Control Measures are now managed in the Risk Management Table */}
+              <div className="info-message" style={{ 
+                backgroundColor: '#E3F2FD', 
+                padding: '12px', 
+                borderRadius: '4px', 
+                marginTop: '12px',
+                fontSize: '14px',
+                color: '#1976D2'
+              }}>
+                ℹ️ <strong>Note:</strong> Risk scores and control measures will be filled in the Risk Management Table after creating the risk.
               </div>
 
               <div className="modal-actions">
@@ -707,6 +696,20 @@ const RiskAnalysis = () => {
             <form onSubmit={handleEditRisk} className="risk-form">
               <div className="form-row">
                 <div className="form-group">
+                  <label>Hazard Category</label>
+                  <select
+                    value={selectedRisk.hazardCategory}
+                    onChange={(e) => setSelectedRisk({...selectedRisk, hazardCategory: e.target.value})}
+                    required
+                  >
+                    <option value="biological_chemical">Biological/Chemical</option>
+                    <option value="operational_informational">Operational/Informational</option>
+                    <option value="software">Software</option>
+                    <option value="energy_functional">Energy/Functional</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
                   <label>Lifecycle Stage</label>
                   <select
                     value={selectedRisk.lifecycleStage}
@@ -718,20 +721,6 @@ const RiskAnalysis = () => {
                     <option value="storage">Storage</option>
                     <option value="transport">Transport</option>
                     <option value="disposal">Disposal</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label>Hazard Category</label>
-                  <select
-                    value={selectedRisk.hazardCategory}
-                    onChange={(e) => setSelectedRisk({...selectedRisk, hazardCategory: e.target.value})}
-                    required
-                  >
-                    <option value="biological_chemical">Biological/Chemical</option>
-                    <option value="operational_informational">Operational/Informational</option>
-                    <option value="software">Software</option>
-                    <option value="energy_functional">Energy/Functional</option>
                   </select>
                 </div>
               </div>
@@ -747,20 +736,20 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Hazardous Situation</label>
+                <label>Sequence of Events</label>
                 <textarea
-                  value={selectedRisk.hazardousS}
-                  onChange={(e) => setSelectedRisk({...selectedRisk, hazardousS: e.target.value})}
+                  value={selectedRisk.sequenceOfEvents}
+                  onChange={(e) => setSelectedRisk({...selectedRisk, sequenceOfEvents: e.target.value})}
                   rows="2"
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label>Sequence of Events</label>
+                <label>Hazardous Situation</label>
                 <textarea
-                  value={selectedRisk.sequenceOfEvents}
-                  onChange={(e) => setSelectedRisk({...selectedRisk, sequenceOfEvents: e.target.value})}
+                  value={selectedRisk.hazardousS}
+                  onChange={(e) => setSelectedRisk({...selectedRisk, hazardousS: e.target.value})}
                   rows="2"
                   required
                 />
@@ -776,46 +765,16 @@ const RiskAnalysis = () => {
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Severity Score (1-5)</label>
-                  <select
-                    value={selectedRisk.severityScore}
-                    onChange={(e) => setSelectedRisk({...selectedRisk, severityScore: parseInt(e.target.value)})}
-                    required
-                  >
-                    <option value="1">1 - Negligible</option>
-                    <option value="2">2 - Minor</option>
-                    <option value="3">3 - Serious</option>
-                    <option value="4">4 - Critical</option>
-                    <option value="5">5 - Catastrophic</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label>Probability Score (1-5)</label>
-                  <select
-                    value={selectedRisk.probabilityScore}
-                    onChange={(e) => setSelectedRisk({...selectedRisk, probabilityScore: parseInt(e.target.value)})}
-                    required
-                  >
-                    <option value="1">1 - Very Unlikely</option>
-                    <option value="2">2 - Unlikely</option>
-                    <option value="3">3 - Possible</option>
-                    <option value="4">4 - Likely</option>
-                    <option value="5">5 - Very Likely</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Control Measures</label>
-                <textarea
-                  value={selectedRisk.controlMeasures}
-                  onChange={(e) => setSelectedRisk({...selectedRisk, controlMeasures: e.target.value})}
-                  rows="2"
-                  placeholder="Describe control measures to mitigate this risk"
-                />
+              {/* Severity, Probability scores and Control Measures are now managed in the Risk Management Table */}
+              <div className="info-message" style={{ 
+                backgroundColor: '#E3F2FD', 
+                padding: '12px', 
+                borderRadius: '4px', 
+                marginTop: '12px',
+                fontSize: '14px',
+                color: '#1976D2'
+              }}>
+                ℹ️ <strong>Note:</strong> Risk scores and control measures are managed in the Risk Management Table.
               </div>
 
               <div className="modal-actions">
@@ -825,6 +784,18 @@ const RiskAnalysis = () => {
                 <button type="submit" className="btn btn-primary">
                   Update Risk
                 </button>
+                {canDeleteRisks() && (
+                  <button 
+                    type="button" 
+                    className="btn btn-danger"
+                    onClick={() => {
+                      setShowEditRisk(false);
+                      handleDeleteRisk(selectedRisk.id);
+                    }}
+                  >
+                    🗑️ Delete Risk
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -847,47 +818,64 @@ const RiskAnalysis = () => {
             
             <div className="risk-details">
               <div className="detail-row">
-                <label>Hazard Name:</label>
-                <span>{selectedRisk.hazardName}</span>
+                <label>Hazard Category:</label>
+                <span>{selectedRisk.hazardCategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
               </div>
               <div className="detail-row">
                 <label>Lifecycle Stage:</label>
                 <span>{selectedRisk.lifecycleStage}</span>
               </div>
               <div className="detail-row">
-                <label>Hazard Category:</label>
-                <span>{selectedRisk.hazardCategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-              </div>
-              <div className="detail-row">
-                <label>Hazardous Situation:</label>
-                <span>{selectedRisk.hazardousS}</span>
+                <label>Hazard Name:</label>
+                <span>{selectedRisk.hazardName}</span>
               </div>
               <div className="detail-row">
                 <label>Sequence of Events:</label>
                 <span>{selectedRisk.sequenceOfEvents}</span>
               </div>
               <div className="detail-row">
+                <label>Hazardous Situation:</label>
+                <span>{selectedRisk.hazardousS}</span>
+              </div>
+              <div className="detail-row">
                 <label>Harm:</label>
                 <span>{selectedRisk.harm}</span>
               </div>
-              <div className="detail-row">
-                <label>Severity Score:</label>
-                <span>{selectedRisk.severityScore}</span>
-              </div>
-              <div className="detail-row">
-                <label>Probability Score:</label>
-                <span>{selectedRisk.probabilityScore}</span>
-              </div>
-              <div className="detail-row">
-                <label>Risk Score:</label>
-                <span className={`risk-score ${getRiskLevel(selectedRisk.riskScore).level}`}>
-                  {selectedRisk.riskScore}
-                </span>
-              </div>
-              <div className="detail-row">
-                <label>Control Measures:</label>
-                <span>{selectedRisk.controlMeasures || 'None specified'}</span>
-              </div>
+              
+              {/* Show scores if available from risk table */}
+              {selectedRisk.severityScore && (
+                <div className="detail-row">
+                  <label>Severity Score (from Risk Table):</label>
+                  <span>{selectedRisk.severityScore}</span>
+                </div>
+              )}
+              {selectedRisk.probabilityScore && (
+                <div className="detail-row">
+                  <label>Probability Score (from Risk Table):</label>
+                  <span>{selectedRisk.probabilityScore}</span>
+                </div>
+              )}
+              {selectedRisk.riskScore && (
+                <div className="detail-row">
+                  <label>Risk Score (from Risk Table):</label>
+                  <span className={`risk-score ${getRiskLevel(selectedRisk.riskScore).level}`}>
+                    {selectedRisk.riskScore}
+                  </span>
+                </div>
+              )}
+              
+              {!selectedRisk.severityScore && !selectedRisk.probabilityScore && (
+                <div className="info-message" style={{ 
+                  backgroundColor: '#FFF3E0', 
+                  padding: '12px', 
+                  borderRadius: '4px', 
+                  marginTop: '8px',
+                  fontSize: '14px',
+                  color: '#E65100'
+                }}>
+                  ⚠️ Risk scores not yet assigned. Please evaluate this risk in the Risk Management Table.
+                </div>
+              )}
               <div className="detail-row">
                 <label>Last Updated:</label>
                 <span>{new Date(selectedRisk.lastUpdated).toLocaleString()}</span>
@@ -895,6 +883,29 @@ const RiskAnalysis = () => {
             </div>
             
             <div className="modal-actions">
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                onClick={() => {
+                  // Определяем лист по категории риска
+                  const sheetMapping = {
+                    'energy_functional': 'sheet1',
+                    'biological_chemical': 'sheet2',
+                    'operational_informational': 'sheet3',
+                    'software': 'sheet4'
+                  };
+                  const sheetId = sheetMapping[selectedRisk.hazardCategory] || 'sheet1';
+                  
+                  // Сохраняем информацию о том, какой риск нужно подсветить
+                  sessionStorage.setItem('highlightRiskId', selectedRisk.id);
+                  sessionStorage.setItem('openSheet', sheetId);
+                  
+                  // Перенаправляем на страницу проекта с флагом открытия таблицы
+                  navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${selectedRisk.id}`);
+                }}
+              >
+                📊 Open in Risk Table
+              </button>
               <button type="button" className="btn btn-secondary" onClick={() => setShowViewRisk(false)}>
                 Close
               </button>

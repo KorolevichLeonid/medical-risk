@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import './ExcelTable.css';
 
-const ExcelTable = ({ projectId, onClose }) => {
+const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [activeSheet, setActiveSheet] = useState('sheet1');
+  const [activeSheet, setActiveSheet] = useState(initialSheet);
   const [cellColors, setCellColors] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
   const [modifiedCells, setModifiedCells] = useState(new Set());
@@ -53,6 +53,19 @@ const ExcelTable = ({ projectId, onClose }) => {
   ];
   
   const sheets = [...baseSheets, ...customSheets];
+
+  // Проверка, является ли лист автоматически управляемым из Risk Analysis
+  const isAutoManagedSheet = () => {
+    return ['sheet1', 'sheet2', 'sheet3', 'sheet4'].includes(activeSheet);
+  };
+
+  // Проверка, заблокирована ли ячейка для редактирования
+  const isCellLocked = (columnKey) => {
+    // Блокируем первые 5 столбцов в листах sheet1-4 (они управляются из Risk Analysis)
+    const lockedColumns = ['lifecycle_stage', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'];
+    
+    return isAutoManagedSheet() && lockedColumns.includes(columnKey);
+  };
 
   // Колонки для разных листов
   const getColumns = (sheetId) => {
@@ -276,6 +289,10 @@ const ExcelTable = ({ projectId, onClose }) => {
 
   // Обработка цвета ячейки
   const handleCellColorChange = (rowIndex, columnKey, color) => {
+    // Не позволяем менять цвет заблокированных ячеек
+    if (isCellLocked(columnKey)) {
+      return;
+    }
     const cellKey = `${activeSheet}_${rowIndex}_${columnKey}`;
     setCellColors({
       ...cellColors,
@@ -356,6 +373,13 @@ const ExcelTable = ({ projectId, onClose }) => {
   useEffect(() => {
     loadUserRole();
   }, [projectId]);
+
+  // Обновление активного листа при изменении initialSheet
+  useEffect(() => {
+    if (initialSheet) {
+      setActiveSheet(initialSheet);
+    }
+  }, [initialSheet]);
 
   const loadUserRole = async () => {
     setLoadingRole(true);
@@ -564,7 +588,10 @@ const ExcelTable = ({ projectId, onClose }) => {
   };
 
   const handleCellDoubleClick = (rowIndex, columnKey) => {
-    // Все ячейки теперь редактируемые
+    // Проверяем, не заблокирована ли ячейка
+    if (isCellLocked(columnKey)) {
+      return; // Не позволяем редактировать заблокированные ячейки
+    }
     setEditingCell({ rowIndex, columnKey });
   };
 
@@ -647,6 +674,12 @@ const ExcelTable = ({ projectId, onClose }) => {
   };
 
   const handleAddNewRow = () => {
+    // Запрещаем добавление строк в автоматически управляемых листах
+    if (isAutoManagedSheet()) {
+      alert('⚠️ Нельзя добавлять строки вручную в этом листе.\nСтроки добавляются автоматически при создании рисков в Risk Analysis.');
+      return;
+    }
+    
     const cols = getColumns(activeSheet);
     const newRow = { number: data.length + 1, id: null, isNew: true };
     cols.forEach(col => {
@@ -726,6 +759,13 @@ const ExcelTable = ({ projectId, onClose }) => {
   };
 
   const handleDeleteRow = (rowIndex) => {
+    // Запрещаем удаление строк в автоматически управляемых листах
+    if (isAutoManagedSheet()) {
+      alert('⚠️ Нельзя удалять строки вручную в этом листе.\nСтроки удаляются автоматически при удалении рисков из Risk Analysis.');
+      setShowDeleteRow(null);
+      return;
+    }
+    
     if (!window.confirm('Удалить эту строку?')) return;
     
     // Удаляем строку и пересчитываем номера
@@ -823,6 +863,7 @@ const ExcelTable = ({ projectId, onClose }) => {
     const cellColor = getCellColor(rowIndex, column.key);
     const canEdit = canEditColumn(column.key);
     const cellStyle = getCellStyle(column.key, cellColor);
+    const isLocked = isCellLocked(column.key);
 
     // Проверяем, является ли ячейка измененной
     const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
@@ -832,8 +873,16 @@ const ExcelTable = ({ projectId, onClose }) => {
     const cellBackgroundStyle = cellColor && cellColor !== '#FFFFFF' ? { backgroundColor: cellColor } : {};
 
     return (
-      <div className="excel-cell-wrapper" style={{ height: '100%', width: '100%', position: 'relative' }}>
-        {isEditing && canEdit ? (
+      <div 
+        className="excel-cell-wrapper" 
+        style={{ 
+          height: '100%', 
+          width: '100%', 
+          position: 'relative',
+          backgroundColor: isLocked ? '#f0f0f0' : 'transparent'
+        }}
+      >
+        {isEditing && canEdit && !isLocked ? (
           <input
             type="text"
             className="excel-cell-input"
@@ -861,10 +910,15 @@ const ExcelTable = ({ projectId, onClose }) => {
               ...cellStyle,
               backgroundColor: 'transparent',
               position: 'relative',
-              zIndex: 2
+              zIndex: 2,
+              cursor: isLocked ? 'not-allowed' : 'pointer'
             }}
             onClick={(e) => {
               e.stopPropagation();
+              // Не позволяем редактировать заблокированные ячейки
+              if (isLocked) {
+                return;
+              }
               // Одинарный клик для редактирования только если пользователь может редактировать
               if (!isEditing && canEdit) {
                 handleCellDoubleClick(rowIndex, column.key);
@@ -872,6 +926,7 @@ const ExcelTable = ({ projectId, onClose }) => {
               // Всегда устанавливаем выбранную ячейку для палитры цветов
               setSelectedCell({ rowIndex, columnKey: column.key });
             }}
+            title={isLocked ? 'Эта ячейка управляется из Risk Analysis' : ''}
           >
             {value || ''}
           </div>
@@ -922,8 +977,8 @@ const ExcelTable = ({ projectId, onClose }) => {
             )}
           </div>
           <div className="excel-toolbar-right">
-            {/* Палитра цветов */}
-            {selectedCell && (
+            {/* Палитра цветов - не показываем для заблокированных ячеек */}
+            {selectedCell && !isCellLocked(selectedCell.columnKey) && (
               <div className="toolbar-color-picker">
                 <span className="color-picker-label">Цвет ячейки:</span>
                 <div
@@ -1038,6 +1093,32 @@ const ExcelTable = ({ projectId, onClose }) => {
           )}
         </div>
 
+        {/* Информационный баннер для листов с рисками */}
+        {isAutoManagedSheet() && (
+          <div style={{
+            backgroundColor: '#E3F2FD',
+            padding: '12px 20px',
+            margin: '10px 0',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '14px',
+            color: '#1976D2',
+            border: '1px solid #90CAF9'
+          }}>
+            <span>ℹ️</span>
+            <div>
+              <strong>Автоматическое управление:</strong>
+              <ul style={{ margin: '5px 0', paddingLeft: '20px', lineHeight: '1.6' }}>
+                <li>Первые 5 столбцов (отмечены 🔒) заполняются автоматически из Risk Analysis</li>
+                <li>Строки добавляются и удаляются автоматически при изменении рисков в Risk Analysis</li>
+                <li>Вы можете редактировать остальные столбцы для добавления оценок и мер контроля</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
         {/* Таблица */}
         <div className="excel-table-scroll">
           <table className="excel-table">
@@ -1116,7 +1197,8 @@ const ExcelTable = ({ projectId, onClose }) => {
                         onClick={(e) => e.stopPropagation()}
                       />
                     ) : (
-                      <div className="column-header-content">
+                      <div className="column-header-content" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        {isCellLocked(column.key) && <span title="Столбец управляется из Risk Analysis">🔒</span>}
                         {getColumnLabel(activeSheet, column.key)}
                       </div>
                     )}
@@ -1135,7 +1217,7 @@ const ExcelTable = ({ projectId, onClose }) => {
                   >
                     <div className="row-number-content">
                       {row.number}
-                      {canDeleteElements() ? (
+                      {!isAutoManagedSheet() && canDeleteElements() ? (
                         <button
                           className="delete-row-btn"
                           onClick={(e) => {
@@ -1184,7 +1266,11 @@ const ExcelTable = ({ projectId, onClose }) => {
               {/* Строка с кнопкой добавления */}
               <tr>
                 <td className="add-row-cell">
-                  {canAddElements() ? (
+                  {isAutoManagedSheet() ? (
+                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '11px' }}>
+                      🔒 Управляется из Risk Analysis
+                    </div>
+                  ) : canAddElements() ? (
                     <button className="add-row-btn-icon" onClick={handleAddNewRow} title="Добавить строку">
                       ➕
                     </button>

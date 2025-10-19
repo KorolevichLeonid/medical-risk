@@ -157,12 +157,12 @@ class RiskFactor(Base):
     harm = Column(Text, nullable=False)
     hazard_category = Column(Enum(HazardCategory), nullable=False)
     
-    # Risk evaluation
-    severity_score = Column(Integer, nullable=False)  # 1-5 scale
-    probability_score = Column(Integer, nullable=False)  # 1-5 scale
-    risk_score = Column(Integer, nullable=False)  # calculated: severity * probability
+    # Risk evaluation (now optional - filled in risk management table)
+    severity_score = Column(Integer, nullable=True)  # 1-5 scale, set in risk table
+    probability_score = Column(Integer, nullable=True)  # 1-5 scale, set in risk table
+    risk_score = Column(Integer, nullable=True)  # calculated: severity * probability
     
-    # Risk control measures (if any)
+    # Risk control measures (managed in risk table)
     control_measures = Column(Text, nullable=True)
     residual_risk_score = Column(Integer, nullable=True)
     
