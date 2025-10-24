@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User, UserRole
 from ..models.project import Project, ProjectMember, ProjectRole
-from ..models.risk_analysis import RiskAnalysis, RiskFactor, RiskManagementTable, RiskTableRow, RiskTableColumn
+from ..models.risk_analysis import RiskAnalysis, RiskFactor, RiskManagementTable, RiskTableRow, RiskTableColumn, LifecycleStage
 from ..schemas.risk_analysis import (
     RiskAnalysisCreate, RiskAnalysisUpdate, RiskAnalysisResponse, RiskAnalysisSummary,
     RiskFactorCreate, RiskFactorUpdate, RiskFactorResponse
@@ -20,21 +20,22 @@ from ..core.logging import log_risk_created, log_risk_updated, log_risk_deleted
 router = APIRouter()
 
 
-# Mapping of hazard categories to sheet IDs
-CATEGORY_TO_SHEET = {
-    "energy_functional": "sheet1",
-    "biological_chemical": "sheet2",
-    "operational_informational": "sheet3",
-    "software": "sheet4"
+# Mapping of lifecycle stages to sheet IDs
+LIFECYCLE_TO_SHEET = {
+    "operation": "operation",
+    "maintenance": "maintenance",
+    "storage": "storage",
+    "transport": "transport",
+    "disposal": "disposal"
 }
 
 
 async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: int):
     """
     Sync a single risk factor to the risk management table.
-    Creates or updates a row in the appropriate sheet based on hazard_category.
+    Creates or updates a row in the appropriate sheet based on lifecycle_stage.
     """
-    sheet_id = CATEGORY_TO_SHEET.get(risk_factor.hazard_category.value, "sheet1")
+    sheet_id = LIFECYCLE_TO_SHEET.get(risk_factor.lifecycle_stage.value, "operation")
     
     # Get or create table for this sheet
     table = db.query(RiskManagementTable).filter(
@@ -44,25 +45,46 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
     
     if not table:
         # Create table if doesn't exist
+        stage_names = {
+            "operation": "Эксплуатация",
+            "maintenance": "Техническое обслуживание",
+            "storage": "Хранение",
+            "transport": "Транспортировка",
+            "disposal": "Утилизация"
+        }
+
         table = RiskManagementTable(
             project_id=project_id,
             sheet_id=sheet_id,
-            name=f"Risk Table - {sheet_id}"
+            name=f"Управление рисками - {stage_names.get(sheet_id, sheet_id)}"
         )
         db.add(table)
         db.flush()
         
-        # Create columns for this sheet
+        # Create columns for this sheet (full set like in risk_tables.py)
         columns_def = [
-            {"key": "risk_id", "label": "Risk ID", "width": "100px", "index": 0},
-            {"key": "lifecycle_stage", "label": "Lifecycle Stage", "width": "180px", "index": 1},
-            {"key": "hazard_name", "label": "Hazard Name", "width": "200px", "index": 2},
-            {"key": "event_sequence", "label": "Event Sequence", "width": "200px", "index": 3},
-            {"key": "hazardous_situation", "label": "Hazardous Situation", "width": "200px", "index": 4},
-            {"key": "harm", "label": "Harm", "width": "150px", "index": 5},
-            {"key": "severity_score", "label": "Severity Score", "width": "120px", "index": 6},
-            {"key": "probability_score", "label": "Probability Score", "width": "150px", "index": 7},
-            {"key": "risk_score", "label": "Risk Score", "width": "100px", "index": 8},
+            {"key": "risk_id", "label": "ID риска", "width": "100px", "index": 0},
+            {"key": "lifecycle_stage", "label": "Этап жизненного цикла", "width": "180px", "index": 1},
+            {"key": "hazard_name", "label": "Наименование опасности", "width": "200px", "index": 2},
+            {"key": "event_sequence", "label": "Последовательность событий", "width": "200px", "index": 3},
+            {"key": "hazardous_situation", "label": "Опасная ситуация", "width": "200px", "index": 4},
+            {"key": "harm", "label": "Вред", "width": "150px", "index": 5},
+            {"key": "severity_score", "label": "Тяжесть вреда, балл", "width": "120px", "index": 6},
+            {"key": "probability_score", "label": "Вероятность причинения вреда, балл", "width": "150px", "index": 7},
+            {"key": "risk_score", "label": "Риск, балл", "width": "100px", "index": 8},
+            {"key": "risk_level_1", "label": "Уровень риска (доп./не доп.)", "width": "150px", "index": 9},
+            {"key": "control_measure_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 10},
+            {"key": "control_measure_2", "label": "Защитная мера/средство", "width": "180px", "index": 11},
+            {"key": "control_measure_3", "label": "Информация по безопасности/обучение", "width": "200px", "index": 12},
+            {"key": "verification_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 13},
+            {"key": "verification_2", "label": "Защитная мера/средство", "width": "180px", "index": 14},
+            {"key": "verification_3", "label": "Информация по безопасности", "width": "180px", "index": 15},
+            {"key": "residual_risk_level", "label": "Тяжесть вреда, балл", "width": "130px", "index": 16},
+            {"key": "residual_probability", "label": "Вероятность причинения вреда, балл", "width": "150px", "index": 17},
+            {"key": "residual_risk_score", "label": "Достигнутый риск и его уровень", "width": "180px", "index": 18},
+            {"key": "risk_level_2", "label": "Уровень риска (доп./не доп.)", "width": "150px", "index": 19},
+            {"key": "risk_benefit_analysis", "label": "Анализ остаточный риск/польза", "width": "200px", "index": 20},
+            {"key": "new_risks", "label": "Новые риски в результате принятия мер по управлению", "width": "250px", "index": 21}
         ]
         
         for col_def in columns_def:
@@ -84,7 +106,7 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
             existing_row = row
             break
     
-    # Prepare row data
+    # Prepare row data (full set like in risk_tables.py)
     row_data = {
         "risk_id": str(risk_factor.id),
         "lifecycle_stage": risk_factor.lifecycle_stage.value if risk_factor.lifecycle_stage else "",
@@ -94,7 +116,20 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
         "harm": risk_factor.harm or "",
         "severity_score": str(risk_factor.severity_score) if risk_factor.severity_score is not None else "",
         "probability_score": str(risk_factor.probability_score) if risk_factor.probability_score is not None else "",
-        "risk_score": str(risk_factor.risk_score) if risk_factor.risk_score is not None else ""
+        "risk_score": str(risk_factor.risk_score) if risk_factor.risk_score is not None else "",
+        "risk_level_1": "",
+        "control_measure_1": "",
+        "control_measure_2": "",
+        "control_measure_3": "",
+        "verification_1": "",
+        "verification_2": "",
+        "verification_3": "",
+        "residual_risk_level": "",
+        "residual_probability": "",
+        "residual_risk_score": "",
+        "risk_level_2": "",
+        "risk_benefit_analysis": "",
+        "new_risks": ""
     }
     
     if existing_row:
@@ -500,7 +535,7 @@ async def delete_risk_factor(
     risk_name = db_factor.hazard_name
     
     # Delete from risk management table
-    sheet_id = CATEGORY_TO_SHEET.get(db_factor.hazard_category.value, "sheet1")
+    sheet_id = LIFECYCLE_TO_SHEET.get(db_factor.lifecycle_stage.value, "operation")
     table = db.query(RiskManagementTable).filter(
         RiskManagementTable.project_id == project_id,
         RiskManagementTable.sheet_id == sheet_id

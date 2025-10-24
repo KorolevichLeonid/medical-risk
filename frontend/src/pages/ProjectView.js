@@ -570,9 +570,9 @@ const ProjectView = () => {
 
       {/* Risk Management Table Modal */}
       {showRiskTable && (
-        <ExcelTable 
-          projectId={parseInt(id)} 
-          initialSheet={searchParams.get('sheet') || 'sheet1'}
+        <ExcelTable
+          projectId={parseInt(id)}
+          initialSheet={searchParams.get('sheet') || 'operation'}
           onClose={() => {
             setShowRiskTable(false);
             // Clear URL params

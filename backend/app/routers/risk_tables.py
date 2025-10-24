@@ -10,7 +10,7 @@ from ..database import get_db
 from ..models.user import User
 from ..models.project import Project, ProjectMember, ProjectRole
 from ..models.risk_analysis import (
-    RiskManagementTable, RiskTableRow, RiskTableColumn, RiskFactor, RiskAnalysis, HazardCategory
+    RiskManagementTable, RiskTableRow, RiskTableColumn, RiskFactor, RiskAnalysis, HazardCategory, LifecycleStage
 )
 from ..schemas.risk_analysis import (
     RiskManagementTableResponse, RiskManagementTableCreate,
@@ -23,50 +23,51 @@ from ..routers.projects import get_project, check_project_access
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Mapping from sheet_id to hazard_category
-SHEET_TO_CATEGORY = {
-    "sheet1": HazardCategory.ENERGY_FUNCTIONAL,
-    "sheet2": HazardCategory.BIOLOGICAL_CHEMICAL,
-    "sheet3": HazardCategory.OPERATIONAL_INFORMATIONAL,
-    "sheet4": HazardCategory.SOFTWARE
+# Mapping from sheet_id to lifecycle_stage
+SHEET_TO_LIFECYCLE = {
+    "operation": LifecycleStage.OPERATION,
+    "maintenance": LifecycleStage.MAINTENANCE,
+    "storage": LifecycleStage.STORAGE,
+    "transport": LifecycleStage.TRANSPORT,
+    "disposal": LifecycleStage.DISPOSAL
 }
 
 
 def clean_orphaned_rows(db: Session, table: RiskManagementTable, project_id: int, sheet_id: str):
     """
     Remove rows from risk table that don't correspond to existing risk factors.
-    Only applies to auto-managed sheets (sheet1-4).
+    Only applies to auto-managed sheets (lifecycle stages).
     """
     # Only clean auto-managed sheets
-    if sheet_id not in SHEET_TO_CATEGORY:
+    if sheet_id not in SHEET_TO_LIFECYCLE:
         return
-    
+
     logger.info(f"Cleaning orphaned rows for project {project_id}, sheet {sheet_id}")
-    
-    # Get the hazard category for this sheet
-    hazard_category = SHEET_TO_CATEGORY[sheet_id]
-    
-    # Get all risk factor IDs for this category in this project
+
+    # Get the lifecycle stage for this sheet
+    lifecycle_stage = SHEET_TO_LIFECYCLE[sheet_id]
+
+    # Get all risk factor IDs for this lifecycle stage in this project
     valid_risk_ids = set()
     risk_factors = db.query(RiskFactor).join(
         RiskAnalysis, RiskFactor.analysis_id == RiskAnalysis.id
     ).filter(
         RiskAnalysis.project_id == project_id,
-        RiskFactor.hazard_category == hazard_category
+        RiskFactor.lifecycle_stage == lifecycle_stage
     ).all()
-    
+
     for factor in risk_factors:
         valid_risk_ids.add(str(factor.id))
-    
+
     logger.info(f"Valid risk IDs for {sheet_id}: {valid_risk_ids}")
-    
+
     # Get all rows in the table
     all_rows = db.query(RiskTableRow).filter(
         RiskTableRow.table_id == table.id
     ).order_by(RiskTableRow.row_index).all()
-    
+
     logger.info(f"Total rows in table: {len(all_rows)}")
-    
+
     # Find and delete orphaned rows
     rows_to_delete = []
     for row in all_rows:
@@ -74,26 +75,26 @@ def clean_orphaned_rows(db: Session, table: RiskManagementTable, project_id: int
         if not risk_id or risk_id not in valid_risk_ids:
             rows_to_delete.append(row)
             logger.info(f"Marking row for deletion: risk_id={risk_id}")
-    
+
     # Delete orphaned rows
     for row in rows_to_delete:
         db.delete(row)
-    
+
     if rows_to_delete:
         logger.info(f"Deleting {len(rows_to_delete)} orphaned rows")
         db.flush()
-        
+
         # Reindex remaining rows
         remaining_rows = db.query(RiskTableRow).filter(
             RiskTableRow.table_id == table.id
         ).order_by(RiskTableRow.row_index).all()
-        
+
         logger.info(f"Reindexing {len(remaining_rows)} remaining rows")
-        
+
         for idx, row in enumerate(remaining_rows):
             row.row_number = idx + 1
             row.row_index = idx
-        
+
         db.commit()
         logger.info("Cleanup complete")
     else:
@@ -228,8 +229,8 @@ async def create_or_update_table(
     db.commit()
     db.refresh(table)
     
-    # Sync scores back to risk factors if sheet is auto-managed (sheets 1-4)
-    if sheet_id in ['sheet1', 'sheet2', 'sheet3', 'sheet4']:
+    # Sync scores back to risk factors if sheet is auto-managed (lifecycle stages)
+    if sheet_id in SHEET_TO_LIFECYCLE:
         await sync_table_to_risks(db, table, project_id)
 
     return table
@@ -443,66 +444,88 @@ async def sync_risks_to_table(
 ):
     """
     Synchronize all risk factors from risk_analyses to risk management tables.
-    Creates or updates rows in the appropriate sheet based on hazard_category.
+    Creates or updates rows in the appropriate sheet based on lifecycle_stage.
     """
     from ..models.risk_analysis import RiskFactor, RiskAnalysis
-    
-    # Mapping of hazard categories to sheet IDs
-    CATEGORY_TO_SHEET = {
-        "energy_functional": "sheet1",
-        "biological_chemical": "sheet2",
-        "operational_informational": "sheet3",
-        "software": "sheet4"
-    }
-    
+
     # Get project
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     # Get all risk factors for this project
     risk_factors = db.query(RiskFactor).join(RiskAnalysis).filter(
         RiskAnalysis.project_id == project_id
     ).all()
-    
+
     if not risk_factors:
         return {"message": "No risks to synchronize", "synced_count": 0}
-    
+
     synced_count = 0
-    
-    # Group risks by category
+
+    # Group risks by lifecycle stage
     for factor in risk_factors:
-        sheet_id = CATEGORY_TO_SHEET.get(factor.hazard_category.value, "sheet1")
-        
+        # Map lifecycle stage to sheet_id
+        lifecycle_to_sheet = {
+            "operation": "operation",
+            "maintenance": "maintenance",
+            "storage": "storage",
+            "transport": "transport",
+            "disposal": "disposal"
+        }
+
+        sheet_id = lifecycle_to_sheet.get(factor.lifecycle_stage.value, "operation")
+
         # Get or create table for this sheet
         table = db.query(RiskManagementTable).filter(
             RiskManagementTable.project_id == project_id,
             RiskManagementTable.sheet_id == sheet_id
         ).first()
-        
+
         if not table:
             # Create table if doesn't exist
+            stage_names = {
+                "operation": "Эксплуатация",
+                "maintenance": "Техническое обслуживание",
+                "storage": "Хранение",
+                "transport": "Транспортировка",
+                "disposal": "Утилизация"
+            }
+
             table = RiskManagementTable(
                 project_id=project_id,
                 sheet_id=sheet_id,
-                name=f"Risk Table - {sheet_id}"
+                name=f"Управление рисками - {stage_names.get(sheet_id, sheet_id)}"
             )
             db.add(table)
             db.flush()
-            
+
             # Create columns for this sheet
             columns_def = [
-                {"key": "risk_id", "label": "Risk ID", "width": "100px", "index": 0},
-                {"key": "lifecycle_stage", "label": "Lifecycle Stage", "width": "180px", "index": 1},
-                {"key": "hazard_name", "label": "Hazard Name", "width": "200px", "index": 2},
-                {"key": "event_sequence", "label": "Event Sequence", "width": "200px", "index": 3},
-                {"key": "hazardous_situation", "label": "Hazardous Situation", "width": "200px", "index": 4},
-                {"key": "harm", "label": "Harm", "width": "150px", "index": 5},
-                {"key": "severity_score", "label": "Severity Score", "width": "120px", "index": 6},
-                {"key": "probability_score", "label": "Probability Score", "width": "150px", "index": 7},
-                {"key": "risk_score", "label": "Risk Score", "width": "100px", "index": 8},
+                {"key": "risk_id", "label": "ID риска", "width": "100px", "index": 0},
+                {"key": "lifecycle_stage", "label": "Этап жизненного цикла", "width": "180px", "index": 1},
+                {"key": "hazard_name", "label": "Наименование опасности", "width": "200px", "index": 2},
+                {"key": "event_sequence", "label": "Последовательность событий", "width": "200px", "index": 3},
+                {"key": "hazardous_situation", "label": "Опасная ситуация", "width": "200px", "index": 4},
+                {"key": "harm", "label": "Вред", "width": "150px", "index": 5},
+                {"key": "severity_score", "label": "Тяжесть вреда, балл", "width": "120px", "index": 6},
+                {"key": "probability_score", "label": "Вероятность причинения вреда, балл", "width": "150px", "index": 7},
+                {"key": "risk_score", "label": "Риск, балл", "width": "100px", "index": 8},
+                {"key": "risk_level_1", "label": "Уровень риска (доп./не доп.)", "width": "150px", "index": 9},
+                {"key": "control_measure_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 10},
+                {"key": "control_measure_2", "label": "Защитная мера/средство", "width": "180px", "index": 11},
+                {"key": "control_measure_3", "label": "Информация по безопасности/обучение", "width": "200px", "index": 12},
+                {"key": "verification_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 13},
+                {"key": "verification_2", "label": "Защитная мера/средство", "width": "180px", "index": 14},
+                {"key": "verification_3", "label": "Информация по безопасности", "width": "180px", "index": 15},
+                {"key": "residual_risk_level", "label": "Тяжесть вреда, балл", "width": "130px", "index": 16},
+                {"key": "residual_probability", "label": "Вероятность причинения вреда, балл", "width": "150px", "index": 17},
+                {"key": "residual_risk_score", "label": "Достигнутый риск и его уровень", "width": "180px", "index": 18},
+                {"key": "risk_level_2", "label": "Уровень риска (доп./не доп.)", "width": "150px", "index": 19},
+                {"key": "risk_benefit_analysis", "label": "Анализ остаточный риск/польза", "width": "200px", "index": 20},
+                {"key": "new_risks", "label": "Новые риски в результате принятия мер по управлению", "width": "250px", "index": 21}
             ]
-            
+
             for col_def in columns_def:
                 column = RiskTableColumn(
                     table_id=table.id,
@@ -512,7 +535,7 @@ async def sync_risks_to_table(
                     column_index=col_def["index"]
                 )
                 db.add(column)
-        
+
         # Check if this risk already exists in the table (SQLite compatible)
         existing_row = None
         all_rows = db.query(RiskTableRow).filter(RiskTableRow.table_id == table.id).all()
@@ -520,7 +543,7 @@ async def sync_risks_to_table(
             if row.data.get("risk_id") == str(factor.id):
                 existing_row = row
                 break
-        
+
         # Prepare row data
         row_data = {
             "risk_id": str(factor.id),
@@ -531,9 +554,22 @@ async def sync_risks_to_table(
             "harm": factor.harm or "",
             "severity_score": str(factor.severity_score) if factor.severity_score is not None else "",
             "probability_score": str(factor.probability_score) if factor.probability_score is not None else "",
-            "risk_score": str(factor.risk_score) if factor.risk_score is not None else ""
+            "risk_score": str(factor.risk_score) if factor.risk_score is not None else "",
+            "risk_level_1": "",
+            "control_measure_1": "",
+            "control_measure_2": "",
+            "control_measure_3": "",
+            "verification_1": "",
+            "verification_2": "",
+            "verification_3": "",
+            "residual_risk_level": "",
+            "residual_probability": "",
+            "residual_risk_score": "",
+            "risk_level_2": "",
+            "risk_benefit_analysis": "",
+            "new_risks": ""
         }
-        
+
         if existing_row:
             # Update existing row
             existing_row.data = row_data
@@ -542,7 +578,7 @@ async def sync_risks_to_table(
             row_count = db.query(RiskTableRow).filter(
                 RiskTableRow.table_id == table.id
             ).count()
-            
+
             new_row = RiskTableRow(
                 table_id=table.id,
                 row_number=row_count + 1,
@@ -550,11 +586,11 @@ async def sync_risks_to_table(
                 data=row_data
             )
             db.add(new_row)
-        
+
         synced_count += 1
-    
+
     db.commit()
-    
+
     return {
         "message": "Risks synchronized successfully",
         "synced_count": synced_count

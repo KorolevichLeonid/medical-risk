@@ -43,10 +43,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Определение всех листов из Excel файла + пользовательские
   const baseSheets = [
-    { id: 'sheet1', name: 'Энергетические опасности', icon: '' },
-    { id: 'sheet2', name: 'Биохимические опасности', icon: '' },
-    { id: 'sheet3', name: 'Эксплуатационные и информ', icon: '' },
-    { id: 'sheet4', name: 'Программные', icon: '' },
+    { id: 'operation', name: 'Эксплуатация', icon: '' },
+    { id: 'maintenance', name: 'Техническое обслуживание', icon: '' },
+    { id: 'storage', name: 'Хранение', icon: '' },
+    { id: 'transport', name: 'Транспортировка', icon: '' },
+    { id: 'disposal', name: 'Утилизация', icon: '' },
     { id: 'sheet5', name: '14931', icon: '' },
     { id: 'sheet6', name: 'Определения 62366', icon: '' },
     { id: 'sheet7', name: 'Заключения-Выводы', icon: '' }
@@ -56,7 +57,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Проверка, является ли лист автоматически управляемым из Risk Analysis
   const isAutoManagedSheet = () => {
-    return ['sheet1', 'sheet2', 'sheet3', 'sheet4'].includes(activeSheet);
+    return ['operation', 'maintenance', 'storage', 'transport', 'disposal'].includes(activeSheet);
   };
 
   // Проверка, заблокирована ли ячейка для редактирования
@@ -70,37 +71,14 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   // Колонки для разных листов
   const getColumns = (sheetId) => {
     switch(sheetId) {
-      case 'sheet1':
-        // Энергетические опасности - 22 столбца
+      case 'operation':
+      case 'maintenance':
+      case 'storage':
+      case 'transport':
+      case 'disposal':
+        // Листы по этапам жизненного цикла - 22 столбца
         return [
-          { key: 'lifecycle_stage', label: 'Этап жизненного цикла изделия', width: '180px' },
-          { key: 'hazard_name', label: 'Наименование опасности', width: '200px' },
-          { key: 'event_sequence', label: 'Последовательность событий', width: '200px' },
-          { key: 'hazardous_situation', label: 'Опасная ситуация', width: '200px' },
-          { key: 'harm', label: 'Вред', width: '150px' },
-          { key: 'severity_score', label: 'Тяжесть вреда, балл', width: '120px' },
-          { key: 'probability_score', label: 'Вероятность причинения вреда, балл', width: '150px' },
-          { key: 'risk_score', label: 'Риск, балл', width: '100px' },
-          { key: 'risk_level_1', label: 'Уровень риска (доп./не доп.)', width: '150px' },
-          { key: 'control_measure_1', label: 'Безопасность, заложенная в конструкции', width: '200px' },
-          { key: 'control_measure_2', label: 'Защитная мера/средство', width: '180px' },
-          { key: 'control_measure_3', label: 'Информация по безопасности/обучение', width: '200px' },
-          { key: 'verification_1', label: 'Безопасность, заложенная в конструкции', width: '200px' },
-          { key: 'verification_2', label: 'Защитная мера/средство', width: '180px' },
-          { key: 'verification_3', label: 'Информация по безопасности', width: '180px' },
-          { key: 'residual_risk_level', label: 'Тяжесть вреда, балл', width: '130px' },
-          { key: 'residual_probability', label: 'Вероятность причинения вреда, балл', width: '150px' },
-          { key: 'residual_risk_score', label: 'Достигнутый риск и его уровень', width: '180px' },
-          { key: 'risk_level_2', label: 'Уровень риска (доп./не доп.)', width: '150px' },
-          { key: 'risk_benefit_analysis', label: 'Анализ остаточный риск/польза', width: '200px' },
-          { key: 'new_risks', label: 'Новые риски в результате принятия мер по управлению', width: '250px' }
-        ];
-      case 'sheet2':
-      case 'sheet3':
-      case 'sheet4':
-        // Копии структуры sheet1 для остальных таблиц рисков
-        return [
-          { key: 'lifecycle_stage', label: 'Этап жизненного цикла изделия', width: '180px' },
+          { key: 'lifecycle_stage', label: 'Этап жизненного цикла', width: '180px' },
           { key: 'hazard_name', label: 'Наименование опасности', width: '200px' },
           { key: 'event_sequence', label: 'Последовательность событий', width: '200px' },
           { key: 'hazardous_situation', label: 'Опасная ситуация', width: '200px' },
@@ -270,7 +248,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     
     // Переключаемся на первый лист, если удаляем активный
     if (activeSheet === sheetId) {
-      setActiveSheet('sheet1');
+      setActiveSheet('operation');
     }
     
     setHasChanges(true);
