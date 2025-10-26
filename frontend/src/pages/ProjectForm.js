@@ -8,12 +8,12 @@ const ProjectForm = () => {
   const isEditMode = Boolean(id && id !== 'new');
   
   const [formData, setFormData] = useState({
-    // Basic Project Info
+    // Основная информация о проекте
     name: '',
     description: '',
     status: 'draft',
-    
-    // Device Information
+
+    // Информация об устройстве
     deviceName: '',
     deviceModel: '',
     devicePurpose: '',
@@ -22,21 +22,91 @@ const ProjectForm = () => {
     intendedUse: '',
     userProfile: '',
     operatingEnvironment: '',
-    
-    // Technical Specifications
+
+    // Технические характеристики
     technicalSpecs: '',
     regulatoryRequirements: '',
     standards: '',
-    
-    // Risk Assessment Parameters
+
+    // Параметры оценки рисков
     contactType: 'no_contact',
     duration: 'temporary',
     invasiveness: 'non_invasive',
     energySource: 'none',
-    
-    // Team Assignment
+
+    // Назначение команды
     projectLead: '',
-    teamMembers: []
+    teamMembers: [],
+
+    // Этапы жизненного цикла
+    lifecycleStages: [],
+    customLifecycleStage: '',
+
+    // Вопросы об опасностях и вкладки
+    hazardQuestions: {
+      active: false,
+      sterile: false,
+      disposable: false,
+      software: false,
+      implantable: false,
+      // Биосовместимость
+      bodyContact: false,
+      materialContact: false,
+      implantableDevice: false,
+      substanceRelease: false,
+      sensitization: false,
+      // Данные и системы
+      containsSoftware: false,
+      dataExchange: false,
+      wireless: false,
+      personalData: false,
+      userInterface: false,
+      // Электричество
+      activeDevice: false,
+      powerConnection: false,
+      electricalContacts: false,
+      // Движущиеся части
+      movingElements: false,
+      movingRisk: false,
+      // Излучение
+      emitsEnergy: false,
+      opticalSystems: false,
+      // Удобство использования
+      specialTraining: false,
+      specialNeeds: false,
+      interfaceError: false,
+      alarms: false,
+      // Микробиологические факторы
+      isSterile: false,
+      reusable: false,
+      biologicalContact: false,
+      // Химические вещества
+      chemicalSubstances: false,
+      chemicalRelease: false,
+      chemicalSterilization: false,
+      // Ткани животного происхождения
+      animalMaterials: false,
+      // Наноматериалы
+      nanomaterials: false,
+      // Фармацевтические субстанции
+      pharmaceutical: false,
+      // Воздействие окружающей среды
+      environmentalSensitivity: false,
+      environmentalImpact: false,
+      // Механические факторы
+      mechanicalLoad: false,
+      destructionRisk: false,
+      // Термические воздействия
+      heating: false,
+      surfaceContact: false,
+      // Надежность (всегда активна)
+      reliability: true,
+      // Клиническое применение
+      clinicalUse: false,
+      clinicalError: false,
+      clinicalValidation: false
+    },
+    customHazard: ''
   });
   
   const [loading, setLoading] = useState(false);
@@ -103,23 +173,23 @@ const ProjectForm = () => {
       if (response.ok) {
         const projectData = await response.json();
         
-        // Load project members
+        // Загружаем членов проекта
         const membersResponse = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
-        
+
         let projectLead = '';
         let teamMembers = [];
-        
+
         if (membersResponse.ok) {
           const membersData = await membersResponse.json();
           teamMembers = membersData
             .filter(member => member.role !== 'owner')
             .map(member => member.user_id.toString());
-          
-          // Set project lead (first member or owner)
+
+          // Устанавливаем руководителя проекта (первый член или владелец)
           const leadMember = membersData.find(member => member.role === 'owner') || membersData[0];
           if (leadMember) {
             projectLead = leadMember.user_id.toString();
@@ -146,13 +216,63 @@ const ProjectForm = () => {
           invasiveness: projectData.invasiveness || 'non_invasive',
           energySource: projectData.energy_source || 'none',
           projectLead: projectLead,
-          teamMembers: teamMembers
+          teamMembers: teamMembers,
+          lifecycleStages: projectData.lifecycle_stages || [],
+          customLifecycleStage: projectData.custom_lifecycle_stage || '',
+          hazardQuestions: projectData.hazard_questions || {
+            active: false,
+            sterile: false,
+            disposable: false,
+            software: false,
+            implantable: false,
+            bodyContact: false,
+            materialContact: false,
+            implantableDevice: false,
+            substanceRelease: false,
+            sensitization: false,
+            containsSoftware: false,
+            dataExchange: false,
+            wireless: false,
+            personalData: false,
+            userInterface: false,
+            activeDevice: false,
+            powerConnection: false,
+            electricalContacts: false,
+            movingElements: false,
+            movingRisk: false,
+            emitsEnergy: false,
+            opticalSystems: false,
+            specialTraining: false,
+            specialNeeds: false,
+            interfaceError: false,
+            alarms: false,
+            isSterile: false,
+            reusable: false,
+            biologicalContact: false,
+            chemicalSubstances: false,
+            chemicalRelease: false,
+            chemicalSterilization: false,
+            animalMaterials: false,
+            nanomaterials: false,
+            pharmaceutical: false,
+            environmentalSensitivity: false,
+            environmentalImpact: false,
+            mechanicalLoad: false,
+            destructionRisk: false,
+            heating: false,
+            surfaceContact: false,
+            reliability: true,
+            clinicalUse: false,
+            clinicalError: false,
+            clinicalValidation: false
+          },
+          customHazard: projectData.custom_hazard || ''
         });
       } else {
-        setError('Failed to load project data');
+        setError('Не удалось загрузить данные проекта');
       }
     } catch (err) {
-      setError('Failed to load project data');
+      setError('Не удалось загрузить данные проекта');
     } finally {
       setLoading(false);
     }
@@ -163,6 +283,27 @@ const ProjectForm = () => {
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleLifecycleCheckboxChange = (e, stage) => {
+    const { checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      lifecycleStages: checked
+        ? [...prev.lifecycleStages, stage]
+        : prev.lifecycleStages.filter(s => s !== stage)
+    }));
+  };
+
+  const handleHazardChange = (e) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      hazardQuestions: {
+        ...prev.hazardQuestions,
+        [name]: checked
+      }
     }));
   };
 
@@ -181,9 +322,9 @@ const ProjectForm = () => {
     setError('');
 
     try {
-      // Validate required fields
+      // Проверка обязательных полей
       if (!formData.name || !formData.deviceName || !formData.devicePurpose) {
-        throw new Error('Please fill in all required fields');
+        throw new Error('Пожалуйста, заполните все обязательные поля');
       }
 
       const token = localStorage.getItem('token');
@@ -217,7 +358,11 @@ const ProjectForm = () => {
           duration: formData.duration,
           invasiveness: formData.invasiveness,
           energy_source: formData.energySource,
-          status: formData.status
+          status: formData.status,
+          lifecycle_stages: formData.lifecycleStages,
+          custom_lifecycle_stage: formData.customLifecycleStage,
+          hazard_questions: formData.hazardQuestions,
+          custom_hazard: formData.customHazard
         })
       });
 
@@ -225,20 +370,20 @@ const ProjectForm = () => {
         const projectData = await response.json();
         
         if (isEditMode) {
-          // For edit mode, first get current members and remove those not selected
+          // Для режима редактирования сначала получаем текущих членов и удаляем тех, кто не выбран
           const currentMembersResponse = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           });
-          
+
           if (currentMembersResponse.ok) {
             const currentMembers = await currentMembersResponse.json();
             const currentMemberIds = currentMembers
               .filter(member => member.role !== 'owner')
               .map(member => member.user_id.toString());
-            
-            // Remove members that are no longer selected
+
+            // Удаляем членов, которые больше не выбраны
             for (const memberId of currentMemberIds) {
               if (!formData.teamMembers.includes(memberId)) {
                 try {
@@ -249,14 +394,14 @@ const ProjectForm = () => {
                     }
                   });
                 } catch (error) {
-                  console.error(`Error removing user ${memberId} from project:`, error);
+                  console.error(`Ошибка при удалении пользователя ${memberId} из проекта:`, error);
                 }
               }
             }
           }
         }
-        
-        // Add new team members
+
+        // Добавляем новых членов команды
         for (const userId of formData.teamMembers) {
           try {
             const memberResponse = await fetch(`http://localhost:8000/api/projects/${projectData.id}/members`, {
@@ -270,23 +415,23 @@ const ProjectForm = () => {
                 role: 'member'
               })
             });
-            
+
             if (!memberResponse.ok) {
-              console.warn(`Failed to add user ${userId} to project`);
+              console.warn(`Не удалось добавить пользователя ${userId} в проект`);
             }
           } catch (error) {
-            console.error(`Error adding user ${userId} to project:`, error);
+            console.error(`Ошибка при добавлении пользователя ${userId} в проект:`, error);
           }
         }
         
         navigate(`/project/${projectData.id}`);
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to save project');
+        throw new Error(errorData.detail || 'Не удалось сохранить проект');
       }
-      
+
     } catch (err) {
-      setError(err.message || 'Failed to save project');
+      setError(err.message || 'Не удалось сохранить проект');
     } finally {
       setLoading(false);
     }
@@ -301,7 +446,7 @@ const ProjectForm = () => {
       <div className="project-form">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Loading project...</p>
+          <p>Загрузка проекта...</p>
         </div>
       </div>
     );
@@ -310,295 +455,295 @@ const ProjectForm = () => {
   return (
     <div className="project-form">
       <div className="form-header">
-        <h1>{isEditMode ? 'Edit Project' : 'Create New Project'}</h1>
-        <p>{isEditMode ? 'Update project information and settings' : 'Set up a new medical device risk analysis project'}</p>
+        <h1>{isEditMode ? 'Редактировать проект' : 'Создать новый проект'}</h1>
+        <p>{isEditMode ? 'Обновить информацию и настройки проекта' : 'Настроить новый проект анализа рисков медицинского устройства'}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="form">
-        {/* Basic Information Section */}
+        {/* Основная информация */}
         <div className="form-section">
-          <h2>Basic Information</h2>
-          
+          <h2>Основная информация</h2>
+
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="name">Project Name *</label>
+              <label htmlFor="name">Название проекта *</label>
               <input
                 type="text"
                 id="name"
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                placeholder="Enter project name"
+                placeholder="Введите название проекта"
                 required
               />
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="status">Status</label>
+              <label htmlFor="status">Статус</label>
               <select
                 id="status"
                 name="status"
                 value={formData.status}
                 onChange={handleInputChange}
               >
-                <option value="draft">Draft</option>
-                <option value="in_progress">In Progress</option>
-                <option value="review">Under Review</option>
-                <option value="completed">Completed</option>
+                <option value="draft">Черновик</option>
+                <option value="in_progress">В процессе</option>
+                <option value="review">На рассмотрении</option>
+                <option value="completed">Завершен</option>
               </select>
             </div>
           </div>
 
           <div className="form-group">
-            <label htmlFor="description">Project Description</label>
+            <label htmlFor="description">Описание проекта</label>
             <textarea
               id="description"
               name="description"
               value={formData.description}
               onChange={handleInputChange}
-              placeholder="Describe the project goals and scope"
+              placeholder="Опишите цели и область проекта"
               rows="3"
             />
           </div>
         </div>
 
-        {/* Device Information Section */}
+        {/* Информация об устройстве */}
         <div className="form-section">
-          <h2>Device Information</h2>
-          
+          <h2>Информация об устройстве</h2>
+
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="deviceName">Device Name *</label>
+              <label htmlFor="deviceName">Название устройства *</label>
               <input
                 type="text"
                 id="deviceName"
                 name="deviceName"
                 value={formData.deviceName}
                 onChange={handleInputChange}
-                placeholder="Enter device name"
+                placeholder="Введите название устройства"
                 required
               />
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="deviceModel">Device Model</label>
+              <label htmlFor="deviceModel">Модель устройства</label>
               <input
                 type="text"
                 id="deviceModel"
                 name="deviceModel"
                 value={formData.deviceModel}
                 onChange={handleInputChange}
-                placeholder="Enter model number"
+                placeholder="Введите номер модели"
               />
             </div>
           </div>
 
           <div className="form-group">
-            <label htmlFor="devicePurpose">Device Purpose *</label>
+            <label htmlFor="devicePurpose">Назначение устройства *</label>
             <textarea
               id="devicePurpose"
               name="devicePurpose"
               value={formData.devicePurpose}
               onChange={handleInputChange}
-              placeholder="Describe the intended purpose of the device"
+              placeholder="Опишите назначение устройства"
               rows="2"
               required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="deviceDescription">Device Description</label>
+            <label htmlFor="deviceDescription">Описание устройства</label>
             <textarea
               id="deviceDescription"
               name="deviceDescription"
               value={formData.deviceDescription}
               onChange={handleInputChange}
-              placeholder="Provide detailed description of the device"
+              placeholder="Предоставьте подробное описание устройства"
               rows="3"
             />
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="deviceClassification">Device Classification</label>
+              <label htmlFor="deviceClassification">Классификация устройства</label>
               <select
                 id="deviceClassification"
                 name="deviceClassification"
                 value={formData.deviceClassification}
                 onChange={handleInputChange}
               >
-                <option value="">Select classification</option>
-                <option value="Class I">Class I</option>
-                <option value="Class IIa">Class IIa</option>
-                <option value="Class IIb">Class IIb</option>
-                <option value="Class III">Class III</option>
+                <option value="">Выберите классификацию</option>
+                <option value="Class I">Класс I</option>
+                <option value="Class IIa">Класс IIa</option>
+                <option value="Class IIb">Класс IIb</option>
+                <option value="Class III">Класс III</option>
               </select>
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="intendedUse">Intended Use</label>
+              <label htmlFor="intendedUse">Предполагаемое использование</label>
               <input
                 type="text"
                 id="intendedUse"
                 name="intendedUse"
                 value={formData.intendedUse}
                 onChange={handleInputChange}
-                placeholder="Where will the device be used?"
+                placeholder="Где будет использоваться устройство?"
               />
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="userProfile">User Profile</label>
+              <label htmlFor="userProfile">Профиль пользователя</label>
               <input
                 type="text"
                 id="userProfile"
                 name="userProfile"
                 value={formData.userProfile}
                 onChange={handleInputChange}
-                placeholder="Who will use the device?"
+                placeholder="Кто будет использовать устройство?"
               />
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="operatingEnvironment">Operating Environment</label>
+              <label htmlFor="operatingEnvironment">Условия эксплуатации</label>
               <input
                 type="text"
                 id="operatingEnvironment"
                 name="operatingEnvironment"
                 value={formData.operatingEnvironment}
                 onChange={handleInputChange}
-                placeholder="Operating environment conditions"
+                placeholder="Условия окружающей среды"
               />
             </div>
           </div>
         </div>
 
-        {/* Technical Specifications Section */}
+        {/* Технические характеристики */}
         <div className="form-section">
-          <h2>Technical Specifications</h2>
-          
+          <h2>Технические характеристики</h2>
+
           <div className="form-group">
-            <label htmlFor="technicalSpecs">Technical Specifications</label>
+            <label htmlFor="technicalSpecs">Технические характеристики</label>
             <textarea
               id="technicalSpecs"
               name="technicalSpecs"
               value={formData.technicalSpecs}
               onChange={handleInputChange}
-              placeholder="Key technical specifications and features"
+              placeholder="Ключевые технические характеристики и особенности"
               rows="3"
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="regulatoryRequirements">Regulatory Requirements</label>
+            <label htmlFor="regulatoryRequirements">Нормативные требования</label>
             <textarea
               id="regulatoryRequirements"
               name="regulatoryRequirements"
               value={formData.regulatoryRequirements}
               onChange={handleInputChange}
-              placeholder="Applicable regulatory requirements (FDA, CE, etc.)"
+              placeholder="Применимые нормативные требования (FDA, CE и т.д.)"
               rows="2"
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="standards">Applicable Standards</label>
+            <label htmlFor="standards">Применимые стандарты</label>
             <textarea
               id="standards"
               name="standards"
               value={formData.standards}
               onChange={handleInputChange}
-              placeholder="Relevant industry standards (ISO, IEC, etc.)"
+              placeholder="Соответствующие отраслевые стандарты (ISO, IEC и т.д.)"
               rows="2"
             />
           </div>
         </div>
 
-        {/* Risk Assessment Parameters Section */}
+        {/* Параметры оценки рисков */}
         <div className="form-section">
-          <h2>Risk Assessment Parameters</h2>
-          
+          <h2>Параметры оценки рисков</h2>
+
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="contactType">Contact Type</label>
+              <label htmlFor="contactType">Тип контакта</label>
               <select
                 id="contactType"
                 name="contactType"
                 value={formData.contactType}
                 onChange={handleInputChange}
               >
-                <option value="no_contact">No Contact</option>
-                <option value="indirect_contact">Indirect Contact</option>
-                <option value="surface_contact">Surface Contact</option>
-                <option value="external_communicating">External Communicating</option>
-                <option value="implantable">Implantable</option>
+                <option value="no_contact">Без контакта</option>
+                <option value="indirect_contact">Косвенный контакт</option>
+                <option value="surface_contact">Поверхностный контакт</option>
+                <option value="external_communicating">Внешнее сообщение</option>
+                <option value="implantable">Имплантируемое</option>
               </select>
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="duration">Duration of Contact</label>
+              <label htmlFor="duration">Продолжительность контакта</label>
               <select
                 id="duration"
                 name="duration"
                 value={formData.duration}
                 onChange={handleInputChange}
               >
-                <option value="temporary">Temporary (≤ 24h)</option>
-                <option value="short_term">Short Term (24h - 30 days)</option>
-                <option value="long_term">Long Term ( 30 days+)</option>
+                <option value="temporary">Временный (≤ 24ч)</option>
+                <option value="short_term">Короткий срок (24ч - 30 дней)</option>
+                <option value="long_term">Долгий срок (30+ дней)</option>
               </select>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="invasiveness">Invasiveness</label>
+              <label htmlFor="invasiveness">Инвазивность</label>
               <select
                 id="invasiveness"
                 name="invasiveness"
                 value={formData.invasiveness}
                 onChange={handleInputChange}
               >
-                <option value="non_invasive">Non-invasive</option>
-                <option value="invasive">Invasive</option>
-                <option value="active_implantable">Active Implantable</option>
+                <option value="non_invasive">Неинвазивное</option>
+                <option value="invasive">Инвазивное</option>
+                <option value="active_implantable">Активное имплантируемое</option>
               </select>
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="energySource">Energy Source</label>
+              <label htmlFor="energySource">Источник энергии</label>
               <select
                 id="energySource"
                 name="energySource"
                 value={formData.energySource}
                 onChange={handleInputChange}
               >
-                <option value="none">None</option>
-                <option value="electrical">Electrical</option>
-                <option value="mechanical">Mechanical</option>
-                <option value="thermal">Thermal</option>
-                <option value="chemical">Chemical</option>
-                <option value="radioactive">Radioactive</option>
+                <option value="none">Отсутствует</option>
+                <option value="electrical">Электрический</option>
+                <option value="mechanical">Механический</option>
+                <option value="thermal">Тепловой</option>
+                <option value="chemical">Химический</option>
+                <option value="radioactive">Радиоактивный</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Team Assignment Section */}
+        {/* Назначение команды */}
         <div className="form-section">
-          <h2>Team Assignment</h2>
-          
+          <h2>Назначение команды</h2>
+
           <div className="form-group">
-            <label htmlFor="projectLead">Project Lead</label>
+            <label htmlFor="projectLead">Руководитель проекта</label>
             <select
               id="projectLead"
               name="projectLead"
               value={formData.projectLead}
               onChange={handleInputChange}
             >
-              <option value="">Select project lead</option>
+              <option value="">Выберите руководителя проекта</option>
               {availableUsers.map(user => (
                 <option key={user.id} value={user.id.toString()}>
                   {user.name} ({user.email})
@@ -608,7 +753,7 @@ const ProjectForm = () => {
           </div>
 
           <div className="form-group">
-            <label>Team Members</label>
+            <label>Члены команды</label>
             <div className="team-selection">
                 {availableUsers.map(user => (
                   <label key={user.id} className="checkbox-label">
@@ -624,28 +769,732 @@ const ProjectForm = () => {
             </div>
         </div>
 
+        {/* Этапы жизненного цикла */}
+        <div className="form-section">
+          <h2>Этапы жизненного цикла</h2>
+          <p>Выберите этапы жизненного цикла устройства. Это определяет количество вкладок в чек-листе. Всегда включайте "Другие".</p>
+
+          <div className="form-group">
+            <label>Этапы жизненного цикла</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="design_development"
+                  checked={formData.lifecycleStages.includes('design_development')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'design_development')}
+                />
+                Проектирование и разработка
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="procurement"
+                  checked={formData.lifecycleStages.includes('procurement')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'procurement')}
+                />
+                Закупка и входной контроль компонентов и материалов
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="production"
+                  checked={formData.lifecycleStages.includes('production')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'production')}
+                />
+                Производство и сборка
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="packaging"
+                  checked={formData.lifecycleStages.includes('packaging')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'packaging')}
+                />
+                Упаковка и маркировка
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="installation"
+                  checked={formData.lifecycleStages.includes('installation')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'installation')}
+                />
+                Монтаж
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="sterilization"
+                  checked={formData.lifecycleStages.includes('sterilization')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'sterilization')}
+                />
+                Стерилизация
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="testing"
+                  checked={formData.lifecycleStages.includes('testing')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'testing')}
+                />
+                Испытания и выпуск продукции
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="storage"
+                  checked={formData.lifecycleStages.includes('storage')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'storage')}
+                />
+                Хранение
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="transportation"
+                  checked={formData.lifecycleStages.includes('transportation')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'transportation')}
+                />
+                Транспортировка и дистрибуция
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="commissioning"
+                  checked={formData.lifecycleStages.includes('commissioning')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'commissioning')}
+                />
+                Установка и ввод в эксплуатацию
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="operation"
+                  checked={formData.lifecycleStages.includes('operation')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'operation')}
+                />
+                Эксплуатация (использование по назначению)
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="maintenance"
+                  checked={formData.lifecycleStages.includes('maintenance')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'maintenance')}
+                />
+                Техническое обслуживание и сервис
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="decommissioning"
+                  checked={formData.lifecycleStages.includes('decommissioning')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'decommissioning')}
+                />
+                Демонтаж и вывод из эксплуатации
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="disposal"
+                  checked={formData.lifecycleStages.includes('disposal')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'disposal')}
+                />
+                Утилизация и уничтожение изделия или его компонентов
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="other"
+                  checked={formData.lifecycleStages.includes('other')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'other')}
+                />
+                Другие
+              </label>
+            </div>
+          </div>
+
+          {formData.lifecycleStages.includes('other') && (
+            <div className="form-group">
+              <label htmlFor="customLifecycleStage">Пользовательский этап жизненного цикла</label>
+              <input
+                type="text"
+                id="customLifecycleStage"
+                name="customLifecycleStage"
+                value={formData.customLifecycleStage}
+                onChange={handleInputChange}
+                placeholder="Введите пользовательский этап жизненного цикла"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Оценка опасностей */}
+        <div className="form-section">
+          <h2>Оценка опасностей</h2>
+          <p>Ответьте на следующие вопросы, чтобы определить, какие вкладки опасностей будут доступны. Некоторые вкладки всегда доступны.</p>
+
+          {/* Основные свойства устройства */}
+          <div className="form-group">
+            <label>Основные свойства устройства</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="active"
+                  checked={formData.hazardQuestions.active}
+                  onChange={handleHazardChange}
+                />
+                Активное
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="sterile"
+                  checked={formData.hazardQuestions.sterile}
+                  onChange={handleHazardChange}
+                />
+                Стерильное
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="disposable"
+                  checked={formData.hazardQuestions.disposable}
+                  onChange={handleHazardChange}
+                />
+                Одноразовое
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="software"
+                  checked={formData.hazardQuestions.software}
+                  onChange={handleHazardChange}
+                />
+                Программное обеспечение входит в состав?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="implantable"
+                  checked={formData.hazardQuestions.implantable}
+                  onChange={handleHazardChange}
+                />
+                Предназначено для имплантации?
+              </label>
+            </div>
+          </div>
+
+          {/* Биосовместимость */}
+          <div className="form-group">
+            <label>Биосовместимость</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="bodyContact"
+                  checked={formData.hazardQuestions.bodyContact}
+                  onChange={handleHazardChange}
+                />
+                Имеет ли изделие контакт с телом человека или его жидкостями?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="materialContact"
+                  checked={formData.hazardQuestions.materialContact}
+                  onChange={handleHazardChange}
+                />
+                Используются ли материалы с прямым контактом с тканями или жидкостями?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="implantableDevice"
+                  checked={formData.hazardQuestions.implantableDevice}
+                  onChange={handleHazardChange}
+                />
+                Предназначено ли изделие для имплантации?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="substanceRelease"
+                  checked={formData.hazardQuestions.substanceRelease}
+                  onChange={handleHazardChange}
+                />
+                Есть ли риск выделения веществ из материалов в организм?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="sensitization"
+                  checked={formData.hazardQuestions.sensitization}
+                  onChange={handleHazardChange}
+                />
+                Есть ли риск сенсибилизации, раздражения или цитотоксичности?
+              </label>
+            </div>
+          </div>
+
+          {/* Данные и системы */}
+          <div className="form-group">
+            <label>Данные и системы</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="containsSoftware"
+                  checked={formData.hazardQuestions.containsSoftware}
+                  onChange={handleHazardChange}
+                />
+                Содержит ли изделие программное обеспечение?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="dataExchange"
+                  checked={formData.hazardQuestions.dataExchange}
+                  onChange={handleHazardChange}
+                />
+                Обменивается ли изделие данными с другими устройствами или сетями?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="wireless"
+                  checked={formData.hazardQuestions.wireless}
+                  onChange={handleHazardChange}
+                />
+                Передаёт ли изделие информацию по беспроводной связи (Wi-Fi, Bluetooth)?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="personalData"
+                  checked={formData.hazardQuestions.personalData}
+                  onChange={handleHazardChange}
+                />
+                Хранит ли изделие персональные или медицинские данные?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="userInterface"
+                  checked={formData.hazardQuestions.userInterface}
+                  onChange={handleHazardChange}
+                />
+                Управляется ли изделие через интерфейс пользователя или сеть?
+              </label>
+            </div>
+          </div>
+
+          {/* Электричество */}
+          <div className="form-group">
+            <label>Электричество</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="activeDevice"
+                  checked={formData.hazardQuestions.activeDevice}
+                  onChange={handleHazardChange}
+                />
+                Является ли изделие активным (использует источник энергии)?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="powerConnection"
+                  checked={formData.hazardQuestions.powerConnection}
+                  onChange={handleHazardChange}
+                />
+                Подключается ли изделие к электросети или батарее?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="electricalContacts"
+                  checked={formData.hazardQuestions.electricalContacts}
+                  onChange={handleHazardChange}
+                />
+                Есть ли электрические контакты, которые могут соприкасаться с пользователем или пациентом?
+              </label>
+            </div>
+          </div>
+
+          {/* Движущиеся части */}
+          <div className="form-group">
+            <label>Движущиеся части</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="movingElements"
+                  checked={formData.hazardQuestions.movingElements}
+                  onChange={handleHazardChange}
+                />
+                Содержит ли изделие движущиеся механические элементы?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="movingRisk"
+                  checked={formData.hazardQuestions.movingRisk}
+                  onChange={handleHazardChange}
+                />
+                Есть ли подвижные узлы, создающие риск защемления, раздавливания или травмы?
+              </label>
+            </div>
+          </div>
+
+          {/* Излучение */}
+          <div className="form-group">
+            <label>Излучение</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="emitsEnergy"
+                  checked={formData.hazardQuestions.emitsEnergy}
+                  onChange={handleHazardChange}
+                />
+                Излучает ли изделие энергию (ультразвук, инфракрасное, УФ, радиацию, лазер)?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="opticalSystems"
+                  checked={formData.hazardQuestions.opticalSystems}
+                  onChange={handleHazardChange}
+                />
+                Использует ли изделие световые или оптические системы высокой интенсивности?
+              </label>
+            </div>
+          </div>
+
+          {/* Удобство использования */}
+          <div className="form-group">
+            <label>Удобство использования</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="specialTraining"
+                  checked={formData.hazardQuestions.specialTraining}
+                  onChange={handleHazardChange}
+                />
+                Требуется ли специальное обучение для безопасного применения?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="specialNeeds"
+                  checked={formData.hazardQuestions.specialNeeds}
+                  onChange={handleHazardChange}
+                />
+                Предусмотрено ли применение лицами с особыми потребностями?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="interfaceError"
+                  checked={formData.hazardQuestions.interfaceError}
+                  onChange={handleHazardChange}
+                />
+                Есть ли риск неправильного выбора режима или ошибки интерфейса?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="alarms"
+                  checked={formData.hazardQuestions.alarms}
+                  onChange={handleHazardChange}
+                />
+                Отображает ли изделие сигналы тревоги или предупреждения?
+              </label>
+            </div>
+          </div>
+
+          {/* Микробиологические факторы */}
+          <div className="form-group">
+            <label>Микробиологические факторы</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="isSterile"
+                  checked={formData.hazardQuestions.isSterile}
+                  onChange={handleHazardChange}
+                />
+                Изделие является стерильным?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="reusable"
+                  checked={formData.hazardQuestions.reusable}
+                  onChange={handleHazardChange}
+                />
+                Изделие многоразовое (повторная очистка и дезинфекция)?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="biologicalContact"
+                  checked={formData.hazardQuestions.biologicalContact}
+                  onChange={handleHazardChange}
+                />
+                Имеет ли изделие контакт с биологическими жидкостями?
+              </label>
+            </div>
+          </div>
+
+          {/* Химические вещества */}
+          <div className="form-group">
+            <label>Химические вещества</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="chemicalSubstances"
+                  checked={formData.hazardQuestions.chemicalSubstances}
+                  onChange={handleHazardChange}
+                />
+                Содержит ли изделие химически активные вещества или реагенты?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="chemicalRelease"
+                  checked={formData.hazardQuestions.chemicalRelease}
+                  onChange={handleHazardChange}
+                />
+                Возможен ли выброс, испарение или утечка химических веществ при эксплуатации?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="chemicalSterilization"
+                  checked={formData.hazardQuestions.chemicalSterilization}
+                  onChange={handleHazardChange}
+                />
+                Требует ли изделие стерилизации химическими агентами?
+              </label>
+            </div>
+          </div>
+
+          {/* Ткани животного происхождения */}
+          <div className="form-group">
+            <label>Ткани животного происхождения</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="animalMaterials"
+                  checked={formData.hazardQuestions.animalMaterials}
+                  onChange={handleHazardChange}
+                />
+                Используются ли материалы или компоненты животного происхождения (коллаген, желатин и т.п.)?
+              </label>
+            </div>
+          </div>
+
+          {/* Наноматериалы */}
+          <div className="form-group">
+            <label>Наноматериалы</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="nanomaterials"
+                  checked={formData.hazardQuestions.nanomaterials}
+                  onChange={handleHazardChange}
+                />
+                Содержит ли изделие наночастицы, нанопокрытия или наноструктуры?
+              </label>
+            </div>
+          </div>
+
+          {/* Фармацевтические субстанции */}
+          <div className="form-group">
+            <label>Фармацевтические субстанции</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="pharmaceutical"
+                  checked={formData.hazardQuestions.pharmaceutical}
+                  onChange={handleHazardChange}
+                />
+                Содержит ли изделие лекарственные вещества или покрытия с высвобождением субстанции?
+              </label>
+            </div>
+          </div>
+
+          {/* Воздействие окружающей среды */}
+          <div className="form-group">
+            <label>Воздействие окружающей среды</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="environmentalSensitivity"
+                  checked={formData.hazardQuestions.environmentalSensitivity}
+                  onChange={handleHazardChange}
+                />
+                Чувствительно ли изделие к температуре, влажности, пыли, вибрации или ЭМИ?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="environmentalImpact"
+                  checked={formData.hazardQuestions.environmentalImpact}
+                  onChange={handleHazardChange}
+                />
+                Может ли изделие оказывать влияние на окружающую среду при утилизации?
+              </label>
+            </div>
+          </div>
+
+          {/* Механические факторы */}
+          <div className="form-group">
+            <label>Механические факторы</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="mechanicalLoad"
+                  checked={formData.hazardQuestions.mechanicalLoad}
+                  onChange={handleHazardChange}
+                />
+                Подвержено ли изделие механическим нагрузкам, вибрации, ударам?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="destructionRisk"
+                  checked={formData.hazardQuestions.destructionRisk}
+                  onChange={handleHazardChange}
+                />
+                Есть ли риск разрушения, деформации, разгерметизации?
+              </label>
+            </div>
+          </div>
+
+          {/* Термические воздействия */}
+          <div className="form-group">
+            <label>Термические воздействия</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="heating"
+                  checked={formData.hazardQuestions.heating}
+                  onChange={handleHazardChange}
+                />
+                Может ли изделие нагреваться или охлаждаться при использовании?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="surfaceContact"
+                  checked={formData.hazardQuestions.surfaceContact}
+                  onChange={handleHazardChange}
+                />
+                Контактирует ли пользователь или пациент с горячими или холодными поверхностями?
+              </label>
+            </div>
+          </div>
+
+          {/* Надежность (всегда активна) */}
+          <div className="form-group">
+            <label>Надежность (всегда активна)</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="reliability"
+                  checked={true}
+                  disabled
+                />
+                Опасности, связанные с надежностью, отказом конструкции или функций изделия
+              </label>
+            </div>
+          </div>
+
+          {/* Клиническое применение */}
+          <div className="form-group">
+            <label>Клиническое применение</label>
+            <div className="checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="clinicalUse"
+                  checked={formData.hazardQuestions.clinicalUse}
+                  onChange={handleHazardChange}
+                />
+                Используется ли изделие в диагностике, лечении, реабилитации или мониторинге состояния пациента?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="clinicalError"
+                  checked={formData.hazardQuestions.clinicalError}
+                  onChange={handleHazardChange}
+                />
+                Может ли ошибка применения привести к клиническим последствиям?
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="clinicalValidation"
+                  checked={formData.hazardQuestions.clinicalValidation}
+                  onChange={handleHazardChange}
+                />
+                Требуется ли клиническая валидация эффективности или безопасности?
+              </label>
+            </div>
+          </div>
+
+          {/* Пользовательская опасность */}
+          <div className="form-group">
+            <label htmlFor="customHazard">Пользовательская опасность</label>
+            <input
+              type="text"
+              id="customHazard"
+              name="customHazard"
+              value={formData.customHazard}
+              onChange={handleInputChange}
+              placeholder="Введите пользовательскую опасность"
+            />
+          </div>
+        </div>
+
         {error && <div className="error-message">{error}</div>}
 
-        {/* Form Actions */}
+        {/* Действия формы */}
         <div className="form-actions">
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="btn btn-secondary"
             onClick={() => navigate(-1)}
           >
-            Cancel
+            Отмена
           </button>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn-primary"
             disabled={loading}
           >
-            {loading ? 'Saving...' : (isEditMode ? 'Update Project' : 'Create Project')}
+            {loading ? 'Сохранение...' : (isEditMode ? 'Обновить проект' : 'Создать проект')}
           </button>
         </div>
       </form>
 
-      {/* Floating return button like Personal Account */}
+      {/* Плавающая кнопка возврата наверх */}
       <button
         className={`floating-return visible`}
         onClick={() => {
@@ -653,7 +1502,7 @@ const ProjectForm = () => {
           if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
           else window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        aria-label="Return to top"
+        aria-label="Вернуться наверх"
       >
         ↑
       </button>
