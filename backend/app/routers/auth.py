@@ -58,18 +58,18 @@ def create_user_from_azure(db: Session, azure_user_info: dict) -> User:
 
 
 async def get_current_user(
-    credentials = Depends(security), 
+    credentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
     """Get current authenticated user from local token"""
     token = credentials.credentials
     token_data = verify_local_token(token)
-    
+
     # Try to find user by email first, then by Azure object ID
     user = get_user_by_email(db, email=token_data["email"])
     if not user:
         user = get_user_by_azure_id(db, azure_object_id=token_data["object_id"])
-    
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

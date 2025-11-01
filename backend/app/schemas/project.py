@@ -27,6 +27,15 @@ class ProjectBase(BaseModel):
     invasiveness: Optional[str] = "non_invasive"
     energy_source: Optional[str] = "none"
 
+    # Project configuration and lifecycle
+    lifecycle_stages: Optional[list] = None
+    custom_lifecycle_stages: Optional[list] = None
+
+    # Hazard questions and checklist answers
+    hazard_questions: Optional[dict] = None
+    custom_hazard: Optional[str] = None
+    hazard_checklist_answers: Optional[dict] = None  # New field for storing checklist answers
+
 
 class ProjectCreate(ProjectBase):
     """Schema for creating a new project"""
@@ -54,6 +63,11 @@ class ProjectUpdate(BaseModel):
     duration: Optional[str] = None
     invasiveness: Optional[str] = None
     energy_source: Optional[str] = None
+    lifecycle_stages: Optional[list] = None
+    custom_lifecycle_stages: Optional[list] = None
+    hazard_questions: Optional[dict] = None
+    custom_hazard: Optional[str] = None
+    hazard_checklist_answers: Optional[dict] = None
 
 
 class ProjectMemberBase(BaseModel):

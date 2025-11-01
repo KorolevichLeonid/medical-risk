@@ -59,7 +59,18 @@ class Project(Base):
     
     # Project ownership
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
+
+    # Project configuration and lifecycle
+    lifecycle_stages = Column(Text, nullable=True)  # JSON string of lifecycle stages array
+    custom_lifecycle_stages = Column(Text, nullable=True)  # JSON string of custom lifecycle stages array
+
+    # Hazard questions and configurations
+    hazard_questions = Column(Text, nullable=True)  # JSON string of hazard questions object
+    custom_hazard = Column(Text, nullable=True)  # Custom hazard descriptions
+
+    # Hazard checklist answers (new for storing detailed checklist responses)
+    hazard_checklist_answers = Column(Text, nullable=True)  # JSON string of detailed answers to checklist questions
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

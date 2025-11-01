@@ -1,3 +1,6 @@
+
+
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import './RiskAnalysis.css';
@@ -27,6 +30,9 @@ const RiskAnalysis = () => {
     hazardCategory: 'biological_chemical'
     // severityScore, probabilityScore, and controlMeasures are now managed in the risk table
   });
+  // Removed hazard checklists functionality
+
+
 
   useEffect(() => {
     loadCurrentUser();
@@ -110,13 +116,14 @@ const RiskAnalysis = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (projectResponse.ok) {
         const projectData = await projectResponse.json();
         setProject({
           id: projectData.id,
           name: projectData.name,
-          deviceName: projectData.device_name
+          deviceName: projectData.device_name,
+          hazardQuestions: projectData.hazard_questions || {}
         });
       }
       
@@ -474,6 +481,8 @@ const RiskAnalysis = () => {
           </select>
         </div>
       </div>
+
+
 
       {/* Risk Table */}
       <div className="risk-table-container">

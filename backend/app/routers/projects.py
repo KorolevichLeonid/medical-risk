@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import json
 
 from ..database import get_db
 from ..models.user import User, UserRole
@@ -141,12 +142,12 @@ async def read_projects(
         projects = db.query(Project).join(ProjectMember, Project.id == ProjectMember.project_id, isouter=True).filter(
             (Project.owner_id == current_user.id) | (ProjectMember.user_id == current_user.id)
         ).distinct().offset(skip).limit(limit).all()
-    
+
     # Add member count and user role for each project
     result = []
     for project in projects:
         member_count = db.query(ProjectMember).filter(ProjectMember.project_id == project.id).count()
-        
+
         # Determine user's role in this project
         user_role = None
         if current_user.role == UserRole.SYS_ADMIN:
@@ -164,7 +165,7 @@ async def read_projects(
                 ).first()
                 if member:
                     user_role = member.role.value
-        
+
         project_data = ProjectListResponse(
             id=project.id,
             name=project.name,
@@ -177,7 +178,7 @@ async def read_projects(
             user_role=user_role
         )
         result.append(project_data)
-    
+
     return result
 
 
@@ -210,7 +211,12 @@ async def create_project(
         invasiveness=project.invasiveness,
         energy_source=project.energy_source,
         status=project.status if hasattr(project, 'status') else ProjectStatus.DRAFT,
-        owner_id=current_user.id
+        owner_id=current_user.id,
+        lifecycle_stages=json.dumps(project.lifecycle_stages) if project.lifecycle_stages else None,
+        custom_lifecycle_stages=json.dumps(project.custom_lifecycle_stages) if project.custom_lifecycle_stages else None,
+        hazard_questions=json.dumps(project.hazard_questions) if project.hazard_questions else None,
+        custom_hazard=project.custom_hazard,
+        hazard_checklist_answers=json.dumps(project.hazard_checklist_answers) if project.hazard_checklist_answers else None
     )
     db.add(db_project)
     db.commit()
@@ -242,8 +248,110 @@ async def create_project(
         project_data=project_data,
         request=request
     )
-    
-    return db_project
+
+    # Return properly formatted response like read_project and update_project
+    # Get project members
+    owner = db.query(User).filter(User.id == db_project.owner_id).first()
+    owner_member = ProjectMemberResponse(
+        id=0,  # Special ID for owner
+        project_id=db_project.id,
+        user_id=owner.id,
+        role="admin",  # Project owner is admin
+        joined_at=db_project.created_at,
+        user_email=owner.email,
+        user_first_name=owner.first_name,
+        user_last_name=owner.last_name
+    )
+
+    # Get project members
+    members = db.query(ProjectMember).filter(ProjectMember.project_id == db_project.id).all()
+    member_responses = []
+
+    # Add owner to members list
+    member_responses.append(owner_member)
+
+    # For sys admin: add them as admin if they're not the owner
+    if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
+        sysadmin_member = ProjectMemberResponse(
+            id=-1,  # Special ID for sys admin
+            project_id=db_project.id,
+            user_id=current_user.id,
+            role="admin",  # Sys admin is always admin in any project
+            joined_at=db_project.created_at,
+            user_email=current_user.email,
+            user_first_name=current_user.first_name,
+            user_last_name=current_user.last_name
+        )
+        member_responses.append(sysadmin_member)
+
+    # Add actual project members (excluding owner to avoid duplication)
+    for member in members:
+        # Skip if this member is the owner (already added above)
+        if member.user_id == db_project.owner_id:
+            continue
+
+        user = db.query(User).filter(User.id == member.user_id).first()
+        if user:
+            member_responses.append(ProjectMemberResponse(
+                id=member.id,
+                project_id=member.project_id,
+                user_id=member.user_id,
+                role=member.role.value,  # Convert enum to string
+                joined_at=member.joined_at,
+                user_email=user.email,
+                user_first_name=user.first_name,
+                user_last_name=user.last_name
+            ))
+
+    # Deserialize JSON fields for response
+    def safe_json_load(data):
+        if not data:
+            return None
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            return None
+
+    lifecycle_stages_data = safe_json_load(db_project.lifecycle_stages)
+    custom_lifecycle_stages_data = safe_json_load(db_project.custom_lifecycle_stages)
+    hazard_questions_data = safe_json_load(db_project.hazard_questions)
+    hazard_checklist_answers_data = safe_json_load(db_project.hazard_checklist_answers)
+
+    # Create response manually to avoid ORM serialization issues
+    response_data = ProjectResponse(
+        id=db_project.id,
+        name=db_project.name,
+        description=db_project.description,
+        status=db_project.status,
+        progress_percentage=db_project.progress_percentage,
+        device_name=db_project.device_name,
+        device_model=db_project.device_model,
+        device_purpose=db_project.device_purpose,
+        device_description=db_project.device_description,
+        device_classification=db_project.device_classification,
+        intended_use=db_project.intended_use,
+        user_profile=db_project.user_profile,
+        operating_environment=db_project.operating_environment,
+        technical_specs=db_project.technical_specs,
+        regulatory_requirements=db_project.regulatory_requirements,
+        standards=db_project.standards,
+        contact_type=db_project.contact_type,
+        duration=db_project.duration,
+        invasiveness=db_project.invasiveness,
+        energy_source=db_project.energy_source,
+        lifecycle_stages=lifecycle_stages_data,
+        custom_lifecycle_stages=custom_lifecycle_stages_data,
+        hazard_questions=hazard_questions_data,
+        custom_hazard=db_project.custom_hazard,
+        hazard_checklist_answers=hazard_checklist_answers_data,
+        owner_id=db_project.owner_id,
+        created_at=db_project.created_at,
+        updated_at=db_project.updated_at,
+        members=member_responses,
+        versions=[]  # We'll add versions if needed later
+    )
+
+    return response_data
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -316,6 +424,12 @@ async def read_project(
                 user_last_name=user.last_name
             ))
     
+    # Deserialize JSON fields
+    lifecycle_stages_data = json.loads(db_project.lifecycle_stages) if db_project.lifecycle_stages else None
+    custom_lifecycle_stages_data = json.loads(db_project.custom_lifecycle_stages) if db_project.custom_lifecycle_stages else None
+    hazard_questions_data = json.loads(db_project.hazard_questions) if db_project.hazard_questions else None
+    hazard_checklist_answers_data = json.loads(db_project.hazard_checklist_answers) if db_project.hazard_checklist_answers else None
+
     # Create response manually to avoid ORM serialization issues
     response_data = ProjectResponse(
         id=db_project.id,
@@ -338,6 +452,11 @@ async def read_project(
         duration=db_project.duration,
         invasiveness=db_project.invasiveness,
         energy_source=db_project.energy_source,
+        lifecycle_stages=lifecycle_stages_data,
+        custom_lifecycle_stages=custom_lifecycle_stages_data,
+        hazard_questions=hazard_questions_data,
+        custom_hazard=db_project.custom_hazard,
+        hazard_checklist_answers=hazard_checklist_answers_data,
         owner_id=db_project.owner_id,
         created_at=db_project.created_at,
         updated_at=db_project.updated_at,
@@ -376,9 +495,19 @@ async def update_project(
     
     # Update fields if provided
     update_data = project_update.dict(exclude_unset=True)
+    # Handle JSON serialization for specific fields
+    if 'lifecycle_stages' in update_data:
+        update_data['lifecycle_stages'] = json.dumps(update_data['lifecycle_stages']) if update_data['lifecycle_stages'] else None
+    if 'custom_lifecycle_stages' in update_data:
+        update_data['custom_lifecycle_stages'] = json.dumps(update_data['custom_lifecycle_stages']) if update_data['custom_lifecycle_stages'] else None
+    if 'hazard_questions' in update_data:
+        update_data['hazard_questions'] = json.dumps(update_data['hazard_questions']) if update_data['hazard_questions'] else None
+    if 'hazard_checklist_answers' in update_data:
+        update_data['hazard_checklist_answers'] = json.dumps(update_data['hazard_checklist_answers']) if update_data['hazard_checklist_answers'] else None
+
     for field, value in update_data.items():
         setattr(db_project, field, value)
-    
+
     db.commit()
     db.refresh(db_project)
     
@@ -472,6 +601,20 @@ async def update_project(
                 user_last_name=member_user.last_name
             ))
     
+    # Deserialize JSON fields for response
+    def safe_json_load(data):
+        if not data:
+            return None
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            return None
+
+    lifecycle_stages_data = safe_json_load(db_project.lifecycle_stages)
+    custom_lifecycle_stages_data = safe_json_load(db_project.custom_lifecycle_stages)
+    hazard_questions_data = safe_json_load(db_project.hazard_questions)
+    hazard_checklist_answers_data = safe_json_load(db_project.hazard_checklist_answers)
+
     # Create response data
     response_data = ProjectResponse(
         id=db_project.id,
@@ -494,6 +637,11 @@ async def update_project(
         duration=db_project.duration,
         invasiveness=db_project.invasiveness,
         energy_source=db_project.energy_source,
+        lifecycle_stages=lifecycle_stages_data,
+        custom_lifecycle_stages=custom_lifecycle_stages_data,
+        hazard_questions=hazard_questions_data,
+        custom_hazard=db_project.custom_hazard,
+        hazard_checklist_answers=hazard_checklist_answers_data,
         owner_id=db_project.owner_id,
         created_at=db_project.created_at,
         updated_at=db_project.updated_at,
