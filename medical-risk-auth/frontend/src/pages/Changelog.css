@@ -1,0 +1,393 @@
+/* Changelog styles based on Figma design */
+
+.changelog-container {
+    min-height: 100vh;
+    background-color: #BFBFBF;
+    padding: 40px;
+    font-family: 'Inter', sans-serif;
+}
+
+.changelog-header {
+    text-align: left;
+    margin-bottom: 40px;
+}
+
+.changelog-header h1 {
+    font-size: 36px;
+    font-weight: 600;
+    color: #131313;
+    margin: 0 0 10px 0;
+}
+
+.changelog-header p {
+    font-size: 18px;
+    color: #131313;
+    opacity: 0.8;
+    margin: 0;
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    font-size: 18px;
+    color: #131313;
+}
+
+.error-message {
+    background-color: #AFADAD;
+    border-radius: 30px;
+    padding: 40px;
+    text-align: center;
+    color: #131313;
+    margin: 40px auto;
+    max-width: 600px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.error-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+.error-message h3 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+}
+
+.error-message p {
+    font-size: 16px;
+    margin: 10px 0;
+    opacity: 0.9;
+}
+
+.projects-changelog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.project-changelog-card {
+    background-color: #AFADAD;
+    border-radius: 30px;
+    padding: 24px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    min-height: auto;
+}
+
+.project-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-main-info {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.project-metadata {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.project-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    padding: 4px 0;
+}
+
+.stat-label {
+    color: #666;
+    font-weight: 500;
+}
+
+.stat-value {
+    color: #131313;
+    font-weight: 600;
+}
+
+.project-status-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 52px;
+}
+
+.status-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    margin-bottom: 8px;
+    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.project-version {
+    font-size: 18px;
+    font-weight: 700;
+    color: #131313;
+}
+
+.project-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.project-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #131313;
+    margin: 0 0 10px 0;
+}
+
+.project-description {
+    font-size: 16px;
+    font-weight: 500;
+    color: #4A4A4A;
+    margin: 0 0 10px 0;
+    line-height: 1.5;
+}
+
+.project-device {
+    margin: 10px 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.project-device .device-label {
+    font-weight: 500;
+    margin-right: 5px;
+}
+
+.project-device .device-name {
+    font-weight: 400;
+}
+
+.project-meta {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.project-status {
+    display: flex;
+    align-items: center;
+}
+
+.project-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* two compact columns */
+    gap: 8px 16px;
+    font-size: 12px;
+    color: #666;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stat-label {
+    font-weight: 500;
+    color: #4A4A4A;
+    min-width: 80px;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #131313;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 16px;
+    border-radius: 30px;
+    color: #131313;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+.project-changelog {
+    flex: 1;
+    background-color: #D9D9D9;
+    border-radius: 20px;
+    padding: 20px;
+    min-height: 180px;
+    box-shadow: 0px 2px 3px rgba(0, 0, 0, 0.15);
+}
+
+.project-changelog h4 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #131313;
+    margin: 0 0 12px 0;
+    text-align: left;
+}
+
+.recent-changes {
+    margin-bottom: 20px;
+}
+
+.no-changes {
+    text-align: center;
+    padding: 40px 20px;
+    color: #131313;
+    opacity: 0.7;
+}
+
+.changes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.change-item {
+    background-color: #F5F5F5;
+    border-radius: 15px;
+    padding: 15px;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.change-item.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.change-item.clickable:hover {
+    background-color: #E8E8E8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.change-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.change-user {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.user-name {
+    font-weight: 600;
+    color: #131313;
+    font-size: 14px;
+}
+
+.user-role {
+    font-size: 12px;
+    color: #131313;
+    opacity: 0.7;
+}
+
+.change-action {
+    font-size: 14px;
+    color: #131313;
+    font-weight: 500;
+}
+
+.change-time {
+    font-size: 12px;
+    color: #131313;
+    opacity: 0.6;
+}
+
+.view-full-history {
+    border-top: 1px solid #ADB0B5;
+    padding-top: 15px;
+    text-align: center;
+}
+
+.view-history-btn {
+    background: #424242;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    box-shadow: none;
+}
+
+.view-history-btn:hover {
+    background: #4F4F4F;
+}
+
+.no-projects {
+    text-align: center;
+    padding: 60px 20px;
+    color: #131313;
+    font-size: 18px;
+    opacity: 0.7;
+}
+
+.no-projects-message h3 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+    color: #131313;
+}
+
+.no-projects-message p {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.5;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .changelog-container {
+        padding: 20px;
+    }
+    
+    .project-changelog-card {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .project-main-info {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .project-status-indicator {
+        align-self: center;
+    }
+    
+    .project-changelog {
+        min-height: auto;
+    }
+    
+    .changelog-header h1 {
+        font-size: 28px;
+    }
+}
