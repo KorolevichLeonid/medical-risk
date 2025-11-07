@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './ExcelTable.css';
+import RiskEvaluationWizard from './RiskEvaluationWizard';
+import BatchRiskEvaluation from './BatchRiskEvaluation';
 
 const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [data, setData] = useState([]);
@@ -20,6 +22,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   // Состояние для роли пользователя в проекте
   const [userRole, setUserRole] = useState(null);
   const [loadingRole, setLoadingRole] = useState(true);
+  
+  // Состояние для оценки рисков
+  const [showBatchEvaluation, setShowBatchEvaluation] = useState(false);
+  const [risksToEvaluate, setRisksToEvaluate] = useState([]);
   
   // Для редактирования названий листов и столбцов
   const [editingSheetId, setEditingSheetId] = useState(null);
@@ -103,68 +109,259 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   };
 
   // Проверка, заблокирована ли ячейка для редактирования
-  const isCellLocked = (columnKey) => {
-    // Блокируем первые 5 столбцов в листах sheet1-4 (они управляются из Risk Analysis)
-    const lockedColumns = ['lifecycle_stage', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'];
+  const isCellLocked = (rowIndex, columnKey) => {
+    // Получаем данные строки
+    const row = data[rowIndex];
+    if (!row) return false;
     
-    return isAutoManagedSheet() && lockedColumns.includes(columnKey);
+    // Если риск закрыт - все ячейки заблокированы
+    if (row.is_closed === true) {
+      return true;
+    }
+    
+    // Если выполнена вторичная оценка и она не допустима - блокируем столбцы 1-20
+    if (row.locked_after_second === true) {
+      const lockedUntilColumn20 = [
+        'hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm',
+        'severity_score', 'probability_score', 'risk_score', 'risk_level_1', 'comment_1',
+        'control_measure_1', 'control_measure_2', 'control_measure_3',
+        'verification_1', 'verification_2', 'verification_3',
+        'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2', 'comment_2'
+      ];
+      if (lockedUntilColumn20.includes(columnKey)) {
+        return true;
+      }
+    }
+    
+    // Если выполнена первичная оценка - блокируем столбцы 6-9 (НО НЕ comment_1)
+    if (row.first_evaluation_done === true) {
+      const lockedAfterFirstEval = ['severity_score', 'probability_score', 'risk_score', 'risk_level_1'];
+      if (lockedAfterFirstEval.includes(columnKey)) {
+        return true;
+      }
+    }
+    
+    // Блокируем первые 5 столбцов в листах этапов жизненного цикла (они управляются из Risk Analysis)
+    const alwaysLockedColumns = ['hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'];
+    
+    return isAutoManagedSheet() && alwaysLockedColumns.includes(columnKey);
   };
 
-  // Колонки для разных листов
-  const getColumns = (sheetId) => {
-    // Если лист является этапом жизненного цикла (из настроенных или стандартных), возвращаем столбцы таблицы рисков
+  // Иерархическая структура столбцов с поддержкой многоуровневых заголовков
+  const getColumnStructure = (sheetId) => {
+    // Если лист является этапом жизненного цикла, возвращаем иерархическую структуру таблицы рисков
     if (isAutoManagedSheet()) {
       return [
-        { key: 'lifecycle_stage', label: 'Этап жизненного цикла', width: '180px' },
-        { key: 'hazard_name', label: 'Наименование опасности', width: '200px' },
-        { key: 'event_sequence', label: 'Последовательность событий', width: '200px' },
-        { key: 'hazardous_situation', label: 'Опасная ситуация', width: '200px' },
-        { key: 'harm', label: 'Вред', width: '150px' },
-        { key: 'severity_score', label: 'Тяжесть вреда, балл', width: '120px' },
-        { key: 'probability_score', label: 'Вероятность причинения вреда, балл', width: '150px' },
-        { key: 'risk_score', label: 'Риск, балл', width: '100px' },
-        { key: 'risk_level_1', label: 'Уровень риска (доп./не доп.)', width: '150px' },
-        { key: 'control_measure_1', label: 'Безопасность, заложенная в конструкции', width: '200px' },
-        { key: 'control_measure_2', label: 'Защитная мера/средство', width: '180px' },
-        { key: 'control_measure_3', label: 'Информация по безопасности/обучение', width: '200px' },
-        { key: 'verification_1', label: 'Безопасность, заложенная в конструкции', width: '200px' },
-        { key: 'verification_2', label: 'Защитная мера/средство', width: '180px' },
-        { key: 'verification_3', label: 'Информация по безопасности', width: '180px' },
-        { key: 'residual_risk_level', label: 'Тяжесть вреда, балл', width: '130px' },
-        { key: 'residual_probability', label: 'Вероятность причинения вреда, балл', width: '150px' },
-        { key: 'residual_risk_score', label: 'Достигнутый риск и его уровень', width: '180px' },
-        { key: 'risk_level_2', label: 'Уровень риска (доп./не доп.)', width: '150px' },
-        { key: 'risk_benefit_analysis', label: 'Анализ остаточный риск/польза', width: '200px' },
-        { key: 'new_risks', label: 'Новые риски в результате принятия мер по управлению', width: '250px' }
+        { key: 'hazard_category', label: 'Категория опасности', width: '220px', rowspan: 3 },
+        { key: 'hazard_name', label: 'Наименование опасности', width: '200px', rowspan: 3 },
+        { key: 'event_sequence', label: 'Последовательность событий', width: '200px', rowspan: 3 },
+        { key: 'hazardous_situation', label: 'Опасная ситуация', width: '200px', rowspan: 3 },
+        { key: 'harm', label: 'Вред', width: '150px', rowspan: 3 },
+        { key: 'severity_score', label: 'Тяжесть вреда, балл', width: '120px', rowspan: 3 },
+        { key: 'probability_score', label: 'Вероятность причинения вреда, балл', width: '150px', rowspan: 3 },
+        { key: 'risk_score', label: 'Риск, балл', width: '100px', rowspan: 3 },
+        { key: 'risk_level_1', label: 'Уровень риска (доп./не доп.)', width: '150px', rowspan: 3 },
+        { key: 'comment_1', label: 'Комментарий', width: '200px', rowspan: 3 },
+        // Группа "Контроль риска"
+        { 
+          label: 'Контроль риска', 
+          colspan: 11, 
+          isGroup: true,
+          children: [
+            // Подгруппа "Меры по управлению риском"
+            {
+              label: 'Меры по управлению риском',
+              colspan: 3,
+              isGroup: true,
+              children: [
+                { key: 'control_measure_1', label: 'Безопасность, заложенная в конструкции', width: '200px' },
+                { key: 'control_measure_2', label: 'Защитная мера/средство', width: '180px' },
+                { key: 'control_measure_3', label: 'Информация по безопасности/обучению', width: '200px' }
+              ]
+            },
+            // Подгруппа "Верификация мер по управлению риском"
+            {
+              label: 'Верификация мер по управлению риском',
+              colspan: 3,
+              isGroup: true,
+              children: [
+                { key: 'verification_1', label: 'Безопасность, заложенная в конструкции', width: '200px' },
+                { key: 'verification_2', label: 'Защитная мера/средство', width: '180px' },
+                { key: 'verification_3', label: 'Информация по безопасности', width: '180px' }
+              ]
+            },
+            // Остальные столбцы группы "Контроль риска"
+            { key: 'residual_risk_level', label: 'Тяжесть вреда, балл', width: '130px', rowspan: 2 },
+            { key: 'residual_probability', label: 'Вероятность причинения вреда, балл', width: '150px', rowspan: 2 },
+            { key: 'residual_risk_score', label: 'Достигнутый риск и его уровень', width: '180px', rowspan: 2 },
+            { key: 'risk_level_2', label: 'Уровень риска (доп./не доп.)', width: '150px', rowspan: 2 },
+            { key: 'comment_2', label: 'Комментарий', width: '200px', rowspan: 2 }
+          ]
+        },
+        { key: 'risk_benefit_analysis', label: 'Анализ остаточный риск/польза', width: '200px', rowspan: 3 },
+        { key: 'new_risks', label: 'Новые риски в результате принятия мер по управлению', width: '250px', rowspan: 3 }
       ];
     }
 
-    // Для статических листов
-    switch(sheetId) {
-      case 'sheet5':
-        // 14931 - пустой лист
-        return [
-          { key: 'content', label: 'Содержание', width: '800px' }
-        ];
-      case 'sheet6':
-        // Определения 62366 - пустой лист
-        return [
-          { key: 'content', label: 'Содержание', width: '800px' }
-        ];
-      case 'sheet7':
-        // Заключения-Выводы - пустой лист
-        return [
-          { key: 'content', label: 'Содержание', width: '800px' }
-        ];
-      default:
-        // Для пользовательских листов возвращаем одну колонку
-        return [
-          { key: 'content', label: 'Содержание', width: '800px' }
-        ];
-    }
+    // Для статических листов - простая структура без иерархии
+    return [{ key: 'content', label: 'Содержание', width: '800px', rowspan: 1 }];
   };
 
-  const columns = getColumns(activeSheet);
+  // Извлекаем плоский список столбцов из иерархической структуры (для обратной совместимости)
+  const flattenColumns = (structure) => {
+    const result = [];
+    const traverse = (items) => {
+      items.forEach(item => {
+        if (item.isGroup && item.children) {
+          traverse(item.children);
+        } else if (item.key) {
+          result.push(item);
+        }
+      });
+    };
+    traverse(structure);
+    return result;
+  };
+
+  const columnStructure = getColumnStructure(activeSheet);
+  const columns = flattenColumns(columnStructure);
+
+  // Функция для рендеринга многоуровневых заголовков
+  const renderHierarchicalHeaders = () => {
+    if (!isAutoManagedSheet()) {
+      // Для обычных листов - простая структура
+      return (
+        <tr>
+          <th className="row-number-header">№</th>
+          {columns.map(column => (
+            <th 
+              key={column.key} 
+              className="column-header"
+              style={{ width: getColumnWidth(column.key), minWidth: '60px', position: 'relative' }}
+              onDoubleClick={() => handleColumnDoubleClick(column.key)}
+            >
+              {editingColumnKey === column.key ? (
+                <input
+                  type="text"
+                  className="column-label-input"
+                  value={editingColumnLabel}
+                  onChange={(e) => setEditingColumnLabel(e.target.value)}
+                  onBlur={handleColumnLabelSave}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleColumnLabelSave();
+                    } else if (e.key === 'Escape') {
+                      setEditingColumnKey(null);
+                      setEditingColumnLabel('');
+                    }
+                  }}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <div className="column-header-content">
+                  {getColumnLabel(activeSheet, column.key)}
+                </div>
+              )}
+            </th>
+          ))}
+          <th></th>
+        </tr>
+      );
+    }
+
+    // Для листов с рисками - иерархическая структура
+    const rows = [[], [], []]; // 3 уровня заголовков
+
+    // Первый ряд - верхний уровень
+    rows[0].push(<th key="number-0" className="row-number-header" rowSpan={3}>№</th>);
+    
+    columnStructure.forEach((col, index) => {
+      if (col.rowspan) {
+        // Столбец занимает несколько рядов
+        rows[0].push(
+          <th 
+            key={`col-0-${col.key || index}`}
+            className="column-header"
+            style={{ width: getColumnWidth(col.key), minWidth: '60px' }}
+            rowSpan={col.rowspan}
+          >
+            <div className="column-header-content" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {isAutoManagedSheet() && ['hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'].includes(col.key) && <span title="Столбец управляется из Risk Analysis">🔒</span>}
+              {col.label}
+            </div>
+          </th>
+        );
+      } else if (col.isGroup && col.children) {
+        // Группа столбцов
+        rows[0].push(
+          <th 
+            key={`group-0-${index}`}
+            className="column-header column-group-header"
+            style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#f0f0f0' }}
+            colSpan={col.colspan}
+          >
+            {col.label}
+          </th>
+        );
+
+        // Обрабатываем детей группы
+        col.children.forEach((child, childIndex) => {
+          if (child.rowspan) {
+            // Столбец с rowspan в подгруппе
+            rows[1].push(
+              <th 
+                key={`col-1-${child.key || `${index}-${childIndex}`}`}
+                className="column-header"
+                style={{ width: getColumnWidth(child.key), minWidth: '60px' }}
+                rowSpan={child.rowspan}
+              >
+                {child.label}
+              </th>
+            );
+          } else if (child.isGroup && child.children) {
+            // Подгруппа второго уровня
+            rows[1].push(
+              <th 
+                key={`subgroup-1-${index}-${childIndex}`}
+                className="column-header column-subgroup-header"
+                style={{ textAlign: 'center', fontWeight: 'bold', backgroundColor: '#f5f5f5' }}
+                colSpan={child.colspan}
+              >
+                {child.label}
+              </th>
+            );
+
+            // Обрабатываем детей подгруппы (третий уровень)
+            child.children.forEach((subChild) => {
+              rows[2].push(
+                <th 
+                  key={`col-2-${subChild.key}`}
+                  className="column-header"
+                  style={{ width: getColumnWidth(subChild.key), minWidth: '60px' }}
+                >
+                  <div className="column-header-content">
+                    {subChild.label}
+                  </div>
+                </th>
+              );
+            });
+          }
+        });
+      }
+    });
+
+    // Добавляем пустую ячейку в конце каждого ряда
+    rows[0].push(<th key="empty-0"></th>);
+    rows[1].push(<th key="empty-1"></th>);
+    rows[2].push(<th key="empty-2"></th>);
+
+    return rows.map((rowCells, rowIndex) => (
+      <tr key={`header-row-${rowIndex}`}>
+        {rowCells}
+      </tr>
+    ));
+  };
 
   // Функция для получения буквы столбца (A, B, C...)
   const getColumnLetter = (index) => {
@@ -309,7 +506,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   // Обработка цвета ячейки
   const handleCellColorChange = (rowIndex, columnKey, color) => {
     // Не позволяем менять цвет заблокированных ячеек
-    if (isCellLocked(columnKey)) {
+    if (isCellLocked(rowIndex, columnKey)) {
       return;
     }
     const cellKey = `${activeSheet}_${rowIndex}_${columnKey}`;
@@ -548,7 +745,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       } else if (response.status === 404) {
         // Таблица не существует, создаем пустые данные
         const emptyData = [];
-        const cols = getColumns(activeSheet);
+        const cols = columns; // Используем уже вычисленный список столбцов
 
         for (let i = 0; i < 20; i++) {
           const row = { number: i + 1, id: null, isNew: true };
@@ -626,7 +823,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   const handleCellDoubleClick = (rowIndex, columnKey) => {
     // Проверяем, не заблокирована ли ячейка
-    if (isCellLocked(columnKey)) {
+    if (isCellLocked(rowIndex, columnKey)) {
       return; // Не позволяем редактировать заблокированные ячейки
     }
     setEditingCell({ rowIndex, columnKey });
@@ -636,7 +833,165 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     setEditingCell(null);
   };
 
+  // Функция для поиска рисков требующих оценки
+  const findRisksNeedingEvaluation = () => {
+    if (!isAutoManagedSheet()) {
+      return []; // Оценка требуется только для листов этапов жизненного цикла
+    }
+    
+    // Проверяем, может ли текущий пользователь оценивать риски
+    if (userRole !== 'doctor' && userRole !== 'admin') {
+      return []; // Только doctor и admin могут оценивать
+    }
+    
+    const risksNeedingEval = [];
+    
+    data.forEach((row, rowIndex) => {
+      // Пропускаем закрытые риски
+      if (row.is_closed === true) {
+        return;
+      }
+      
+      // Проверяем первичную оценку (столбцы 6-8)
+      const hasSeverity = row.severity_score && row.severity_score.toString().trim() !== '';
+      const hasProbability = row.probability_score && row.probability_score.toString().trim() !== '';
+      const hasRiskScore = row.risk_score && row.risk_score.toString().trim() !== '';
+      
+      // Если заполнены оценки но нет first_evaluation_done - нужна первичная оценка
+      if (hasSeverity && hasProbability && hasRiskScore && !row.first_evaluation_done) {
+        risksNeedingEval.push({
+          rowIndex,
+          id: row.risk_id || row.id,
+          hazard_name: row.hazard_name || 'Без названия',
+          hazard_category: row.hazard_category || '',
+          severity_score: row.severity_score,
+          probability_score: row.probability_score,
+          risk_score: row.risk_score,
+          evaluationType: 'first'
+        });
+      }
+      
+      // Проверяем вторичную оценку (столбцы 17-19)
+      const hasResidualSeverity = row.residual_risk_level && row.residual_risk_level.toString().trim() !== '';
+      const hasResidualProbability = row.residual_probability && row.residual_probability.toString().trim() !== '';
+      const hasResidualScore = row.residual_risk_score && row.residual_risk_score.toString().trim() !== '';
+      
+      // Если заполнены остаточные оценки но нет second_evaluation_done - нужна вторичная оценка
+      if (hasResidualSeverity && hasResidualProbability && hasResidualScore && !row.second_evaluation_done) {
+        risksNeedingEval.push({
+          rowIndex,
+          id: row.risk_id || row.id,
+          hazard_name: row.hazard_name || 'Без названия',
+          hazard_category: row.hazard_category || '',
+          residual_risk_level: row.residual_risk_level,
+          residual_probability: row.residual_probability,
+          residual_risk_score: row.residual_risk_score,
+          evaluationType: 'second'
+        });
+      }
+    });
+    
+    return risksNeedingEval;
+  };
+
+  // Применяем результаты оценок к данным
+  const applyEvaluations = (evaluations) => {
+    const newData = [...data];
+    const newCellColors = { ...cellColors };
+    const now = new Date().toISOString();
+    const currentUserId = JSON.parse(localStorage.getItem('user') || '{}').id;
+    
+    evaluations.forEach(evaluation => {
+      const rowIndex = evaluation.rowIndex;
+      const row = newData[rowIndex];
+      
+      if (!row) return;
+      
+      if (evaluation.evaluationType === 'first') {
+        // Первичная оценка
+        row.first_evaluation_done = true;
+        row.evaluation_timestamp = now;
+        row.evaluated_by = currentUserId;
+        
+        // Устанавливаем уровень риска и цвет
+        const riskLevelColumn = 'risk_level_1';
+        const commentColumn = 'comment_1';
+        
+        if (evaluation.isAcceptable) {
+          row[riskLevelColumn] = 'Доп';
+          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#4CAF50'; // Зеленый
+        } else {
+          row[riskLevelColumn] = 'Не доп';
+          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#FF4444'; // Красный
+        }
+        
+        // Добавляем комментарий если есть
+        if (evaluation.comment) {
+          row[commentColumn] = evaluation.comment;
+        }
+        
+        // Если риск закрыт
+        if (evaluation.shouldCloseRisk) {
+          row.is_closed = true;
+          row.risk_status = 'closed';
+        } else {
+          row.risk_status = 'evaluated';
+        }
+      } else if (evaluation.evaluationType === 'second') {
+        // Вторичная оценка
+        row.second_evaluation_done = true;
+        row.evaluation_timestamp = now;
+        row.evaluated_by = currentUserId;
+        
+        // Устанавливаем уровень остаточного риска и цвет
+        const riskLevelColumn = 'risk_level_2';
+        const commentColumn = 'comment_2';
+        const newRisksColumn = 'new_risks';
+        
+        if (evaluation.isAcceptable) {
+          row[riskLevelColumn] = 'Доп';
+          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#4CAF50'; // Зеленый
+          row.risk_status = 'completed';
+        } else {
+          row[riskLevelColumn] = 'Не доп';
+          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#FF4444'; // Красный
+          // Блокируем столбцы 1-20
+          row.locked_after_second = true;
+        }
+        
+        // Добавляем комментарий если есть
+        if (evaluation.comment) {
+          row[commentColumn] = evaluation.comment;
+        }
+        
+        // Если созданы новые риски
+        if (evaluation.shouldCreateNewRisk && evaluation.newRiskDescription) {
+          row[newRisksColumn] = evaluation.newRiskDescription;
+          newCellColors[`${activeSheet}_${rowIndex}_${newRisksColumn}`] = '#FF4444'; // Красный
+        }
+      }
+    });
+    
+    setData(newData);
+    setCellColors(newCellColors);
+  };
+
   const handleSave = async () => {
+    // Проверяем, есть ли риски требующие оценки
+    const risksNeedingEval = findRisksNeedingEvaluation();
+    
+    if (risksNeedingEval.length > 0) {
+      // Показываем batch evaluation
+      setRisksToEvaluate(risksNeedingEval);
+      setShowBatchEvaluation(true);
+      return; // Не продолжаем сохранение, пока не будет оценка
+    }
+    
+    // Продолжаем обычное сохранение
+    await performSave();
+  };
+
+  const performSave = async () => {
     setSaving(true);
     try {
       // Подготавливаем данные для отправки на API
@@ -702,6 +1057,9 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       alert('Данные успешно сохранены на сервере!');
       setHasChanges(false);
       setModifiedCells(new Set());
+      
+      // Перезагружаем данные с сервера, чтобы обновить цвета и другие изменения
+      await loadData();
     } catch (error) {
       console.error('Failed to save:', error);
       alert('Ошибка при сохранении данных. Проверьте подключение к серверу.');
@@ -737,6 +1095,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   };
 
   const handleAddNewColumn = () => {
+    // Запрещаем добавление столбцов в автоматически управляемых листах
+    if (isAutoManagedSheet()) {
+      alert('⚠️ Нельзя добавлять столбцы вручную в этом листе.\nСтолбцы управляются автоматически из Risk Analysis.');
+      return;
+    }
+    
     const columnName = prompt('Введите название нового столбца:', 'Новый столбец');
     if (!columnName || !columnName.trim()) return;
 
@@ -768,6 +1132,13 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   };
 
   const handleDeleteColumn = (columnKey) => {
+    // Запрещаем удаление столбцов в автоматически управляемых листах
+    if (isAutoManagedSheet()) {
+      alert('⚠️ Нельзя удалять столбцы вручную в этом листе.\nСтолбцы управляются автоматически из Risk Analysis.');
+      setShowDeleteColumn(null);
+      return;
+    }
+    
     if (!window.confirm('Удалить этот столбец?')) return;
     
     // Удаляем колонку из всех строк
@@ -894,13 +1265,74 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     return userRole === 'admin';
   };
 
+  // Получить визуальный индикатор состояния риска
+  const getRiskStatusIndicator = (row) => {
+    if (!isAutoManagedSheet()) {
+      return { icon: '', color: '', title: '' };
+    }
+    
+    // Риск закрыт
+    if (row.is_closed === true) {
+      return { 
+        icon: '🔒', 
+        color: '#9E9E9E', 
+        title: 'Риск закрыт - редактирование недоступно' 
+      };
+    }
+    
+    // Риск полностью обработан (вторичная оценка выполнена и допустима)
+    if (row.risk_status === 'completed' || row.second_evaluation_done === true) {
+      return { 
+        icon: '✓✓', 
+        color: '#4CAF50', 
+        title: 'Риск полностью обработан' 
+      };
+    }
+    
+    // Вторичная оценка не допустима (столбцы 1-20 заблокированы)
+    if (row.locked_after_second === true) {
+      return { 
+        icon: '⚠', 
+        color: '#FF9800', 
+        title: 'Остаточный риск не допустим - требуются дополнительные меры' 
+      };
+    }
+    
+    // Первичная оценка выполнена
+    if (row.first_evaluation_done === true || row.risk_status === 'evaluated') {
+      return { 
+        icon: '✓', 
+        color: '#2196F3', 
+        title: 'Первичная оценка выполнена' 
+      };
+    }
+    
+    // Требуется первичная оценка (оценки заполнены но не подтверждены)
+    const hasSeverity = row.severity_score && row.severity_score.toString().trim() !== '';
+    const hasProbability = row.probability_score && row.probability_score.toString().trim() !== '';
+    if (hasSeverity && hasProbability) {
+      return { 
+        icon: '!', 
+        color: '#FF9800', 
+        title: 'Требуется подтверждение оценки' 
+      };
+    }
+    
+    // Новый риск (без оценки)
+    return { 
+      icon: '', 
+      color: '', 
+      title: 'Новый риск - требуется оценка' 
+    };
+  };
+
   const renderCell = (row, column, rowIndex) => {
     const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
     const value = row[column.key] || '';
     const cellColor = getCellColor(rowIndex, column.key);
     const canEdit = canEditColumn(column.key);
     const cellStyle = getCellStyle(column.key, cellColor);
-    const isLocked = isCellLocked(column.key);
+    const isLocked = isCellLocked(rowIndex, column.key);
 
     // Проверяем, является ли ячейка измененной
     const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
@@ -1015,7 +1447,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           </div>
           <div className="excel-toolbar-right">
             {/* Палитра цветов - не показываем для заблокированных ячеек */}
-            {selectedCell && !isCellLocked(selectedCell.columnKey) && (
+            {selectedCell && !isCellLocked(selectedCell.rowIndex, selectedCell.columnKey) && (
               <div className="toolbar-color-picker">
                 <span className="color-picker-label">Цвет ячейки:</span>
                 <div
@@ -1148,7 +1580,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
             <div>
               <strong>Автоматическое управление:</strong>
               <ul style={{ margin: '5px 0', paddingLeft: '20px', lineHeight: '1.6' }}>
-                <li>Первые 5 столбцов (отмечены 🔒) заполняются автоматически из Risk Analysis</li>
+                <li>Первые 5 столбцов (отмечены 🔒): Категория опасности, Наименование опасности, Последовательность событий, Опасная ситуация, Вред - заполняются автоматически из Risk Analysis</li>
                 <li>Строки добавляются и удаляются автоматически при изменении рисков в Risk Analysis</li>
                 <li>Вы можете редактировать остальные столбцы для добавления оценок и мер контроля</li>
               </ul>
@@ -1171,7 +1603,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                     onClick={() => setShowDeleteColumn(showDeleteColumn === column.key ? null : column.key)}
                   >
                     {getColumnLetter(index)}
-                    {canDeleteElements() ? (
+                    {!isAutoManagedSheet() && canDeleteElements() ? (
                       <button
                         className="delete-column-btn"
                         onClick={(e) => {
@@ -1193,7 +1625,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                   </th>
                 ))}
                 <th className="add-column-cell">
-                  {canAddElements() ? (
+                  {isAutoManagedSheet() ? (
+                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '11px' }}>
+                      🔒 Управляется из Risk Analysis
+                    </div>
+                  ) : canAddElements() ? (
                     <button className="add-column-btn" onClick={handleAddNewColumn} title="Добавить столбец">
                       ➕
                     </button>
@@ -1205,44 +1641,8 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                 </th>
               </tr>
 
-              {/* Ряд с названиями столбцов */}
-              <tr>
-                <th className="row-number-header">№</th>
-                {columns.map(column => (
-                  <th 
-                    key={column.key} 
-                    className="column-header"
-                    style={{ width: getColumnWidth(column.key), minWidth: '60px', position: 'relative' }}
-                    onDoubleClick={() => handleColumnDoubleClick(column.key)}
-                  >
-                    {editingColumnKey === column.key ? (
-                      <input
-                        type="text"
-                        className="column-label-input"
-                        value={editingColumnLabel}
-                        onChange={(e) => setEditingColumnLabel(e.target.value)}
-                        onBlur={handleColumnLabelSave}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleColumnLabelSave();
-                          } else if (e.key === 'Escape') {
-                            setEditingColumnKey(null);
-                            setEditingColumnLabel('');
-                          }
-                        }}
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <div className="column-header-content" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        {isCellLocked(column.key) && <span title="Столбец управляется из Risk Analysis">🔒</span>}
-                        {getColumnLabel(activeSheet, column.key)}
-                      </div>
-                    )}
-                  </th>
-                ))}
-                <th></th>
-              </tr>
+              {/* Иерархические заголовки столбцов */}
+              {renderHierarchicalHeaders()}
             </thead>
             <tbody>
               {data.map((row, rowIndex) => (
@@ -1253,6 +1653,19 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                     onClick={() => setShowDeleteRow(showDeleteRow === rowIndex ? null : rowIndex)}
                   >
                     <div className="row-number-content">
+                      {/* Индикатор состояния риска */}
+                      {(() => {
+                        const indicator = getRiskStatusIndicator(row);
+                        return indicator.icon ? (
+                          <span 
+                            className="risk-status-indicator" 
+                            style={{ color: indicator.color }}
+                            title={indicator.title}
+                          >
+                            {indicator.icon}
+                          </span>
+                        ) : null;
+                      })()}
                       {row.number}
                       {!isAutoManagedSheet() && canDeleteElements() ? (
                         <button
@@ -1326,6 +1739,27 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           </table>
         </div>
       </div>
+      
+      {/* Batch Risk Evaluation Modal */}
+      {showBatchEvaluation && risksToEvaluate.length > 0 && (
+        <BatchRiskEvaluation
+          risks={risksToEvaluate}
+          onComplete={(evaluations) => {
+            // Применяем оценки
+            applyEvaluations(evaluations);
+            // Закрываем modal
+            setShowBatchEvaluation(false);
+            setRisksToEvaluate([]);
+            // Сохраняем данные
+            performSave();
+          }}
+          onCancel={() => {
+            setShowBatchEvaluation(false);
+            setRisksToEvaluate([]);
+            setSaving(false);
+          }}
+        />
+      )}
     </div>
   );
 };

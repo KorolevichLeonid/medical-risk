@@ -66,7 +66,7 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
         # Create columns for this sheet (full set like in risk_tables.py)
         columns_def = [
             {"key": "risk_id", "label": "ID риска", "width": "100px", "index": 0},
-            {"key": "lifecycle_stage", "label": "Этап жизненного цикла", "width": "180px", "index": 1},
+            {"key": "hazard_category", "label": "Категория опасности", "width": "220px", "index": 1},
             {"key": "hazard_name", "label": "Наименование опасности", "width": "200px", "index": 2},
             {"key": "event_sequence", "label": "Последовательность событий", "width": "200px", "index": 3},
             {"key": "hazardous_situation", "label": "Опасная ситуация", "width": "200px", "index": 4},
@@ -75,18 +75,20 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
             {"key": "probability_score", "label": "Вероятность причинения вреда, балл", "width": "150px", "index": 7},
             {"key": "risk_score", "label": "Риск, балл", "width": "100px", "index": 8},
             {"key": "risk_level_1", "label": "Уровень риска (доп./не доп.)", "width": "150px", "index": 9},
-            {"key": "control_measure_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 10},
-            {"key": "control_measure_2", "label": "Защитная мера/средство", "width": "180px", "index": 11},
-            {"key": "control_measure_3", "label": "Информация по безопасности/обучение", "width": "200px", "index": 12},
-            {"key": "verification_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 13},
-            {"key": "verification_2", "label": "Защитная мера/средство", "width": "180px", "index": 14},
-            {"key": "verification_3", "label": "Информация по безопасности", "width": "180px", "index": 15},
-            {"key": "residual_risk_level", "label": "Тяжесть вреда, балл", "width": "130px", "index": 16},
-            {"key": "residual_probability", "label": "Вероятность причинения вреда, балл", "width": "150px", "index": 17},
-            {"key": "residual_risk_score", "label": "Достигнутый риск и его уровень", "width": "180px", "index": 18},
-            {"key": "risk_level_2", "label": "Уровень риска (доп./не доп.)", "width": "150px", "index": 19},
-            {"key": "risk_benefit_analysis", "label": "Анализ остаточный риск/польза", "width": "200px", "index": 20},
-            {"key": "new_risks", "label": "Новые риски в результате принятия мер по управлению", "width": "250px", "index": 21}
+            {"key": "comment_1", "label": "Комментарий", "width": "200px", "index": 10},
+            {"key": "control_measure_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 11},
+            {"key": "control_measure_2", "label": "Защитная мера/средство", "width": "180px", "index": 12},
+            {"key": "control_measure_3", "label": "Информация по безопасности/обучение", "width": "200px", "index": 13},
+            {"key": "verification_1", "label": "Безопасность, заложенная в конструкции", "width": "200px", "index": 14},
+            {"key": "verification_2", "label": "Защитная мера/средство", "width": "180px", "index": 15},
+            {"key": "verification_3", "label": "Информация по безопасности", "width": "180px", "index": 16},
+            {"key": "residual_risk_level", "label": "Тяжесть вреда, балл", "width": "130px", "index": 17},
+            {"key": "residual_probability", "label": "Вероятность причинения вреда, балл", "width": "150px", "index": 18},
+            {"key": "residual_risk_score", "label": "Достигнутый риск и его уровень", "width": "180px", "index": 19},
+            {"key": "risk_level_2", "label": "Уровень риска (доп./не доп.)", "width": "150px", "index": 20},
+            {"key": "comment_2", "label": "Комментарий", "width": "200px", "index": 21},
+            {"key": "risk_benefit_analysis", "label": "Анализ остаточный риск/польза", "width": "200px", "index": 22},
+            {"key": "new_risks", "label": "Новые риски в результате принятия мер по управлению", "width": "250px", "index": 23}
         ]
 
         for col_def in columns_def:
@@ -109,10 +111,20 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
             break
 
     # Prepare row data (full set like in risk_tables.py)
+    # Extract hazard category from hazard_name (format: "[Category] Name")
+    hazard_category = ""
+    clean_hazard_name = risk_factor.hazard_name or ""
+    if risk_factor.hazard_name:
+        import re
+        category_match = re.match(r'^\[(.+?)\]\s*(.*)$', risk_factor.hazard_name)
+        if category_match:
+            hazard_category = category_match.group(1)
+            clean_hazard_name = category_match.group(2)
+    
     row_data = {
         "risk_id": str(risk_factor.id),
-        "lifecycle_stage": risk_factor.lifecycle_stage or "",
-        "hazard_name": risk_factor.hazard_name or "",
+        "hazard_category": hazard_category,
+        "hazard_name": clean_hazard_name,
         "event_sequence": risk_factor.sequence_of_events or "",
         "hazardous_situation": risk_factor.hazardous_situation or "",
         "harm": risk_factor.harm or "",
@@ -120,6 +132,7 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
         "probability_score": str(risk_factor.probability_score) if risk_factor.probability_score is not None else "",
         "risk_score": str(risk_factor.risk_score) if risk_factor.risk_score is not None else "",
         "risk_level_1": "",
+        "comment_1": "",
         "control_measure_1": "",
         "control_measure_2": "",
         "control_measure_3": "",
@@ -130,6 +143,7 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
         "residual_probability": "",
         "residual_risk_score": "",
         "risk_level_2": "",
+        "comment_2": "",
         "risk_benefit_analysis": "",
         "new_risks": ""
     }

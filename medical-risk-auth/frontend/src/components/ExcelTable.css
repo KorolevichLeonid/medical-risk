@@ -434,6 +434,23 @@
   padding: 4px;
 }
 
+/* Стили для групповых заголовков */
+.column-group-header {
+  background-color: #e8e8e8 !important;
+  font-weight: bold !important;
+  text-align: center !important;
+  border: 2px solid #ccc !important;
+  font-size: 13px !important;
+}
+
+.column-subgroup-header {
+  background-color: #f2f2f2 !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+  border: 1px solid #ddd !important;
+  font-size: 12px !important;
+}
+
 /* Column label input */
 .column-label-input {
   width: 100%;
@@ -820,4 +837,32 @@
     font-size: 11px;
     padding: 3px 10px;
   }
+}
+
+/* Risk Status Indicator */
+.risk-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: bold;
+  margin-right: 6px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.2);
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.row-number-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }

@@ -142,7 +142,17 @@ class RiskTableColumnResponse(RiskTableColumnBase):
 
 
 class RiskTableRowBase(BaseModel):
-    """Base row schema"""
+    """Base row schema
+    
+    data field contains all cell values plus risk status fields:
+    - risk_status: str - 'new', 'evaluated', 'closed', 'measures_applied', 'completed'
+    - is_closed: bool - whether risk is closed (no further edits allowed)
+    - first_evaluation_done: bool - whether first evaluation (columns 6-10) is completed
+    - second_evaluation_done: bool - whether second evaluation (columns 17-21) is completed
+    - locked_after_second: bool - whether columns 1-20 are locked after second evaluation
+    - evaluated_by: int - user_id who made evaluation
+    - evaluation_timestamp: str - ISO timestamp of evaluation
+    """
     row_number: int
     row_index: int
     data: Dict[str, Any] = {}
