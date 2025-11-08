@@ -6,11 +6,13 @@ from .risk_analysis import (
     RiskManagementTable, RiskTableRow, RiskTableColumn
 )
 from .changelog import ChangeLog, ActionType
+from .document import DocumentVersion
 
 __all__ = [
     "User", "UserRole",
     "Project", "ProjectMember", "ProjectVersion", "ProjectStatus", "ProjectRole",
-"RiskAnalysis", "RiskFactor", "LifecycleStage", "HazardCategory", "ContactType",
-"RiskManagementTable", "RiskTableRow", "RiskTableColumn",
-    "ChangeLog", "ActionType"
+    "RiskAnalysis", "RiskFactor", "LifecycleStage", "HazardCategory", "ContactType",
+    "RiskManagementTable", "RiskTableRow", "RiskTableColumn",
+    "ChangeLog", "ActionType",
+    "DocumentVersion"
 ]

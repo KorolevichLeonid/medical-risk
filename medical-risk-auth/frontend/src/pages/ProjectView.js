@@ -344,23 +344,30 @@ const ProjectView = () => {
           <p className="project-description">{project.description}</p>
         </div>
         
-                 <div className="header-actions">
-           {canEditProject() && (
-             <Link to={`/project/${project.id}/edit`} className="btn btn-secondary">
-               Edit Project
-             </Link>
-           )}
-           <button 
-             className="btn btn-secondary"
-             onClick={() => setShowRiskTable(true)}
-             style={{ marginRight: '8px' }}
-           >
-             📊 Risk Management Table
-           </button>
-           <Link to={`/project/${project.id}/risks`} className="btn btn-primary">
-             {canManageRisks() ? 'Manage Risk Analysis' : 'View Risk Analysis'}
-           </Link>
-         </div>
+        <div className="header-actions">
+          {canEditProject() && (
+            <Link to={`/project/${project.id}/edit`} className="btn btn-secondary">
+              Edit Project
+            </Link>
+          )}
+          <button 
+            className="btn btn-secondary"
+            onClick={() => setShowRiskTable(true)}
+            style={{ marginRight: '8px' }}
+          >
+            📊 Risk Management Table
+          </button>
+          <button 
+            className="btn btn-secondary"
+            onClick={() => navigate(`/project/${project.id}/documents`)}
+            style={{ marginRight: '8px' }}
+          >
+            📄 View Document
+          </button>
+          <Link to={`/project/${project.id}/risks`} className="btn btn-primary">
+            {canManageRisks() ? 'Manage Risk Analysis' : 'View Risk Analysis'}
+          </Link>
+        </div>
       </div>
 
       {/* Progress Section */}

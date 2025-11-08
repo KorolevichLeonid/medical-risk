@@ -18,6 +18,7 @@ import PersonalAccount from './pages/PersonalAccount';
 import Changelog from './pages/Changelog';
 import ChangelogHistory from './pages/ChangelogHistory';
 import ChangelogDetail from './pages/ChangelogDetail';
+import DocumentView from './pages/DocumentView';
 import './App.css';
 
 function App() {
@@ -96,6 +97,13 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <RiskAnalysis />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/project/:id/documents" element={
+          <ProtectedRoute>
+            <Layout>
+              <DocumentView />
             </Layout>
           </ProtectedRoute>
         } />

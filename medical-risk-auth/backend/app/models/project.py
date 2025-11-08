@@ -84,6 +84,7 @@ class Project(Base):
     risk_analyses = relationship("RiskAnalysis", back_populates="project")
     versions = relationship("ProjectVersion", back_populates="project")
     risk_tables = relationship("RiskManagementTable", back_populates="project")
+    document_versions = relationship("DocumentVersion", back_populates="project")
 
     def __repr__(self):
         return f"<Project(name='{self.name}', status='{self.status.value}')>"

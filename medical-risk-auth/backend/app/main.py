@@ -7,7 +7,8 @@ from sqlalchemy import text
 from .database import engine, get_db
 from .models import user, project, risk_analysis
 from .models import changelog as changelog_model
-from .routers import auth, users, projects, risk_analyses, risk_tables, changelog
+from .models import document as document_model
+from .routers import auth, users, projects, risk_analyses, risk_tables, changelog, documents
 from . import admin_auth
 from .core.config import settings
 
@@ -16,6 +17,7 @@ user.Base.metadata.create_all(bind=engine)
 project.Base.metadata.create_all(bind=engine)
 risk_analysis.Base.metadata.create_all(bind=engine)
 changelog_model.Base.metadata.create_all(bind=engine)
+document_model.Base.metadata.create_all(bind=engine)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -49,6 +51,7 @@ app.include_router(risk_analyses.router, prefix="/api/risk-analyses", tags=["ris
 app.include_router(risk_tables.router, prefix="/api/risk-tables", tags=["risk-tables"])
 app.include_router(changelog.router)
 app.include_router(admin_auth.router, tags=["admin"])
+app.include_router(documents.router, tags=["documents"])
 
 @app.get("/")
 async def root():
