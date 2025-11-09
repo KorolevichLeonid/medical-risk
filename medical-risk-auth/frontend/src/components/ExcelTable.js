@@ -26,6 +26,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   // Состояние для оценки рисков
   const [showBatchEvaluation, setShowBatchEvaluation] = useState(false);
   const [risksToEvaluate, setRisksToEvaluate] = useState([]);
+  const [dataBeforeChanges, setDataBeforeChanges] = useState(null); // Snapshot данных при последнем сохранении
   
   // Для редактирования названий листов и столбцов
   const [editingSheetId, setEditingSheetId] = useState(null);
@@ -114,10 +115,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const row = data[rowIndex];
     if (!row) return false;
     
-    // Если риск закрыт - все ячейки заблокированы
-    if (row.is_closed === true) {
+    // Если риск полностью закрыт (fully_closed) - ВСЕ ячейки заблокированы
+    if (row.risk_status === 'fully_closed') {
       return true;
     }
+    
     
     // Если выполнена вторичная оценка и она не допустима - блокируем столбцы 1-20
     if (row.locked_after_second === true) {
@@ -137,6 +139,21 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     if (row.first_evaluation_done === true) {
       const lockedAfterFirstEval = ['severity_score', 'probability_score', 'risk_score', 'risk_level_1'];
       if (lockedAfterFirstEval.includes(columnKey)) {
+        return true;
+      }
+    }
+    
+    // ДО ПЕРВИЧНОЙ ОЦЕНКИ - блокируем ВСЁ что после первичной оценки + допуск и комментарий (9, 10)
+    if (!row.first_evaluation_done) {
+      const lockedUntilFirstEval = [
+        'risk_level_1', 'comment_1', // ← Добавили допуск и комментарий первичной оценки
+        'control_measure_1', 'control_measure_2', 'control_measure_3',
+        'verification_1', 'verification_2', 'verification_3',
+        'residual_risk_level', 'residual_probability', 'residual_risk_score', 
+        'risk_level_2', 'comment_2',
+        'risk_benefit_analysis', 'new_risks'
+      ];
+      if (lockedUntilFirstEval.includes(columnKey)) {
         return true;
       }
     }
@@ -734,14 +751,21 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         }));
 
         setData(formattedData);
-        setCellColors(formattedData.reduce((acc, row, index) => {
+        const initialCellColors = formattedData.reduce((acc, row, index) => {
           if (row.cell_colors) {
             Object.entries(row.cell_colors).forEach(([colKey, color]) => {
               acc[`${activeSheet}_${index}_${colKey}`] = color;
             });
           }
           return acc;
-        }, {}));
+        }, {});
+        setCellColors(initialCellColors);
+        
+        // Сохраняем snapshot загруженных данных для отката при отмене оценки
+        setDataBeforeChanges({
+          data: JSON.parse(JSON.stringify(formattedData)),
+          cellColors: { ...initialCellColors }
+        });
       } else if (response.status === 404) {
         // Таблица не существует, создаем пустые данные
         const emptyData = [];
@@ -847,8 +871,8 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const risksNeedingEval = [];
     
     data.forEach((row, rowIndex) => {
-      // Пропускаем закрытые риски
-      if (row.is_closed === true) {
+      // Пропускаем полностью закрытые риски
+      if (row.risk_status === 'fully_closed') {
         return;
       }
       
@@ -894,6 +918,53 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     return risksNeedingEval;
   };
 
+  // Восстанавливаем данные для отмененных рисков из snapshot (до изменений)
+  const restoreDataForCancelledRisks = (cancelledIndices) => {
+    if (!cancelledIndices || cancelledIndices.length === 0 || !dataBeforeChanges) return;
+    
+    const newData = [...data];
+    const newCellColors = { ...cellColors };
+    
+    cancelledIndices.forEach(rowIndex => {
+      const row = newData[rowIndex];
+      if (!row) return;
+      
+      // Находим тип оценки для этого риска
+      const risk = risksToEvaluate.find(r => r.rowIndex === rowIndex);
+      if (!risk) return;
+      
+      const snapshotRow = dataBeforeChanges.data[rowIndex];
+      if (!snapshotRow) return;
+      
+      // Определяем какие поля нужно восстановить в зависимости от типа оценки
+      let fieldsToRestore = [];
+      
+      if (risk.evaluationType === 'first') {
+        // Для первичной оценки восстанавливаем только поля оценки
+        fieldsToRestore = ['severity_score', 'probability_score', 'risk_score'];
+      } else if (risk.evaluationType === 'second') {
+        // Для вторичной оценки
+        fieldsToRestore = ['residual_risk_level', 'residual_probability', 'residual_risk_score'];
+      }
+      
+      // Восстанавливаем значения из snapshot (состояние ДО начала редактирования)
+      fieldsToRestore.forEach(field => {
+        row[field] = snapshotRow[field] || '';
+        
+        // Восстанавливаем или удаляем цвета
+        const colorKey = `${activeSheet}_${rowIndex}_${field}`;
+        if (dataBeforeChanges.cellColors[colorKey]) {
+          newCellColors[colorKey] = dataBeforeChanges.cellColors[colorKey];
+        } else {
+          delete newCellColors[colorKey];
+        }
+      });
+    });
+    
+    setData(newData);
+    setCellColors(newCellColors);
+  };
+
   // Применяем результаты оценок к данным
   const applyEvaluations = (evaluations) => {
     const newData = [...data];
@@ -930,12 +1001,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           row[commentColumn] = evaluation.comment;
         }
         
-        // Если риск закрыт
+        // Если риск закрыт при первичной оценке - переводим в pending_closure (на проверке)
         if (evaluation.shouldCloseRisk) {
-          row.is_closed = true;
-          row.risk_status = 'closed';
+          row.risk_status = 'pending_closure'; // Требует финального подтверждения
+          row.locked_after_second = true; // Блокируем столбцы 1-21
         } else {
-          row.risk_status = 'evaluated';
+          row.risk_status = 'evaluated'; // В работе
         }
       } else if (evaluation.evaluationType === 'second') {
         // Вторичная оценка
@@ -951,16 +1022,19 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         if (evaluation.isAcceptable) {
           row[riskLevelColumn] = 'Доп';
           newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#4CAF50'; // Зеленый
-          row.risk_status = 'completed';
+          row.risk_status = 'pending_closure'; // На проверке, ожидает финального закрытия
         } else {
           row[riskLevelColumn] = 'Не доп';
           newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#FF4444'; // Красный
-          // Блокируем столбцы 1-20
-          row.locked_after_second = true;
+          row.risk_status = 'pending_closure'; // На проверке, ожидает финального закрытия
         }
         
-        // Добавляем комментарий если есть
-        if (evaluation.comment) {
+        // В ЛЮБОМ случае (и Доп, и Не доп) блокируем столбцы 1-21 (до comment_2 включительно)
+        // Остаются редактируемыми: risk_benefit_analysis (22), new_risks (23)
+        row.locked_after_second = true;
+        
+        // Добавляем комментарий если есть (не обязательно для вторичной оценки)
+        if (evaluation.comment && evaluation.comment.trim()) {
           row[commentColumn] = evaluation.comment;
         }
         
@@ -981,7 +1055,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const risksNeedingEval = findRisksNeedingEvaluation();
     
     if (risksNeedingEval.length > 0) {
-      // Показываем batch evaluation
+      // Показываем batch evaluation (snapshot уже создан при загрузке данных)
       setRisksToEvaluate(risksNeedingEval);
       setShowBatchEvaluation(true);
       return; // Не продолжаем сохранение, пока не будет оценка
@@ -1271,39 +1345,30 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       return { icon: '', color: '', title: '' };
     }
     
-    // Риск закрыт
-    if (row.is_closed === true) {
+    // Риск полностью закрыт (финальный статус)
+    if (row.risk_status === 'fully_closed') {
       return { 
-        icon: '🔒', 
-        color: '#9E9E9E', 
-        title: 'Риск закрыт - редактирование недоступно' 
-      };
-    }
-    
-    // Риск полностью обработан (вторичная оценка выполнена и допустима)
-    if (row.risk_status === 'completed' || row.second_evaluation_done === true) {
-      return { 
-        icon: '✓✓', 
+        icon: '🟢', 
         color: '#4CAF50', 
-        title: 'Риск полностью обработан' 
+        title: 'Риск полностью закрыт' 
       };
     }
     
-    // Вторичная оценка не допустима (столбцы 1-20 заблокированы)
-    if (row.locked_after_second === true) {
+    // Риск на проверке (после вторичной оценки, ожидает финального закрытия)
+    if (row.risk_status === 'pending_closure') {
       return { 
-        icon: '⚠', 
+        icon: '🟠', 
         color: '#FF9800', 
-        title: 'Остаточный риск не допустим - требуются дополнительные меры' 
+        title: 'Риск на проверке - ожидает финального закрытия' 
       };
     }
     
-    // Первичная оценка выполнена
+    // Первичная оценка выполнена (в работе)
     if (row.first_evaluation_done === true || row.risk_status === 'evaluated') {
       return { 
-        icon: '✓', 
-        color: '#2196F3', 
-        title: 'Первичная оценка выполнена' 
+        icon: '🟡', 
+        color: '#FFC107', 
+        title: 'В работе - первичная оценка выполнена' 
       };
     }
     
@@ -1320,10 +1385,117 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     
     // Новый риск (без оценки)
     return { 
-      icon: '', 
-      color: '', 
+      icon: '⚪', 
+      color: '#9E9E9E', 
       title: 'Новый риск - требуется оценка' 
     };
+  };
+
+  // Проверка, можно ли полностью закрыть риск
+  const canCloseFully = (row) => {
+    if (!isAutoManagedSheet()) return false;
+    
+    // Только риски со статусом pending_closure могут быть закрыты окончательно
+    return row.risk_status === 'pending_closure';
+  };
+
+  // Финальное закрытие риска (с подтверждением)
+  const handleFullyCloseRisk = async (rowIndex) => {
+    const row = data[rowIndex];
+    
+    const confirmed = window.confirm(
+      '⚠️ ВНИМАНИЕ!\n\n' +
+      'После закрытия риска вы НЕ сможете изменить какие-либо данные в этой строке.\n\n' +
+      `Риск: ${row.hazard_name || 'Без названия'}\n` +
+      `Категория: ${row.hazard_category || '-'}\n\n` +
+      'Вы уверены, что хотите закрыть этот риск окончательно?'
+    );
+    
+    if (!confirmed) return;
+    
+    // Сохраняем текущие данные для отката в случае ошибки
+    const oldData = [...data];
+    
+    // Обновляем статус риска
+    const newData = [...data];
+    newData[rowIndex] = {
+      ...newData[rowIndex],
+      risk_status: 'fully_closed',
+      is_closed: true, // Полная блокировка всех полей
+      closed_by: JSON.parse(localStorage.getItem('user') || '{}').id,
+      closed_timestamp: new Date().toISOString()
+    };
+    
+    setData(newData);
+    setHasChanges(true);
+    
+    // Сразу сохраняем изменения в БД
+    setSaving(true);
+    try {
+      // Подготавливаем данные для отправки
+      const columnDefinitions = columns.map((col, index) => ({
+        key: col.key,
+        label: col.label,
+        width: col.width,
+        column_index: index
+      }));
+
+      const rowData = newData.map((row, index) => {
+        const rowDataOnly = { ...row };
+        delete rowDataOnly.number;
+        delete rowDataOnly.id;
+        delete rowDataOnly.isNew;
+        delete rowDataOnly.cell_colors;
+
+        const cellColorsForRow = {};
+        Object.entries(cellColors)
+          .filter(([key, color]) => key.startsWith(`${activeSheet}_${index}_`))
+          .forEach(([key, color]) => {
+            const parts = key.split('_');
+            const columnKey = parts.slice(2).join('_');
+            cellColorsForRow[columnKey] = color;
+          });
+
+        return {
+          row_number: row.number,
+          row_index: index,
+          data: rowDataOnly,
+          cell_colors: Object.keys(cellColorsForRow).length > 0 ? cellColorsForRow : null
+        };
+      });
+
+      const response = await fetch(`http://localhost:8000/api/risk-tables/project/${projectId}/sheets/${activeSheet}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sheet_name: customSheetNames[activeSheet] || null,
+          columns: columnDefinitions,
+          rows: rowData
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      alert(`✓ Риск "${row.hazard_name || 'Без названия'}" успешно закрыт окончательно!`);
+      setHasChanges(false);
+      
+      // Обновляем snapshot
+      setDataBeforeChanges({
+        data: JSON.parse(JSON.stringify(newData)),
+        cellColors: { ...cellColors }
+      });
+    } catch (error) {
+      console.error('Failed to close risk:', error);
+      alert('Ошибка при закрытии риска. Попробуйте еще раз.');
+      // Откатываем изменения при ошибке
+      setData(oldData);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderCell = (row, column, rowIndex) => {
@@ -1667,7 +1839,20 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                         ) : null;
                       })()}
                       {row.number}
-                      {!isAutoManagedSheet() && canDeleteElements() ? (
+                      
+                      {/* Кнопка финального закрытия риска */}
+                      {canCloseFully(row) ? (
+                        <button
+                          className="close-risk-fully-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFullyCloseRisk(rowIndex);
+                          }}
+                          title="Закрыть риск окончательно"
+                        >
+                          ✓
+                        </button>
+                      ) : !isAutoManagedSheet() && canDeleteElements() ? (
                         <button
                           className="delete-row-btn"
                           onClick={(e) => {
@@ -1744,8 +1929,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       {showBatchEvaluation && risksToEvaluate.length > 0 && (
         <BatchRiskEvaluation
           risks={risksToEvaluate}
-          onComplete={(evaluations) => {
-            // Применяем оценки
+          onComplete={(evaluations, cancelledRiskIndices = []) => {
+            // Восстанавливаем данные для отмененных рисков из snapshot (откат изменений)
+            restoreDataForCancelledRisks(cancelledRiskIndices);
+            // Применяем оценки для НЕ отмененных рисков
             applyEvaluations(evaluations);
             // Закрываем modal
             setShowBatchEvaluation(false);
@@ -1754,6 +1941,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
             performSave();
           }}
           onCancel={() => {
+            // Восстанавливаем все данные из snapshot (полный откат)
+            if (dataBeforeChanges) {
+              setData(JSON.parse(JSON.stringify(dataBeforeChanges.data)));
+              setCellColors({ ...dataBeforeChanges.cellColors });
+            }
             setShowBatchEvaluation(false);
             setRisksToEvaluate([]);
             setSaving(false);

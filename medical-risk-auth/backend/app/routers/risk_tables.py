@@ -691,12 +691,59 @@ async def sync_risks_to_table(
             "risk_level_2": "",
             "comment_2": "",
             "risk_benefit_analysis": "",
-            "new_risks": ""
+            "new_risks": "",
+            "risk_status": "new"  # Default status for new risks
         }
 
         if existing_row:
-            # Update existing row
+            # Update existing row but preserve risk_status and evaluation data
+            existing_risk_status = existing_row.data.get('risk_status', 'new')
+            existing_first_eval = existing_row.data.get('first_evaluation_done', False)
+            existing_second_eval = existing_row.data.get('second_evaluation_done', False)
+            existing_locked_after_second = existing_row.data.get('locked_after_second', False)
+            existing_is_closed = existing_row.data.get('is_closed', False)
+            
+            # Preserve control measures and evaluation data
+            existing_control_1 = existing_row.data.get('control_measure_1', '')
+            existing_control_2 = existing_row.data.get('control_measure_2', '')
+            existing_control_3 = existing_row.data.get('control_measure_3', '')
+            existing_verification_1 = existing_row.data.get('verification_1', '')
+            existing_verification_2 = existing_row.data.get('verification_2', '')
+            existing_verification_3 = existing_row.data.get('verification_3', '')
+            existing_risk_level_1 = existing_row.data.get('risk_level_1', '')
+            existing_comment_1 = existing_row.data.get('comment_1', '')
+            existing_residual_risk_level = existing_row.data.get('residual_risk_level', '')
+            existing_residual_probability = existing_row.data.get('residual_probability', '')
+            existing_residual_risk_score = existing_row.data.get('residual_risk_score', '')
+            existing_risk_level_2 = existing_row.data.get('risk_level_2', '')
+            existing_comment_2 = existing_row.data.get('comment_2', '')
+            existing_risk_benefit = existing_row.data.get('risk_benefit_analysis', '')
+            existing_new_risks = existing_row.data.get('new_risks', '')
+            
+            # Update row with new base data
             existing_row.data = row_data
+            
+            # Restore preserved fields
+            existing_row.data['risk_status'] = existing_risk_status
+            existing_row.data['first_evaluation_done'] = existing_first_eval
+            existing_row.data['second_evaluation_done'] = existing_second_eval
+            existing_row.data['locked_after_second'] = existing_locked_after_second
+            existing_row.data['is_closed'] = existing_is_closed
+            existing_row.data['control_measure_1'] = existing_control_1
+            existing_row.data['control_measure_2'] = existing_control_2
+            existing_row.data['control_measure_3'] = existing_control_3
+            existing_row.data['verification_1'] = existing_verification_1
+            existing_row.data['verification_2'] = existing_verification_2
+            existing_row.data['verification_3'] = existing_verification_3
+            existing_row.data['risk_level_1'] = existing_risk_level_1
+            existing_row.data['comment_1'] = existing_comment_1
+            existing_row.data['residual_risk_level'] = existing_residual_risk_level
+            existing_row.data['residual_probability'] = existing_residual_probability
+            existing_row.data['residual_risk_score'] = existing_residual_risk_score
+            existing_row.data['risk_level_2'] = existing_risk_level_2
+            existing_row.data['comment_2'] = existing_comment_2
+            existing_row.data['risk_benefit_analysis'] = existing_risk_benefit
+            existing_row.data['new_risks'] = existing_new_risks
         else:
             # Create new row
             row_count = db.query(RiskTableRow).filter(

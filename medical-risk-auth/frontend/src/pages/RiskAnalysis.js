@@ -29,8 +29,7 @@ const RiskAnalysis = () => {
     hazardousS: '',
     sequenceOfEvents: '',
     harm: '',
-    hazardCategory: '',  // Будет выбираться из active_hazard_categories проекта
-    customHazardCategory: ''  // Для случая когда выбрано "Другие"
+    hazardCategory: ''  // Будет выбираться из active_hazard_categories проекта
     // severityScore, probabilityScore, and controlMeasures are now managed in the risk table
   });
 
@@ -180,6 +179,7 @@ const RiskAnalysis = () => {
       
       if (risksResponse.ok) {
         const risksData = await risksResponse.json();
+        
         const transformedRisks = risksData.map(risk => {
           // Извлекаем текстовое название категории из hazard_name (формат: "[Категория] Название")
           let textualHazardCategory = risk.hazard_category; // fallback to enum
@@ -204,9 +204,11 @@ const RiskAnalysis = () => {
             riskScore: risk.risk_score,
             controlMeasures: risk.control_measures || '',
             status: 'identified', // Default status for now
-            lastUpdated: risk.updated_at || risk.created_at
+            lastUpdated: risk.updated_at || risk.created_at,
+            risk_status: risk.risk_status || 'new' // Статус риска для матрицы
           };
         });
+        
         setRisks(transformedRisks);
       } else {
         setRisks([]);
@@ -283,18 +285,35 @@ const RiskAnalysis = () => {
     const coveredSet = new Set();
     const missingCombinations = [];
 
-    // Инициализируем матрицу
+    // Инициализируем матрицу - теперь для каждой комбинации храним статусы
     lifecycleStages.forEach(stage => {
       matrix[stage] = {};
       selectedHazardCategories.forEach(hazard => {
-        matrix[stage][hazard] = 0; // Количество рисков для этой комбинации
+        matrix[stage][hazard] = {
+          new: 0,
+          evaluated: 0,
+          pending_closure: 0,
+          fully_closed: 0,
+          total: 0
+        };
       });
     });
 
     // Заполняем матрицу на основе существующих рисков
     risks.forEach(risk => {
-      if (matrix[risk.lifecycleStage] && matrix[risk.lifecycleStage][risk.hazardCategory] !== undefined) {
-        matrix[risk.lifecycleStage][risk.hazardCategory]++;
+      if (matrix[risk.lifecycleStage] && matrix[risk.lifecycleStage][risk.hazardCategory]) {
+        const cell = matrix[risk.lifecycleStage][risk.hazardCategory];
+        cell.total++;
+        
+        // Группируем по статусам
+        const status = risk.risk_status || 'new';
+        
+        if (cell[status] !== undefined) {
+          cell[status]++;
+        } else {
+          cell.new++; // Если статус неизвестен, считаем как new
+        }
+        
         coveredSet.add(`${risk.lifecycleStage}|||${risk.hazardCategory}`);
       }
     });
@@ -302,7 +321,7 @@ const RiskAnalysis = () => {
     // Находим недостающие комбинации
     lifecycleStages.forEach(stage => {
       selectedHazardCategories.forEach(hazard => {
-        if (matrix[stage][hazard] === 0) {
+        if (matrix[stage][hazard].total === 0) {
           missingCombinations.push({ stage, hazard });
         }
       });
@@ -361,9 +380,7 @@ const RiskAnalysis = () => {
       
       // Определяем категорию для backend (требуется enum: biological_chemical, operational_informational, software, energy_functional)
       // Мапим выбранную категорию в соответствующий enum
-      const finalHazardCategory = newRisk.hazardCategory === 'Другие' && newRisk.customHazardCategory 
-        ? newRisk.customHazardCategory 
-        : newRisk.hazardCategory;
+      const finalHazardCategory = newRisk.hazardCategory;
       
       // Мапинг категорий на enum для backend
       const categoryToEnumMap = {
@@ -422,8 +439,7 @@ const RiskAnalysis = () => {
           hazardousS: '',
           sequenceOfEvents: '',
           harm: '',
-          hazardCategory: selectedHazardCategories.length > 0 ? selectedHazardCategories[0] : '',
-          customHazardCategory: ''
+          hazardCategory: selectedHazardCategories.length > 0 ? selectedHazardCategories[0] : ''
         });
         setShowAddRisk(false);
         
@@ -629,23 +645,6 @@ const RiskAnalysis = () => {
               </div>
             </div>
 
-            {coverage.missingCombinations.length > 0 && (
-              <div className="missing-combinations-warning">
-                <strong>⚠️ Missing {coverage.missingCombinations.length} combination(s):</strong>
-                <div className="missing-list">
-                  {coverage.missingCombinations.slice(0, 5).map((combo, idx) => (
-                    <span key={idx} className="missing-item">
-                      <strong>{combo.stage}</strong> × {combo.hazard}
-                    </span>
-                  ))}
-                  {coverage.missingCombinations.length > 5 && (
-                    <span className="missing-item more">
-                      +{coverage.missingCombinations.length - 5} more...
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
 
             <div className="coverage-matrix-container">
               <table className="coverage-matrix-table">
@@ -668,16 +667,40 @@ const RiskAnalysis = () => {
                         {stage}
                       </td>
                       {selectedHazardCategories.map((hazard, hazardIdx) => {
-                        const count = coverage.matrix[stage]?.[hazard] || 0;
-                        const isCovered = count > 0;
+                        const cellData = coverage.matrix[stage]?.[hazard] || { total: 0 };
+                        const isCovered = cellData.total > 0;
+                        
                         return (
                           <td 
                             key={hazardIdx} 
                             className={`matrix-cell ${isCovered ? 'covered' : 'missing'}`}
-                            title={isCovered ? `${count} risk(s) for this combination` : 'No risks yet'}
+                            title={isCovered ? 
+                              `Total: ${cellData.total} | New: ${cellData.new} | In work: ${cellData.evaluated} | Pending: ${cellData.pending_closure} | Closed: ${cellData.fully_closed}` 
+                              : 'No risks yet'}
                           >
                             {isCovered ? (
-                              <span className="cell-count">{count}</span>
+                              <div className="cell-status-badges">
+                                {cellData.new > 0 && (
+                                  <span className="status-badge status-new">
+                                    ⚪{cellData.new}
+                                  </span>
+                                )}
+                                {cellData.evaluated > 0 && (
+                                  <span className="status-badge status-evaluated">
+                                    🟡{cellData.evaluated}
+                                  </span>
+                                )}
+                                {cellData.pending_closure > 0 && (
+                                  <span className="status-badge status-pending">
+                                    🟠{cellData.pending_closure}
+                                  </span>
+                                )}
+                                {cellData.fully_closed > 0 && (
+                                  <span className="status-badge status-closed">
+                                    🟢{cellData.fully_closed}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <span className="cell-empty">—</span>
                             )}
@@ -744,6 +767,7 @@ const RiskAnalysis = () => {
         <table className="risk-table">
           <thead>
             <tr>
+              <th style={{ width: '50px', textAlign: 'center' }}>Status</th>
               <th>Category</th>
               <th>Lifecycle Stage</th>
               <th>Hazard</th>
@@ -757,8 +781,31 @@ const RiskAnalysis = () => {
           <tbody>
             {filteredRisks.map(risk => {
               const riskLevel = risk.riskScore ? getRiskLevel(risk.riskScore) : { level: 'unknown', color: '#9E9E9E' };
+              
+              // Определяем статус риска
+              const getRiskStatusIcon = (status) => {
+                switch(status) {
+                  case 'fully_closed': return { icon: '🟢', title: 'Fully Closed' };
+                  case 'pending_closure': return { icon: '🟠', title: 'Pending Closure' };
+                  case 'evaluated': return { icon: '🟡', title: 'In Work' };
+                  case 'new': return { icon: '⚪', title: 'New' };
+                  default: return { icon: '⚪', title: 'New' };
+                }
+              };
+              
+              const statusInfo = getRiskStatusIcon(risk.risk_status);
+              
               return (
                 <tr key={risk.id} className="risk-row">
+                  <td className="status-cell" style={{ textAlign: 'center' }}>
+                    <span 
+                      className="risk-status-icon"
+                      title={statusInfo.title}
+                      style={{ fontSize: '18px', cursor: 'help' }}
+                    >
+                      {statusInfo.icon}
+                    </span>
+                  </td>
                   <td className="category-cell">
                     {risk.hazardCategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </td>
@@ -850,8 +897,7 @@ const RiskAnalysis = () => {
                     onChange={(e) => {
                       setNewRisk({
                         ...newRisk, 
-                        hazardCategory: e.target.value,
-                        customHazardCategory: e.target.value === 'Другие' ? newRisk.customHazardCategory : ''
+                        hazardCategory: e.target.value
                       });
                     }}
                     required
@@ -866,19 +912,6 @@ const RiskAnalysis = () => {
                     ))}
                   </select>
                 </div>
-                
-                {newRisk.hazardCategory === 'Другие' && (
-                  <div className="form-group">
-                    <label>Укажите свою категорию опасности</label>
-                    <input
-                      type="text"
-                      value={newRisk.customHazardCategory}
-                      onChange={(e) => setNewRisk({...newRisk, customHazardCategory: e.target.value})}
-                      placeholder="Например: Опасности, связанные с..."
-                      required
-                    />
-                  </div>
-                )}
                 
                 <div className="form-group">
                   <label>Lifecycle Stage</label>

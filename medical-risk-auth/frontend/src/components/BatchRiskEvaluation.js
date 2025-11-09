@@ -21,46 +21,53 @@ const BatchRiskEvaluation = ({ risks, onComplete, onCancel }) => {
   
   // Проверка, оценены ли все риски (кроме отмененных)
   const allEvaluated = risks.every((risk, index) => {
-    return cancelledRisks.has(index) || evaluations[index];
+    return cancelledRisks.has(risk.rowIndex) || evaluations[risk.rowIndex];
   });
 
   // Обработка завершения оценки текущего риска
   const handleRiskEvaluated = (evaluation) => {
+    const currentRisk = risks[currentRiskIndex];
+    const rowIndex = currentRisk.rowIndex;
+    
+    // Сохраняем оценку по rowIndex (реальный индекс в таблице)
     const newEvaluations = {
       ...evaluations,
-      [currentRiskIndex]: evaluation
+      [rowIndex]: evaluation
     };
     setEvaluations(newEvaluations);
     
     // Удаляем из отмененных, если был отменен ранее
     const newCancelled = new Set(cancelledRisks);
-    newCancelled.delete(currentRiskIndex);
+    newCancelled.delete(rowIndex);
     setCancelledRisks(newCancelled);
   };
 
   // Отмена оценки текущего риска (помечаем как отмененный)
   const handleCancelCurrentRisk = () => {
     if (window.confirm('Отменить оценку этого риска? При сохранении этот риск будет пропущен.')) {
+      const currentRisk = risks[currentRiskIndex];
+      const rowIndex = currentRisk.rowIndex; // Реальный индекс в таблице данных
+      
       // Удаляем оценку если была
       const newEvaluations = { ...evaluations };
-      delete newEvaluations[currentRiskIndex];
+      delete newEvaluations[rowIndex]; // Используем rowIndex
       setEvaluations(newEvaluations);
       
-      // Добавляем в отмененные
+      // Добавляем в отмененные (по rowIndex!)
       const newCancelled = new Set(cancelledRisks);
-      newCancelled.add(currentRiskIndex);
+      newCancelled.add(rowIndex);
       setCancelledRisks(newCancelled);
       
       // Переходим к следующему не отмененному риску
       const nextIndex = risks.findIndex((_, idx) => 
-        idx > currentRiskIndex && !newCancelled.has(idx)
+        idx > currentRiskIndex && !newCancelled.has(risks[idx].rowIndex)
       );
       
       if (nextIndex !== -1) {
         setCurrentRiskIndex(nextIndex);
       } else {
         // Если все последующие отменены, ищем с начала
-        const firstAvailable = risks.findIndex((_, idx) => !newCancelled.has(idx));
+        const firstAvailable = risks.findIndex((_, idx) => !newCancelled.has(risks[idx].rowIndex));
         if (firstAvailable !== -1) {
           setCurrentRiskIndex(firstAvailable);
         }
@@ -102,15 +109,19 @@ const BatchRiskEvaluation = ({ risks, onComplete, onCancel }) => {
       }
     });
     
-    onComplete(evaluationsArray);
+    // Передаем и отмененные риски, чтобы очистить их данные
+    onComplete(evaluationsArray, Array.from(cancelledRisks));
   };
 
-  // Получить статус риска
+  // Получить статус риска (index - индекс в массиве risks)
   const getRiskStatus = (index) => {
-    if (cancelledRisks.has(index)) {
+    const risk = risks[index];
+    const rowIndex = risk.rowIndex;
+    
+    if (cancelledRisks.has(rowIndex)) {
       return 'cancelled';
     }
-    if (evaluations[index]) {
+    if (evaluations[rowIndex]) {
       return 'completed';
     }
     if (index === currentRiskIndex) {
@@ -142,7 +153,7 @@ const BatchRiskEvaluation = ({ risks, onComplete, onCancel }) => {
   return (
     <div className="batch-risk-evaluation">
       {/* Wizard для текущего риска */}
-      {currentRisk && !cancelledRisks.has(currentRiskIndex) && (
+      {currentRisk && !cancelledRisks.has(currentRisk.rowIndex) && (
         <div className="batch-wizard-wrapper">
           <RiskEvaluationWizard
             risk={currentRisk}
@@ -249,7 +260,7 @@ const BatchRiskEvaluation = ({ risks, onComplete, onCancel }) => {
       )}
       
       {/* Если текущий риск отменен, показываем заглушку */}
-      {cancelledRisks.has(currentRiskIndex) && (
+      {currentRisk && cancelledRisks.has(currentRisk.rowIndex) && (
         <div className="cancelled-risk-placeholder">
           <div className="placeholder-content">
             <h2>Оценка риска #{currentRiskIndex + 1} отменена</h2>

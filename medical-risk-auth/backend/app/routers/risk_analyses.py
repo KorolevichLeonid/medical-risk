@@ -145,12 +145,59 @@ async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: i
         "risk_level_2": "",
         "comment_2": "",
         "risk_benefit_analysis": "",
-        "new_risks": ""
+        "new_risks": "",
+        "risk_status": "new"  # Default status for new risks
     }
 
     if existing_row:
-        # Update existing row
+        # Update existing row but preserve risk_status and evaluation data
+        existing_risk_status = existing_row.data.get('risk_status', 'new')
+        existing_first_eval = existing_row.data.get('first_evaluation_done', False)
+        existing_second_eval = existing_row.data.get('second_evaluation_done', False)
+        existing_locked_after_second = existing_row.data.get('locked_after_second', False)
+        existing_is_closed = existing_row.data.get('is_closed', False)
+        
+        # Preserve control measures and evaluation data
+        existing_control_1 = existing_row.data.get('control_measure_1', '')
+        existing_control_2 = existing_row.data.get('control_measure_2', '')
+        existing_control_3 = existing_row.data.get('control_measure_3', '')
+        existing_verification_1 = existing_row.data.get('verification_1', '')
+        existing_verification_2 = existing_row.data.get('verification_2', '')
+        existing_verification_3 = existing_row.data.get('verification_3', '')
+        existing_risk_level_1 = existing_row.data.get('risk_level_1', '')
+        existing_comment_1 = existing_row.data.get('comment_1', '')
+        existing_residual_risk_level = existing_row.data.get('residual_risk_level', '')
+        existing_residual_probability = existing_row.data.get('residual_probability', '')
+        existing_residual_risk_score = existing_row.data.get('residual_risk_score', '')
+        existing_risk_level_2 = existing_row.data.get('risk_level_2', '')
+        existing_comment_2 = existing_row.data.get('comment_2', '')
+        existing_risk_benefit = existing_row.data.get('risk_benefit_analysis', '')
+        existing_new_risks = existing_row.data.get('new_risks', '')
+        
+        # Update row with new base data
         existing_row.data = row_data
+        
+        # Restore preserved fields
+        existing_row.data['risk_status'] = existing_risk_status
+        existing_row.data['first_evaluation_done'] = existing_first_eval
+        existing_row.data['second_evaluation_done'] = existing_second_eval
+        existing_row.data['locked_after_second'] = existing_locked_after_second
+        existing_row.data['is_closed'] = existing_is_closed
+        existing_row.data['control_measure_1'] = existing_control_1
+        existing_row.data['control_measure_2'] = existing_control_2
+        existing_row.data['control_measure_3'] = existing_control_3
+        existing_row.data['verification_1'] = existing_verification_1
+        existing_row.data['verification_2'] = existing_verification_2
+        existing_row.data['verification_3'] = existing_verification_3
+        existing_row.data['risk_level_1'] = existing_risk_level_1
+        existing_row.data['comment_1'] = existing_comment_1
+        existing_row.data['residual_risk_level'] = existing_residual_risk_level
+        existing_row.data['residual_probability'] = existing_residual_probability
+        existing_row.data['residual_risk_score'] = existing_residual_risk_score
+        existing_row.data['risk_level_2'] = existing_risk_level_2
+        existing_row.data['comment_2'] = existing_comment_2
+        existing_row.data['risk_benefit_analysis'] = existing_risk_benefit
+        existing_row.data['new_risks'] = existing_new_risks
     else:
         # Create new row
         row_count = db.query(RiskTableRow).filter(
@@ -622,7 +669,9 @@ async def get_project_risk_factors(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get all risk factors for a project"""
+    """Get all risk factors for a project with risk status from risk table"""
+    from ..models.risk_analysis import RiskManagementTable, RiskTableRow
+    
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -641,7 +690,76 @@ async def get_project_risk_factors(
     if not analysis:
         return []
     
-    return analysis.risk_factors
+    # Get risk status from risk tables for each risk factor
+    risk_factors_with_status = []
+    
+    for factor in analysis.risk_factors:
+        factor_dict = {
+            "id": factor.id,
+            "analysis_id": factor.analysis_id,
+            "lifecycle_stage": factor.lifecycle_stage,
+            "hazard_name": factor.hazard_name,
+            "hazardous_situation": factor.hazardous_situation,
+            "sequence_of_events": factor.sequence_of_events,
+            "harm": factor.harm,
+            "hazard_category": factor.hazard_category,
+            "severity_score": factor.severity_score,
+            "probability_score": factor.probability_score,
+            "risk_score": factor.risk_score,
+            "control_measures": factor.control_measures,
+            "created_at": factor.created_at,
+            "updated_at": factor.updated_at,
+            "risk_status": "new"  # Default status
+        }
+        
+        # Try to find risk status from risk table
+        if factor.lifecycle_stage:
+            table = db.query(RiskManagementTable).filter(
+                RiskManagementTable.project_id == project_id,
+                RiskManagementTable.sheet_id == factor.lifecycle_stage
+            ).first()
+            
+            if table and table.rows:
+                # Search by risk_id (stored as string in row.data) - most reliable
+                factor_id_str = str(factor.id)
+                matched_row = None
+                
+                for row in table.rows:
+                    row_data = row.data or {}
+                    row_risk_id = row_data.get('risk_id', '')
+                    
+                    # Primary match: by risk_id (most reliable method)
+                    if row_risk_id == factor_id_str:
+                        matched_row = row
+                        break
+                    
+                    # Fallback match: by hazard details (for old rows without risk_id)
+                    if not matched_row:
+                        # Extract clean hazard name (remove category prefix if exists)
+                        clean_factor_name = factor.hazard_name
+                        if factor.hazard_name and '[' in factor.hazard_name:
+                            parts = factor.hazard_name.split(']', 1)
+                            if len(parts) > 1:
+                                clean_factor_name = parts[1].strip()
+                        
+                        row_hazard_name = row_data.get('hazard_name', '')
+                        row_situation = row_data.get('hazardous_situation', '')
+                        row_harm = row_data.get('harm', '')
+                        
+                        # Match by hazard details
+                        if (row_situation == factor.hazardous_situation and
+                            row_harm == factor.harm and
+                            (row_hazard_name == clean_factor_name or row_hazard_name == factor.hazard_name)):
+                            matched_row = row
+                
+                if matched_row:
+                    # Get risk status from matched row
+                    matched_data = matched_row.data or {}
+                    factor_dict["risk_status"] = matched_data.get('risk_status', 'new')
+        
+        risk_factors_with_status.append(factor_dict)
+    
+    return risk_factors_with_status
 
 
 @router.get("/summary", response_model=List[RiskAnalysisSummary])

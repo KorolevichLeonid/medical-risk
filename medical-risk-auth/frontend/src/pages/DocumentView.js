@@ -92,7 +92,123 @@ const DocumentView = () => {
     }
   };
 
+  const checkReportGenerationConditions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Загружаем проект для получения lifecycle stages и hazard categories
+      const projectResponse = await fetch(`http://localhost:8000/api/projects/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!projectResponse.ok) {
+        return { canGenerate: false, message: 'Не удалось загрузить данные проекта' };
+      }
+      
+      const projectData = await projectResponse.json();
+      
+      // Получаем lifecycle stages
+      const lifecycleStages = [];
+      if (projectData.lifecycle_stages) {
+        if (Array.isArray(projectData.lifecycle_stages)) {
+          lifecycleStages.push(...projectData.lifecycle_stages);
+        } else if (typeof projectData.lifecycle_stages === 'string') {
+          lifecycleStages.push(...JSON.parse(projectData.lifecycle_stages));
+        }
+      }
+      if (projectData.custom_lifecycle_stages) {
+        if (Array.isArray(projectData.custom_lifecycle_stages)) {
+          lifecycleStages.push(...projectData.custom_lifecycle_stages);
+        } else if (typeof projectData.custom_lifecycle_stages === 'string') {
+          lifecycleStages.push(...JSON.parse(projectData.custom_lifecycle_stages));
+        }
+      }
+      
+      // Получаем hazard categories
+      const hazardCategories = [];
+      if (projectData.active_hazard_categories) {
+        if (Array.isArray(projectData.active_hazard_categories)) {
+          hazardCategories.push(...projectData.active_hazard_categories);
+        } else if (typeof projectData.active_hazard_categories === 'string') {
+          hazardCategories.push(...JSON.parse(projectData.active_hazard_categories));
+        }
+      }
+      
+      if (lifecycleStages.length === 0 || hazardCategories.length === 0) {
+        return { canGenerate: false, message: 'Не настроены этапы жизненного цикла или категории опасностей' };
+      }
+      
+      // Загружаем все риски
+      const risksResponse = await fetch(`http://localhost:8000/api/risk-analyses/project/${id}/factors`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!risksResponse.ok) {
+        return { canGenerate: false, message: 'Не удалось загрузить риски' };
+      }
+      
+      const risks = await risksResponse.json();
+      
+      // Проверка 1: Матрица полностью заполнена (хотя бы по одному риску в каждой ячейке)
+      const totalRequired = lifecycleStages.length * hazardCategories.length;
+      const coveredCombinations = new Set();
+      
+      risks.forEach(risk => {
+        // Извлекаем текстовую категорию из hazard_name (формат: "[Категория] Название")
+        let textualHazardCategory = risk.hazard_category; // fallback
+        
+        const categoryMatch = risk.hazard_name?.match(/^\[(.+?)\]\s*(.*)$/);
+        if (categoryMatch) {
+          textualHazardCategory = categoryMatch[1]; // Текстовое название категории
+        }
+        
+        if (risk.lifecycle_stage && textualHazardCategory) {
+          const key = `${risk.lifecycle_stage}|||${textualHazardCategory}`;
+          coveredCombinations.add(key);
+        }
+      });
+      
+      if (coveredCombinations.size < totalRequired) {
+        const missing = totalRequired - coveredCombinations.size;
+        return { 
+          canGenerate: false, 
+          message: `Матрица рисков не полностью заполнена. Отсутствует ${missing} комбинация(й) этап × опасность.` 
+        };
+      }
+      
+      // Проверка 2: Все риски закрыты (fully_closed)
+      const notClosedRisks = risks.filter(risk => {
+        const status = risk.risk_status || 'new';
+        return status !== 'fully_closed';
+      });
+      
+      if (notClosedRisks.length > 0) {
+        return { 
+          canGenerate: false, 
+          message: `Не все риски закрыты. Осталось ${notClosedRisks.length} риск(ов) в работе или на проверке.` 
+        };
+      }
+      
+      return { canGenerate: true, message: '' };
+    } catch (error) {
+      console.error('Error checking conditions:', error);
+      return { canGenerate: false, message: 'Ошибка при проверке условий генерации отчета' };
+    }
+  };
+
   const handleGenerateDocument = async () => {
+    // Проверяем условия перед генерацией
+    const checkResult = await checkReportGenerationConditions();
+    
+    if (!checkResult.canGenerate) {
+      alert(`⚠️ Невозможно сгенерировать отчет:\n\n${checkResult.message}\n\nПожалуйста, заполните все комбинации матрицы рисков и закройте все риски.`);
+      return;
+    }
+    
     if (!confirm('Generate a new version of the Risk Management Report?')) return;
 
     setGenerating(true);

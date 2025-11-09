@@ -131,11 +131,34 @@ const RiskEvaluationWizard = ({
               </span>
             </label>
             
-            <div className="info-box">
-              <strong>ℹ️ Важно:</strong> При закрытии риска все поля будут заблокированы для редактирования,
-              включая меры контроля. Закрытие нельзя отменить.
-            </div>
+            {evaluation.shouldCloseRisk && (
+              <div className="info-box">
+                <strong>ℹ️ Важно:</strong> При закрытии риска поля оценки и меры контроля будут заблокированы.
+                Поля для анализа остаточного риска останутся доступными. Закрытие нельзя отменить.
+              </div>
+            )}
           </div>
+          
+          {/* Если НЕ закрывать риск - нужен комментарий (как для не допустимых) */}
+          {!evaluation.shouldCloseRisk && (
+            <div className="comment-section" style={{ marginTop: '20px' }}>
+              <label className="form-label">Комментарий (обязательно):</label>
+              <textarea
+                className="form-textarea"
+                rows="4"
+                placeholder="Опишите причины допустимости и планируемые меры управления..."
+                value={evaluation.comment}
+                onChange={(e) => setEvaluation({ ...evaluation, comment: e.target.value })}
+              />
+              {errors.comment && (
+                <div className="error-message">{errors.comment}</div>
+              )}
+              <div className="info-box" style={{ marginTop: '10px' }}>
+                <strong>ℹ️ Внимание:</strong> Даже для допустимых рисков требуется комментарий, 
+                если работа над риском продолжается.
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -167,47 +190,37 @@ const RiskEvaluationWizard = ({
       );
     }
     
-    // Вторичная оценка + Доп (без дополнительных действий)
-    if (!isFirstEvaluation && evaluation.isAcceptable === true) {
+    // Вторичная оценка (и Доп, и Не доп - одинаковая логика)
+    if (!isFirstEvaluation) {
       return (
         <div className="wizard-step">
-          <h3>Остаточный риск допустим</h3>
+          <h3>{evaluation.isAcceptable ? 'Остаточный риск допустим' : 'Остаточный риск не допустим'}</h3>
           <p className="step-description">
-            Остаточный риск оценен как <strong className="acceptable-text">допустимый</strong>.
-          </p>
-          <div className="success-box">
-            ✓ Риск успешно обработан. Все меры по управлению приняты.
-          </div>
-        </div>
-      );
-    }
-    
-    // Вторичная оценка + Не доп (комментарий + новый риск)
-    if (!isFirstEvaluation && evaluation.isAcceptable === false) {
-      return (
-        <div className="wizard-step">
-          <h3>Остаточный риск не допустим</h3>
-          <p className="step-description">
-            Остаточный риск оценен как <strong className="not-acceptable-text">не допустимый</strong>.
+            Остаточный риск оценен как{' '}
+            <strong className={evaluation.isAcceptable ? 'acceptable-text' : 'not-acceptable-text'}>
+              {evaluation.isAcceptable ? 'допустимый' : 'не допустимый'}
+            </strong>.
           </p>
           
-          {/* Комментарий */}
+          {/* Комментарий (НЕ обязательный для вторичной оценки) */}
           <div className="comment-section">
-            <label className="form-label">Комментарий (обязательно):</label>
+            <label className="form-label">Комментарий (опционально):</label>
             <textarea
               className="form-textarea"
               rows="3"
-              placeholder="Опишите причины недостаточности мер управления..."
+              placeholder={evaluation.isAcceptable 
+                ? "Можете добавить комментарий по остаточному риску..." 
+                : "Можете описать причины недостаточности мер управления..."}
               value={evaluation.comment}
               onChange={(e) => setEvaluation({ ...evaluation, comment: e.target.value })}
             />
-            {errors.comment && (
-              <div className="error-message">{errors.comment}</div>
-            )}
+            <div className="info-box" style={{ marginTop: '10px' }}>
+              <strong>ℹ️ Информация:</strong> Для вторичной оценки комментарий не обязателен.
+            </div>
           </div>
           
-          {/* Новый риск */}
-          <div className="new-risk-section">
+          {/* Вопрос про новые риски (для ВСЕХ вторичных оценок) */}
+          <div className="new-risk-section" style={{ marginTop: '20px' }}>
             <label className="checkbox-label">
               <input
                 type="checkbox"
@@ -219,17 +232,17 @@ const RiskEvaluationWizard = ({
                 })}
               />
               <span className="checkbox-text">
-                Возникли новые риски при применении мер управления
+                Возник новый риск после применения мер
               </span>
             </label>
             
             {evaluation.shouldCreateNewRisk && (
-              <div className="new-risk-input">
-                <label className="form-label">Описание нового риска:</label>
+              <div className="new-risk-input" style={{ marginTop: '15px' }}>
+                <label className="form-label">Описание нового риска (обязательно):</label>
                 <textarea
                   className="form-textarea"
                   rows="3"
-                  placeholder="Опишите новый риск, возникший при применении мер управления..."
+                  placeholder="Опишите новый риск, который возник после применения мер управления..."
                   value={evaluation.newRiskDescription}
                   onChange={(e) => setEvaluation({ ...evaluation, newRiskDescription: e.target.value })}
                 />
@@ -341,10 +354,21 @@ const RiskEvaluationWizard = ({
     }
     
     if (step === 2) {
-      // Для не допустимых рисков комментарий обязателен
-      if (evaluation.isAcceptable === false && !evaluation.comment.trim()) {
-        newErrors.comment = 'Комментарий обязателен для не допустимых рисков';
+      // Для ПЕРВИЧНОЙ оценки:
+      if (isFirstEvaluation) {
+        // Не допустимый риск - комментарий ОБЯЗАТЕЛЕН
+        if (evaluation.isAcceptable === false && !evaluation.comment.trim()) {
+          newErrors.comment = 'Комментарий обязателен для не допустимых рисков';
+        }
+        
+        // Допустимый риск БЕЗ закрытия - комментарий тоже обязателен
+        if (evaluation.isAcceptable === true && 
+            !evaluation.shouldCloseRisk && !evaluation.comment.trim()) {
+          newErrors.comment = 'Комментарий обязателен, если работа над риском продолжается';
+        }
       }
+      
+      // Для ВТОРИЧНОЙ оценки комментарий НЕ обязателен (ни для Доп, ни для Не доп)
       
       // Если выбрано создание нового риска, описание обязательно
       if (evaluation.shouldCreateNewRisk && !evaluation.newRiskDescription.trim()) {
