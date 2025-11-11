@@ -21,6 +21,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Состояние для роли пользователя в проекте
   const [userRole, setUserRole] = useState(null);
+  const [userPermissions, setUserPermissions] = useState([]);
   const [loadingRole, setLoadingRole] = useState(true);
   
   // Состояние для оценки рисков
@@ -605,6 +606,30 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   // Загрузка роли пользователя при монтировании компонента
   useEffect(() => {
     loadUserRole();
+
+    // Логирование данных пользователя в консоль
+    const logUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:8000/api/users/me/permissions?project_id=${projectId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('Данные пользователя (ExcelTable):', userData);
+          console.log('Разрешения пользователя (ExcelTable):', userData.permissions);
+          // Сохраняем разрешения в состоянии
+          setUserPermissions(userData.permissions || []);
+        }
+      } catch (error) {
+        console.error('Ошибка при получении данных пользователя:', error);
+      }
+    };
+
+    logUserData();
   }, [projectId]);
 
   // Обновление активного листа при изменении initialSheet
@@ -1298,21 +1323,25 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Проверить, может ли пользователь редактировать данный столбец
   const canEditColumn = (columnKey) => {
-    // Пользователи с ролью DOCTOR могут редактировать только определенные столбцы
-    if (userRole === 'doctor') {
-      const editableColumns = ['severity_score', 'probability_score', 'risk_score'];
-      return editableColumns.includes(columnKey);
+    // Определяем столбцы с баллами риска
+    const riskScoreColumns = ['severity_score', 'probability_score', 'risk_score', 'residual_risk_level', 'residual_probability', 'residual_risk_score'];
+
+    // Если столбец содержит баллы риска, проверяем разрешение edit_risk_values
+    if (riskScoreColumns.includes(columnKey)) {
+      return userPermissions.includes('edit_risk_values');
     }
+
+    // Для остальных столбцов проверяем роль пользователя
     // Администраторы и менеджеры могут редактировать все столбцы
-    return true;
+    return userRole === 'admin' || userRole === 'manager';
   };
 
   // Получить стиль для ячейки в зависимости от прав доступа
   const getCellStyle = (columnKey, cellColor) => {
     const canEdit = canEditColumn(columnKey);
 
-    if (!canEdit && userRole === 'doctor') {
-      // Для пользователей DOCTOR недоступные для редактирования ячейки выделяем серым
+    if (!canEdit) {
+      // Недоступные для редактирования ячейки выделяем серым
       return {
         backgroundColor: '#f5f5f5',
         color: '#999',

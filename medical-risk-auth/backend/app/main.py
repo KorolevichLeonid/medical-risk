@@ -8,7 +8,7 @@ from .database import engine, get_db
 from .models import user, project, risk_analysis
 from .models import changelog as changelog_model
 from .models import document as document_model
-from .routers import auth, users, projects, risk_analyses, risk_tables, changelog, documents
+from .routers import auth, users, projects, risk_analyses, risk_tables, changelog, documents, permissions
 from . import admin_auth
 from .core.config import settings
 
@@ -49,6 +49,7 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(risk_analyses.router, prefix="/api/risk-analyses", tags=["risk-analyses"])
 app.include_router(risk_tables.router, prefix="/api/risk-tables", tags=["risk-tables"])
+app.include_router(permissions.router, prefix="/api", tags=["permissions"])
 app.include_router(changelog.router)
 app.include_router(admin_auth.router, tags=["admin"])
 app.include_router(documents.router, tags=["documents"])

@@ -33,97 +33,74 @@ def check_project_access(project: Project, user: User, db: Session):
     # System admin can access all projects
     if user.role == UserRole.SYS_ADMIN:
         return True
-    
+
     # Project owner can access their project
     if project.owner_id == user.id:
         return True
-    
+
     # Check if user is a member of the project
     member = db.query(ProjectMember).filter(
         ProjectMember.project_id == project.id,
         ProjectMember.user_id == user.id
     ).first()
-    
+
     return member is not None
+
+
+def check_user_permission(user: User, permission_key: str, project_id: int = None, db: Session = None):
+    """Check if user has a specific permission"""
+    # System admin has all permissions
+    if user.role == UserRole.SYS_ADMIN:
+        return True
+
+    if not db or not project_id:
+        return False
+
+    # Get user's role in the project
+    project_role = None
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        return False
+
+    # Check if user is project owner (always admin)
+    if project.owner_id == user.id:
+        project_role = "admin"
+    else:
+        # Check if user is a project member
+        member = db.query(ProjectMember).filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id
+        ).first()
+
+        if member:
+            project_role = member.role.value
+
+    # Get permissions for the role
+    if project_role:
+        from ..models.project import RolePermission
+        role_permissions = db.query(RolePermission).filter(
+            RolePermission.role_name == project_role
+        ).all()
+        permission_keys = [rp.permission_key for rp in role_permissions]
+        return permission_key in permission_keys
+
+    return False
 
 
 def check_project_edit_permission(project: Project, user: User, db: Session = None):
     """Check if user can edit project data"""
-    # System administrator can edit any project
-    if user.role == UserRole.SYS_ADMIN:
-        return True
-    
-    # Project owner (automatically admin role) can edit their project
-    if project.owner_id == user.id:
-        return True
-    
-    # Check if user is a project member with manager role
-    if db:
-        member = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project.id,
-            ProjectMember.user_id == user.id
-        ).first()
-        
-        if member and member.role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
-            return True
-    
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not enough permissions to edit this project"
-    )
+    return check_user_permission(user, "edit_project", project.id, db)
 
 
 def check_project_delete_permission(project: Project, user: User, db: Session = None):
     """Check if user can delete project (only admin)"""
-    # System administrator can delete any project
-    if user.role == UserRole.SYS_ADMIN:
-        return True
-    
-    # Project owner (automatically admin role) can delete their project
-    if project.owner_id == user.id:
-        return True
-    
-    # Check if user is a project member with admin role
-    if db:
-        member = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project.id,
-            ProjectMember.user_id == user.id,
-            ProjectMember.role == ProjectRole.ADMIN
-        ).first()
-        
-        if member:
-            return True
-    
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Only project administrators can delete projects"
-    )
+    return check_user_permission(user, "delete_project", project.id, db)
 
 
 def check_project_member_management_permission(project: Project, user: User, db: Session = None):
     """Check if user can manage project members"""
-    # System administrator can manage members in any project
-    if user.role == UserRole.SYS_ADMIN:
-        return True
-    
-    # Project owner can manage members
-    if project.owner_id == user.id:
-        return True
-    
-    # Check if user is a project member with manager role
-    if db:
-        member = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project.id,
-            ProjectMember.user_id == user.id
-        ).first()
-        
-        if member and member.role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
-            return True
-    
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not enough permissions to manage project members"
-    )
+    return check_user_permission(user, "manage_members", project.id, db)
 
 
 @router.get("/", response_model=List[ProjectListResponse])

@@ -680,6 +680,7 @@ const ProjectForm = () => {
   const [error, setError] = useState('');
   const [availableUsers, setAvailableUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedRole, setSelectedRole] = useState('doctor');
 
   useEffect(() => {
     loadCurrentUser();
@@ -687,6 +688,29 @@ const ProjectForm = () => {
     if (isEditMode) {
       loadProjectData();
     }
+
+    // Логирование данных пользователя в консоль
+    const logUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const projectId = id; // id доступен в компоненте
+        const response = await fetch(`http://localhost:8000/api/users/me/permissions?project_id=${projectId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('Данные пользователя (ProjectForm):', userData);
+          console.log('Разрешения пользователя (ProjectForm):', userData.permissions);
+        }
+      } catch (error) {
+        console.error('Ошибка при получении данных пользователя:', error);
+      }
+    };
+
+    logUserData();
   }, [id, isEditMode]);
 
   // Автоматически пересчитываем активные категории опасностей при изменении hazardQuestions или customHazards
@@ -1240,7 +1264,7 @@ const ProjectForm = () => {
               },
               body: JSON.stringify({
                 user_id: userId,
-                role: 'member'
+                role: selectedRole
               })
             });
 
@@ -1355,18 +1379,27 @@ const ProjectForm = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="status">Статус</label>
+              <label>Project role</label>
               <select
-                id="status"
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="form-select"
               >
-                <option value="draft">Черновик</option>
-                <option value="in_progress">В процессе</option>
-                <option value="review">На рассмотрении</option>
-                <option value="completed">Завершен</option>
+                <option value="doctor">Clinical Evaluation / Doctor - risk management</option>
+                <option value="manager">Top Manager - project and users management</option>
+                <option value="quality_management_representative">Quality Management Representative</option>
+                <option value="product_manager">Product Manager / Quality Manager</option>
+                <option value="risk_assessment_team_leader">Risk Assessment Team Leader</option>
+                <option value="risk_assessment_team_member">Member of the Risk Assessment Team</option>
               </select>
+              <small className="role-description">
+                {selectedRole === 'doctor' && 'Can view risks and edit risk evaluation table'}
+                {selectedRole === 'manager' && 'Can edit project, manage members and risks'}
+                {selectedRole === 'quality_management_representative' && 'Can view all blocks, create RMF, chat/comment'}
+                {selectedRole === 'product_manager' && 'Can view all blocks, edit source data'}
+                {selectedRole === 'risk_assessment_team_leader' && 'Can view all, edit source/risk data, verify reports, chat'}
+                {selectedRole === 'risk_assessment_team_member' && 'Can view all blocks, edit risk values'}
+              </small>
             </div>
           </div>
 

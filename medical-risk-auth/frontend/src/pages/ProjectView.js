@@ -238,10 +238,14 @@ const ProjectView = () => {
   const getProjectRoleBadge = (role) => {
     const roleConfig = {
       admin: { label: 'Project Admin', className: 'project-role-admin' },
-      manager: { label: 'Manager', className: 'project-role-manager' },
-      doctor: { label: 'Doctor', className: 'project-role-doctor' }
+      manager: { label: 'Top Manager', className: 'project-role-manager' },
+      doctor: { label: 'Clinical Evaluation / Doctor', className: 'project-role-doctor' },
+      quality_management_representative: { label: 'Quality Management Representative', className: 'project-role-quality' },
+      product_manager: { label: 'Product Manager / Quality Manager', className: 'project-role-product' },
+      risk_assessment_team_leader: { label: 'Risk Assessment Team Leader', className: 'project-role-leader' },
+      risk_assessment_team_member: { label: 'Member of the Risk Assessment Team', className: 'project-role-member' }
     };
-    
+
     const config = roleConfig[role] || { label: 'Member', className: 'project-role-member' };
     return <span className={`project-role-badge ${config.className}`}>{config.label}</span>;
   };
@@ -544,12 +548,20 @@ const ProjectView = () => {
                   onChange={(e) => setSelectedRole(e.target.value)}
                   className="form-select"
                 >
-                  <option value="doctor">Doctor - risk management</option>
-                  <option value="manager">Manager - project and users management</option>
+                  <option value="doctor">Clinical Evaluation / Doctor - risk management</option>
+                  <option value="manager">Top Manager - project and users management</option>
+                  <option value="quality_management_representative">Quality Management Representative</option>
+                  <option value="product_manager">Product Manager / Quality Manager</option>
+                  <option value="risk_assessment_team_leader">Risk Assessment Team Leader</option>
+                  <option value="risk_assessment_team_member">Member of the Risk Assessment Team</option>
                 </select>
                 <small className="role-description">
                   {selectedRole === 'doctor' && 'Can view risks and edit risk evaluation table'}
                   {selectedRole === 'manager' && 'Can edit project, manage members and risks'}
+                  {selectedRole === 'quality_management_representative' && 'Can view all blocks, create RMF, chat/comment'}
+                  {selectedRole === 'product_manager' && 'Can view all blocks, edit source data'}
+                  {selectedRole === 'risk_assessment_team_leader' && 'Can view all, edit source/risk data, verify reports, chat'}
+                  {selectedRole === 'risk_assessment_team_member' && 'Can view all blocks, edit risk values'}
                 </small>
               </div>
             </div>

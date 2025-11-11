@@ -4,7 +4,7 @@ Database initialization script
 from sqlalchemy.orm import Session
 from .database import SessionLocal, engine
 from .models.user import User, UserRole
-from .models.project import Project, ProjectMember, ProjectVersion
+from .models.project import Project, ProjectMember, ProjectVersion, Permission, RolePermission
 from .models.risk_analysis import RiskAnalysis, RiskFactor
 def create_tables():
     """Create all database tables"""
@@ -33,17 +33,24 @@ def create_admin_user():
 def init_database():
     """Initialize the database with tables and sample data"""
     print("[*] Initializing database...")
-    
+
     # Create tables
     create_tables()
     print("[+] Database tables created")
-    
+
+    # Initialize permissions
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from init_permissions import init_permissions
+    init_permissions()
+
     # Check admin user status (Azure auth system)
     create_admin_user()
-    
+
     # Users are created automatically through Azure authentication
     print("[i] Users will be created automatically through Azure authentication")
-    
+
     print("[+] Database initialization completed!")
 
 

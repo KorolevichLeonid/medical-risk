@@ -10,11 +10,51 @@ from datetime import datetime
 from ..database import Base
 
 
+class Permission(Base):
+    """Permission model for role-based access control"""
+    __tablename__ = "permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, nullable=False)  # e.g., "view_all", "edit_source_data"
+    label_ru = Column(String, nullable=False)  # Russian label for UI
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    role_permissions = relationship("RolePermission", back_populates="permission")
+
+    def __repr__(self):
+        return f"<Permission(key='{self.key}', label_ru='{self.label_ru}')>"
+
+
+class RolePermission(Base):
+    """Junction table for role-permission relationships"""
+    __tablename__ = "role_permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    role_name = Column(String, nullable=False)  # ProjectRole enum value
+    permission_key = Column(String, ForeignKey("permissions.key"), nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    permission = relationship("Permission", back_populates="role_permissions")
+
+    def __repr__(self):
+        return f"<RolePermission(role='{self.role_name}', permission='{self.permission_key}')>"
+
+
 class ProjectRole(PyEnum):
     """Project-level user roles"""
     ADMIN = "admin"      # Project creator/owner - full project control
     MANAGER = "manager"  # Project management, user management, risk editing
     DOCTOR = "doctor"    # View risks and edit risk evaluation table only
+    QUALITY_MANAGEMENT_REPRESENTATIVE = "quality_management_representative"
+    PRODUCT_MANAGER = "product_manager"
+    RISK_ASSESSMENT_TEAM_LEADER = "risk_assessment_team_leader"
+    RISK_ASSESSMENT_TEAM_MEMBER = "risk_assessment_team_member"
 
 
 class ProjectStatus(PyEnum):

@@ -116,33 +116,50 @@ def get_risk_table(db: Session, table_id: int) -> RiskManagementTable:
     return db.query(RiskManagementTable).filter(RiskManagementTable.id == table_id).first()
 
 
+def check_user_permission(user: User, permission_key: str, project_id: int = None, db: Session = None):
+    """Check if user has a specific permission"""
+    # System admin has all permissions
+    if user.role == "SYS_ADMIN":
+        return True
+
+    if not db or not project_id:
+        return False
+
+    # Get user's role in the project
+    project_role = None
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        return False
+
+    # Check if user is project owner (always admin)
+    if project.owner_id == user.id:
+        project_role = "admin"
+    else:
+        # Check if user is a project member
+        member = db.query(ProjectMember).filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id
+        ).first()
+
+        if member:
+            project_role = member.role.value
+
+    # Get permissions for the role
+    if project_role:
+        from ..models.project import RolePermission
+        role_permissions = db.query(RolePermission).filter(
+            RolePermission.role_name == project_role
+        ).all()
+        permission_keys = [rp.permission_key for rp in role_permissions]
+        return permission_key in permission_keys
+
+    return False
+
+
 def check_risk_table_edit_permission(project: Project, user: User, db: Session):
     """Check if user can edit risk tables in this project"""
-    # For now, allow all authenticated users to edit tables
-    # TODO: Implement proper permissions when roles are stabilized
-    return True
-
-    # System administrator can edit any project
-    if hasattr(user, 'role') and user.role == "SYS_ADMIN":
-        return True
-
-    # Project owner can edit
-    if project.owner_id == user.id:
-        return True
-
-    # Check if user is a project member with doctor role (can edit risk management tables)
-    member = db.query(ProjectMember).filter(
-        ProjectMember.project_id == project.id,
-        ProjectMember.user_id == user.id
-    ).first()
-
-    if member and member.role == ProjectRole.DOCTOR:
-        return True
-
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not enough permissions to edit risk management tables in this project"
-    )
+    return check_user_permission(user, "edit_risk_tables", project.id, db)
 
 
 @router.get("/project/{project_id}/sheets/{sheet_id}", response_model=RiskManagementTableResponse)

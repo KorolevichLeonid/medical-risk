@@ -39,6 +39,28 @@ const RiskAnalysis = () => {
     loadCurrentUser();
     loadProjectAndRisks();
     loadUserProjectRole();
+
+    // Логирование данных пользователя в консоль
+    const logUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:8000/api/users/me/permissions?project_id=${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('Данные пользователя (RiskAnalysis):', userData);
+          console.log('Разрешения пользователя (RiskAnalysis):', userData.permissions);
+        }
+      } catch (error) {
+        console.error('Ошибка при получении данных пользователя:', error);
+      }
+    };
+
+    logUserData();
   }, [id]);
 
   const loadCurrentUser = () => {

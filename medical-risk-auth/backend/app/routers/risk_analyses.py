@@ -242,30 +242,50 @@ def calculate_analysis_statistics(risk_factors: List[RiskFactor]) -> dict:
     }
 
 
-def check_risk_edit_permission(project: Project, user: User, db: Session):
-    """Check if user can edit risks in this project"""
-    # System administrator can edit any project risks
+def check_user_permission(user: User, permission_key: str, project_id: int = None, db: Session = None):
+    """Check if user has a specific permission"""
+    # System admin has all permissions
     if user.role == UserRole.SYS_ADMIN:
         return True
-    
-    # Project owner can edit risks
+
+    if not db or not project_id:
+        return False
+
+    # Get user's role in the project
+    project_role = None
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        return False
+
+    # Check if user is project owner (always admin)
     if project.owner_id == user.id:
-        return True
-    
-    # Check if user is a project member with manager role (can edit risks)
-    # Doctor can only view and edit risk table, but cannot add/edit/delete risks
-    member = db.query(ProjectMember).filter(
-        ProjectMember.project_id == project.id,
-        ProjectMember.user_id == user.id
-    ).first()
-    
-    if member and member.role == ProjectRole.MANAGER:
-        return True
-    
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not enough permissions to edit risks in this project"
-    )
+        project_role = "admin"
+    else:
+        # Check if user is a project member
+        member = db.query(ProjectMember).filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user.id
+        ).first()
+
+        if member:
+            project_role = member.role.value
+
+    # Get permissions for the role
+    if project_role:
+        from ..models.project import RolePermission
+        role_permissions = db.query(RolePermission).filter(
+            RolePermission.role_name == project_role
+        ).all()
+        permission_keys = [rp.permission_key for rp in role_permissions]
+        return permission_key in permission_keys
+
+    return False
+
+
+def check_risk_edit_permission(project: Project, user: User, db: Session):
+    """Check if user can edit risks in this project"""
+    return check_user_permission(user, "edit_risks", project.id, db)
 
 
 @router.get("/project/{project_id}", response_model=RiskAnalysisResponse)
