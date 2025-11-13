@@ -387,7 +387,11 @@ async def delete_table(
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    check_risk_table_edit_permission(db_project, current_user, db)
+    if not check_risk_table_edit_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risk tables in this project"
+        )
 
     # Find table
     table = db.query(RiskManagementTable).filter(
@@ -418,7 +422,11 @@ async def add_row(
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    check_risk_table_edit_permission(db_project, current_user, db)
+    if not check_risk_table_edit_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risk tables in this project"
+        )
 
     table = db.query(RiskManagementTable).filter(
         RiskManagementTable.project_id == project_id,
@@ -460,7 +468,11 @@ async def update_row(
         raise HTTPException(status_code=404, detail="Row not found")
 
     # Check permissions via project
-    check_risk_table_edit_permission(row.table.project, current_user, db)
+    if not check_risk_table_edit_permission(row.table.project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risk tables in this project"
+        )
 
     # Update fields
     if 'data' in row_update:
@@ -512,7 +524,11 @@ async def delete_row(
     if not row:
         raise HTTPException(status_code=404, detail="Row not found")
 
-    check_risk_table_edit_permission(row.table.project, current_user, db)
+    if not check_risk_table_edit_permission(row.table.project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risk tables in this project"
+        )
 
     # Get table to recalculate row numbers
     table_id = row.table_id

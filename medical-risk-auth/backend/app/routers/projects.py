@@ -461,8 +461,12 @@ async def update_project(
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    check_project_edit_permission(db_project, current_user, db)
+
+    if not check_project_edit_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit this project"
+        )
     
     # Store old values for logging
     old_values = {
@@ -650,7 +654,11 @@ async def delete_project(
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    check_project_delete_permission(db_project, current_user, db)
+    if not check_project_delete_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to delete this project"
+        )
 
     # Store project data for logging before deletion
     project_data = {
@@ -739,8 +747,12 @@ async def add_project_member(
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    check_project_member_management_permission(db_project, current_user, db)
+
+    if not check_project_member_management_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to manage project members"
+        )
     
     # Check if user exists
     user = db.query(User).filter(User.id == member.user_id).first()
@@ -800,8 +812,12 @@ async def remove_project_member(
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    check_project_member_management_permission(db_project, current_user, db)
+
+    if not check_project_member_management_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to manage project members"
+        )
     
     # Cannot remove project owner
     if user_id == db_project.owner_id:
@@ -928,7 +944,11 @@ async def create_project_version(
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    check_project_edit_permission(db_project, current_user, db)
+    if not check_project_edit_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit this project"
+        )
 
     # Check if version already exists
     existing_version = db.query(ProjectVersion).filter(

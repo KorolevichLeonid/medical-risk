@@ -28,6 +28,7 @@ def init_permissions():
             {"key": "edit_source_data", "label_ru": "Редактирование исходных данных"},
             {"key": "edit_risk_values", "label_ru": "Редактирование вероятности/вреда"},
             {"key": "verify_report", "label_ru": "Проверка/верификация отчёта"},
+            {"key": "view_report", "label_ru": "Просмотр отчётов"},
             {"key": "manage_users_roles", "label_ru": "Управление пользователями/ролями"},
             {"key": "create_rmf", "label_ru": "Создание RMF"},
             {"key": "chat_comment", "label_ru": "Чат/комментарии к отклонению"},
@@ -62,11 +63,11 @@ def init_permissions():
             ]},
             # Quality Management Representative
             {"role": "quality_management_representative", "permissions": [
-                "view_project", "view_all", "create_rmf", "chat_comment"
+                "view_project", "view_all", "chat_comment", "view_report"
             ]},
             # Product Manager / Quality Manager
             {"role": "product_manager", "permissions": [
-                "view_project", "view_all", "edit_source_data"
+                "view_project", "view_all", "edit_source_data", "view_report"
             ]},
             # Risk Assessment Team Leader
             {"role": "risk_assessment_team_leader", "permissions": [

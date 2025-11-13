@@ -16,7 +16,7 @@ from ..schemas.document import (
     GenerateDocumentRequest
 )
 from .auth import get_current_user, get_current_active_user
-from .projects import check_project_access
+from .projects import check_project_access, check_user_permission
 from ..services.document_generator import RiskManagementReportGenerator
 
 
@@ -41,6 +41,13 @@ async def generate_document(
     # Check user access to project
     if not check_project_access(project, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied to this project")
+
+    # Check verify_report permission
+    if not check_user_permission(current_user, "verify_report", project.id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to generate reports in this project"
+        )
     
     # Determine version number
     if request.auto_version:
@@ -329,7 +336,14 @@ async def download_document(
     
     if not check_project_access(project, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
+    # Check verify_report permission
+    if not check_user_permission(current_user, "verify_report", project.id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to download reports in this project"
+        )
+
     # Get document version
     doc_version = db.query(DocumentVersion).filter(
         DocumentVersion.id == version_id,
@@ -937,4 +951,3 @@ async def get_current_document(
         generator_name=f"{generator.first_name} {generator.last_name}",
         generator_email=generator.email
     )
-

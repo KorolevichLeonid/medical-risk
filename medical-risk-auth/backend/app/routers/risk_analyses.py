@@ -337,8 +337,12 @@ async def create_risk_analysis(
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    check_risk_edit_permission(db_project, current_user, db)
+
+    if not check_risk_edit_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risks in this project"
+        )
     
     # Create risk analysis
     db_analysis = RiskAnalysis(
@@ -422,9 +426,13 @@ async def update_risk_analysis(
     db_analysis = get_risk_analysis(db, analysis_id=analysis_id)
     if db_analysis is None:
         raise HTTPException(status_code=404, detail="Risk analysis not found")
-    
+
     # Check risk edit permission
-    check_risk_edit_permission(db_analysis.project, current_user, db)
+    if not check_risk_edit_permission(db_analysis.project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risks in this project"
+        )
     
     # Update fields if provided
     update_data = analysis_update.dict(exclude_unset=True)
@@ -459,9 +467,13 @@ async def add_risk_factor(
     db_analysis = get_risk_analysis(db, analysis_id=analysis_id)
     if db_analysis is None:
         raise HTTPException(status_code=404, detail="Risk analysis not found")
-    
+
     # Check risk edit permission
-    check_risk_edit_permission(db_analysis.project, current_user, db)
+    if not check_risk_edit_permission(db_analysis.project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risks in this project"
+        )
     
     # Risk score is optional now, calculated only if both severity and probability are provided
     risk_score = None
@@ -526,9 +538,13 @@ async def update_risk_factor(
     db_factor = db.query(RiskFactor).filter(RiskFactor.id == factor_id).first()
     if db_factor is None:
         raise HTTPException(status_code=404, detail="Risk factor not found")
-    
+
     # Check risk edit permission
-    check_risk_edit_permission(db_factor.analysis.project, current_user, db)
+    if not check_risk_edit_permission(db_factor.analysis.project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risks in this project"
+        )
     
     # Store old values for logging
     old_values = {
@@ -597,9 +613,13 @@ async def delete_risk_factor(
     db_factor = db.query(RiskFactor).filter(RiskFactor.id == factor_id).first()
     if db_factor is None:
         raise HTTPException(status_code=404, detail="Risk factor not found")
-    
+
     # Check risk edit permission
-    check_risk_edit_permission(db_factor.analysis.project, current_user, db)
+    if not check_risk_edit_permission(db_factor.analysis.project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risks in this project"
+        )
     
     # Store data for logging before deletion
     risk_data = {
