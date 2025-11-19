@@ -140,6 +140,14 @@
   flex-direction: column;
   gap: 8px;
   align-items: flex-end;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.project-badges .role-badge {
+  max-width: 220px;
+  text-align: center;
+  line-height: 1.3;
 }
 
 .project-title {
@@ -413,41 +421,67 @@
 
 /* Role badges */
 .role-badge {
-  padding: 4px 12px;
-  border-radius: 15px;
-  font-size: 11px;
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 12px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  white-space: normal;
+  max-width: 220px;
+  overflow: visible;
+  word-wrap: break-word;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  line-height: 1.3;
+  text-align: center;
+  color: white !important;
 }
 
 .role-admin {
-  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
-  color: white;
-  border: 1px solid #FF6B6B;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(255, 107, 107, 0.3);
 }
 
 .role-manager {
-  background: linear-gradient(135deg, #4FC3F7 0%, #29B6F6 100%);
-  color: white;
-  border: 1px solid #4FC3F7;
+  background: linear-gradient(135deg, #4ECDC4 0%, #6BDCDC 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(78, 205, 196, 0.3);
 }
 
 .role-doctor {
-  background: linear-gradient(135deg, #66BB6A 0%, #4CAF50 100%);
-  color: white;
-  border: 1px solid #66BB6A;
+  background: linear-gradient(135deg, #45B7D1 0%, #6BCFE8 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(69, 183, 209, 0.3);
+}
+
+.role-product-manager {
+  background: linear-gradient(135deg, #9B59B6 0%, #BB6FDD 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(155, 89, 182, 0.3);
+}
+
+.role-risk-leader {
+  background: linear-gradient(135deg, #3498DB 0%, #5AB0F0 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
+}
+
+.role-quality-rep {
+  background: linear-gradient(135deg, #F39C12 0%, #FFB84D 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(243, 156, 18, 0.3);
+}
+
+.role-risk-member {
+  background: linear-gradient(135deg, #95A5A6 0%, #B8C5C6 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(149, 165, 166, 0.3);
 }
 
 .role-unknown {
   background: #f0f0f0;
   color: #666;
-  border: 1px solid #ddd;
-}
-
-.project-badges {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }

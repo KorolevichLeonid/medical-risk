@@ -1299,26 +1299,32 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     return '#00FF00';                   // Зеленый - минимальный риск
   };
 
-  // Получить отображаемое название роли
+  // Получить отображаемое название роли (в том же стиле, что и на дашборде)
   const getRoleDisplayName = (role) => {
-    switch(role) {
-      case 'admin': return 'Администратор';
-      case 'manager': return 'Менеджер';
-      case 'doctor': return 'Врач';
-      case 'guest': return 'Гость';
-      default: return 'Неизвестная роль';
-    }
+    const roleConfig = {
+      admin: 'ADMIN',
+      manager: 'MANAGER',
+      doctor: 'DOCTOR',
+      product_manager: 'PRODUCT MANAGER',
+      risk_assessment_team_leader: 'RISK ASSESSMENT TEAM LEADER',
+      quality_management_representative: 'QUALITY MANAGMENT REPRESENTATIVE',
+      risk_assessment_team_member: 'RISK ASSESSMENT TEAM MEMBER'
+    };
+    return roleConfig[role] || (role?.toUpperCase() || 'UNKNOWN');
   };
 
-  // Получить цвет для роли
-  const getRoleColor = (role) => {
-    switch(role) {
-      case 'admin': return '#FF4444';     // Красный для администратора
-      case 'manager': return '#FF8800';   // Оранжевый для менеджера
-      case 'doctor': return '#4444FF';    // Синий для врача
-      case 'guest': return '#888888';     // Серый для гостя
-      default: return '#666666';          // Серый по умолчанию
-    }
+  // Получить CSS класс для роли
+  const getRoleClassName = (role) => {
+    const roleConfig = {
+      admin: 'role-admin',
+      manager: 'role-manager',
+      doctor: 'role-doctor',
+      product_manager: 'role-product-manager',
+      risk_assessment_team_leader: 'role-risk-leader',
+      quality_management_representative: 'role-quality-rep',
+      risk_assessment_team_member: 'role-risk-member'
+    };
+    return roleConfig[role] || 'role-unknown';
   };
 
   // Проверить, может ли пользователь редактировать данный столбец
@@ -1633,8 +1639,8 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
               <div className="user-role-indicator">
                 <span className="role-label">Ваша роль:</span>
                 <span
-                  className="role-badge"
-                  style={{ backgroundColor: getRoleColor(userRole) }}
+                  className={`role-badge ${getRoleClassName(userRole)}`}
+                  title={getRoleDisplayName(userRole)}
                 >
                   {getRoleDisplayName(userRole)}
                 </span>

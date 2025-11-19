@@ -117,13 +117,17 @@ const RoleManagement = () => {
 
   const getProjectRoleBadge = (role) => {
     const roleConfig = {
-      admin: { label: 'Admin', className: 'project-role-admin' },
-      manager: { label: 'Manager', className: 'project-role-manager' },
-      doctor: { label: 'Doctor', className: 'project-role-doctor' }
+      admin: { label: 'ADMIN', className: 'role-admin' },
+      manager: { label: 'MANAGER', className: 'role-manager' },
+      doctor: { label: 'DOCTOR', className: 'role-doctor' },
+      product_manager: { label: 'PRODUCT MANAGER', className: 'role-product-manager' },
+      risk_assessment_team_leader: { label: 'RISK ASSESSMENT TEAM LEADER', className: 'role-risk-leader' },
+      quality_management_representative: { label: 'QUALITY MANAGMENT REPRESENTATIVE', className: 'role-quality-rep' },
+      risk_assessment_team_member: { label: 'RISK ASSESSMENT TEAM MEMBER', className: 'role-risk-member' }
     };
     
-    const config = roleConfig[role] || { label: role, className: 'project-role-unknown' };
-    return <span className={`project-role-badge ${config.className}`}>{config.label}</span>;
+    const config = roleConfig[role] || { label: role?.toUpperCase() || 'UNKNOWN', className: 'role-unknown' };
+    return <span className={`role-badge ${config.className}`} title={config.label}>{config.label}</span>;
   };
 
   const showAllProjects = (projects, userName) => {

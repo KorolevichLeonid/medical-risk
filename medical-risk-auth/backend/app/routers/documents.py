@@ -825,6 +825,23 @@ def generate_residual_risks_table(risks):
     return html
 
 
+def format_role_display_name(role: str) -> str:
+    """
+    Convert role code to display name in uppercase format
+    Used in documents to display roles consistently
+    """
+    role_mapping = {
+        'admin': 'ADMIN',
+        'manager': 'MANAGER',
+        'doctor': 'DOCTOR',
+        'product_manager': 'PRODUCT MANAGER',
+        'risk_assessment_team_leader': 'RISK ASSESSMENT TEAM LEADER',
+        'quality_management_representative': 'QUALITY MANAGMENT REPRESENTATIVE',
+        'risk_assessment_team_member': 'RISK ASSESSMENT TEAM MEMBER'
+    }
+    return role_mapping.get(role, role.upper() if role else 'UNKNOWN')
+
+
 def generate_team_table(team_members, date_str):
     """Generate team members table"""
     import html as html_module
@@ -833,11 +850,12 @@ def generate_team_table(team_members, date_str):
     
     for member in team_members:
         name = html_module.escape(member.get('name', ''))
-        role = html_module.escape(member.get('role', ''))
+        role = format_role_display_name(member.get('role', ''))
+        role_escaped = html_module.escape(role)
         html += f'<tr>'
         html += f'<td>{name}</td>'
         html += f'<td><span class="empty-field">не заполнено</span></td>'
-        html += f'<td>{role}</td>'
+        html += f'<td>{role_escaped}</td>'
         html += f'<td></td>'
         html += f'<td>{date_str.replace(" ", ".") if isinstance(date_str, str) and "не заполнено" not in date_str else date_str}</td>'
         html += '</tr>'

@@ -11,6 +11,23 @@ from typing import Dict, List, Optional
 import json
 
 
+def format_role_display_name(role: str) -> str:
+    """
+    Convert role code to display name in uppercase format
+    Used in documents to display roles consistently
+    """
+    role_mapping = {
+        'admin': 'ADMIN',
+        'manager': 'MANAGER',
+        'doctor': 'DOCTOR',
+        'product_manager': 'PRODUCT MANAGER',
+        'risk_assessment_team_leader': 'RISK ASSESSMENT TEAM LEADER',
+        'quality_management_representative': 'QUALITY MANAGMENT REPRESENTATIVE',
+        'risk_assessment_team_member': 'RISK ASSESSMENT TEAM MEMBER'
+    }
+    return role_mapping.get(role, role.upper() if role else 'UNKNOWN')
+
+
 class RiskManagementReportGenerator:
     """Generates Risk Management Report documents in DOCX format"""
     
@@ -514,7 +531,7 @@ class RiskManagementReportGenerator:
             for member in self.team:
                 row = table.add_row().cells
                 row[0].text = member.get('name', '')
-                row[1].text = member.get('role', '')
+                row[1].text = format_role_display_name(member.get('role', ''))
                 row[2].text = ''  # Signature placeholder
                 row[3].text = datetime.now().strftime('%d.%m.%Y')
         else:
