@@ -17,20 +17,51 @@ const ProtectedRoute = ({ children }) => {
     console.log('isAuthenticated:', isAuthenticated);
     console.log('accounts:', accounts);
     console.log('accounts.length:', accounts.length);
-    
+
     if (isAuthenticated && accounts.length > 0) {
       console.log('✅ User is authenticated, proceeding with backend auth');
       authenticateWithBackend();
-    } else if (isAuthenticated && accounts.length === 0) {
-      console.log('⚠️  Authenticated but no accounts found');
-      setIsBackendAuthenticated(false);
-      setIsLoading(false);
     } else {
-      console.log('❌ User not authenticated with Azure');
-      setIsBackendAuthenticated(false);
-      setIsLoading(false);
+      console.log('Checking for local token...');
+      const token = localStorage.getItem('token');
+      if (token) {
+        console.log('Found local token, verifying with backend...');
+        authenticateWithLocalToken(token);
+      } else {
+        console.log('No token found');
+        setIsBackendAuthenticated(false);
+        setIsLoading(false);
+      }
     }
   }, [isAuthenticated, accounts]);
+
+  const authenticateWithLocalToken = async (token) => {
+    try {
+      console.log('👤 Verifying local token...');
+      const userResponse = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        console.log('✅ Local token verified:', userData);
+        setUserInfo(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        setIsBackendAuthenticated(true);
+      } else {
+        console.error('❌ Local token invalid');
+        localStorage.removeItem('token');
+        setIsBackendAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('❌ Local token verification error:', error);
+      setIsBackendAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const authenticateWithBackend = async () => {
     try {

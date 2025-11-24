@@ -22,6 +22,25 @@ export default function AuthPage() {
     });
   };
 
+  const handleMockLogin = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/azure-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ azure_token: 'dummy' })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        localStorage.setItem('token', data.access_token);
+        navigate('/dashboard');
+      } else {
+        console.error('Mock login failed', data);
+      }
+    } catch (error) {
+      console.error('Mock login error', error);
+    }
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-container">
@@ -34,17 +53,26 @@ export default function AuthPage() {
           <h2>Войти в систему</h2>
           <p>Используйте ваш корпоративный аккаунт Microsoft для входа</p>
           
-          <button 
+          <button
             className="auth-button"
             onClick={handleLogin}
           >
-            <img 
-              src={require('../assets/figma/image4.png')} 
-              alt="Microsoft" 
+            <img
+              src={require('../assets/figma/image4.png')}
+              alt="Microsoft"
               className="auth-icon"
             />
             Войти через Microsoft
           </button>
+
+          {window.location.hostname === 'localhost' && (
+            <button
+              className="auth-button"
+              onClick={handleMockLogin}
+            >
+              Local Mock Login
+            </button>
+          )}
           
           <div className="auth-info">
             <h3>Первый вход?</h3>
