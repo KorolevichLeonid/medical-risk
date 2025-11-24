@@ -13,7 +13,7 @@ from ..database import Base
 class UserRole(PyEnum):
     """System-level user roles"""
     USER = "USER"  # Regular user - default role for all new users
-    SYS_ADMIN = "SYS_ADMIN"  # System administrator
+    ADMIN = "ADMIN"  # Administrator role
 
 
 class User(Base):
