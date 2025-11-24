@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -56,18 +57,21 @@ app.include_router(changelog.router)
 app.include_router(admin_auth.router, tags=["admin"])
 app.include_router(documents.router, tags=["documents"])
 
+static_dir = os.path.join(os.path.dirname(__file__), "build", "static")
+build_root = os.path.join(os.path.dirname(__file__), "build")
+
 # Mount static files for React app
-app.mount("/static", StaticFiles(directory="build/static"), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 async def read_root():
-    return FileResponse("build/index.html")
+    return FileResponse(os.path.join(build_root, "index.html"))
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
     if full_path.startswith("api") or full_path.startswith("static"):
         raise HTTPException(404)
-    return FileResponse("build/index.html")
+    return FileResponse(os.path.join(build_root, "index.html"))
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
