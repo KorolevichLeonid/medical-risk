@@ -1,0 +1,312 @@
+/* Batch Risk Evaluation */
+.batch-risk-evaluation {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  gap: 0;
+}
+
+/* Wrapper для wizard с индикаторами */
+.batch-wizard-wrapper {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  gap: 0;
+}
+
+/* Индикаторы рисков СПРАВА от wizard */
+.batch-indicators-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 10002; /* Над wizard */
+  animation: slideLeft 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes slideLeft {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.batch-indicators-container {
+  background: white;
+  border-radius: 0;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+  border-left: 4px solid #667eea;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.indicators-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.indicators-header h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Индикаторы рисков */
+.risk-indicators {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+  gap: 10px;
+  margin-bottom: 15px;
+  justify-items: center;
+}
+
+.risk-indicator {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+.risk-indicator:hover:not(.cancelled) {
+  transform: translateY(-3px) scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.risk-indicator.current {
+  animation: pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.3);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(33, 150, 243, 0.1);
+  }
+}
+
+.risk-indicator.completed {
+  color: white;
+}
+
+.risk-indicator.cancelled {
+  color: white;
+  opacity: 0.7;
+}
+
+.risk-indicator.pending {
+  color: #666;
+}
+
+.indicator-icon {
+  font-size: 20px;
+}
+
+.indicator-number {
+  font-size: 16px;
+}
+
+/* Кнопки действий */
+.indicators-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  margin-top: auto; /* Прижимаем к низу */
+}
+
+.indicators-actions .btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.indicators-actions .btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.indicators-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.indicators-actions .btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+  width: 100%;
+}
+
+.indicators-actions .btn-secondary:hover {
+  background: #d0d0d0;
+}
+
+.indicators-actions .btn-success {
+  background: #4CAF50;
+  color: white;
+  width: 100%;
+}
+
+.indicators-actions .btn-success:hover:not(:disabled) {
+  background: #45a049;
+}
+
+/* Легенда */
+.indicators-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
+}
+
+.legend-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Заглушка для отмененного риска */
+.cancelled-risk-placeholder {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.placeholder-content {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  max-width: 600px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.placeholder-content h2 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.placeholder-content p {
+  color: #666;
+  font-size: 16px;
+  margin-bottom: 30px;
+}
+
+.placeholder-content .batch-indicators-container {
+  border-top: none;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+  .batch-indicators-overlay {
+    width: 280px;
+  }
+  
+  .risk-indicators {
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 8px;
+  }
+  
+  .risk-indicator {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* На мобильных - возвращаемся к нижнему размещению */
+  .batch-indicators-overlay {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+  }
+  
+  .batch-indicators-container {
+    border-left: none;
+    border-top: 4px solid #667eea;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    padding: 15px;
+  }
+  
+  .risk-indicators {
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 8px;
+  }
+  
+  .risk-indicator {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+  
+  .indicators-legend {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+}

@@ -1,0 +1,369 @@
+/* Floating Support Button */
+.floating-support {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  background-color: #D9D9D9;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.floating-support:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.floating-support-icon {
+  font-size: 24px;
+  color: white;
+}
+
+/* Support Modal */
+.support-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.3s ease;
+}
+
+.support-modal {
+  background-color: #E5E5E5;
+  border-radius: 20px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease;
+  overflow: hidden;
+}
+
+.support-modal-header {
+  background-color: #D9D9D9;
+  padding: 20px 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #C0C0C0;
+}
+
+.support-modal-header h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #131313;
+}
+
+.support-modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #131313;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.support-modal-close:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.support-modal-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.support-modal-content {
+  padding: 25px;
+  flex: 1;
+}
+
+.support-email-field,
+.support-message-field {
+  margin-bottom: 20px;
+}
+
+.support-email-field label,
+.support-message-field label {
+  display: block;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #4A4A4A;
+  font-weight: 500;
+}
+
+.support-email-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #C0C0C0;
+  border-radius: 15px;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  background-color: white;
+  color: #131313;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.support-email-input:focus {
+  outline: none;
+  border-color: #61DAFB;
+  box-shadow: 0 0 0 3px rgba(97, 218, 251, 0.1);
+}
+
+.support-email-input:disabled {
+  background-color: #F5F5F5;
+  color: #8A8A8A;
+  cursor: not-allowed;
+}
+
+.support-email-input::placeholder {
+  color: #8A8A8A;
+}
+
+/* Support User Section Styles */
+.support-user-section {
+  margin-bottom: 20px;
+}
+
+.support-user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background-color: #F5F5F5;
+  border-radius: 15px;
+  margin-bottom: 12px;
+}
+
+.support-user-avatar {
+  width: 50px;
+  height: 50px;
+  background-color: #8A8A8A;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.support-user-icon {
+  font-size: 24px;
+  color: white;
+}
+
+.support-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.support-user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #131313;
+  margin: 0;
+}
+
+.support-notification-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background-color: #E8F4FD;
+  border: 1px solid #61DAFB;
+  border-radius: 12px;
+  margin-bottom: 0;
+}
+
+.support-note-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.support-note-text {
+  font-size: 14px;
+  color: #4A4A4A;
+  font-weight: 500;
+  margin: 0;
+}
+
+.support-textarea {
+  width: 100%;
+  padding: 15px;
+  border: 2px solid #C0C0C0;
+  border-radius: 15px;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  resize: vertical;
+  min-height: 120px;
+  background-color: white;
+  color: #131313;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.support-textarea:focus {
+  outline: none;
+  border-color: #61DAFB;
+  box-shadow: 0 0 0 3px rgba(97, 218, 251, 0.1);
+}
+
+.support-textarea::placeholder {
+  color: #8A8A8A;
+}
+
+.support-modal-footer {
+  padding: 20px 25px;
+  background-color: #E5E5E5;
+  display: flex;
+  gap: 15px;
+  justify-content: flex-end;
+}
+
+.support-cancel-btn,
+.support-submit-btn {
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  min-width: 100px;
+}
+
+.support-cancel-btn {
+  background-color: #C0C0C0;
+  color: #131313;
+}
+
+.support-cancel-btn:hover {
+  background-color: #B0B0B0;
+  transform: translateY(-2px);
+}
+
+.support-submit-btn {
+  background-color: #4A4A4A;
+  color: white;
+}
+
+.support-submit-btn:hover {
+  background-color: #131313;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive Support Modal */
+@media (max-width: 768px) {
+  .floating-support {
+    width: 50px;
+    height: 50px;
+    bottom: 20px;
+    right: 20px;
+  }
+
+  .floating-support-icon {
+    font-size: 20px;
+  }
+
+  .support-modal {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .support-modal-header {
+    padding: 15px 20px;
+  }
+  
+  .support-modal-header h3 {
+    font-size: 20px;
+  }
+  
+  .support-modal-content {
+    padding: 20px;
+  }
+  
+  .support-modal-footer {
+    padding: 15px 20px;
+    flex-direction: column;
+  }
+  
+  .support-cancel-btn,
+  .support-submit-btn {
+    width: 100%;
+  }
+
+  .support-user-info {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .support-user-avatar {
+    width: 45px;
+    height: 45px;
+  }
+
+  .support-user-icon {
+    font-size: 20px;
+  }
+
+  .support-user-name {
+    font-size: 15px;
+  }
+
+  .support-notification-note {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .support-note-icon {
+    font-size: 14px;
+  }
+
+  .support-note-text {
+    font-size: 13px;
+  }
+}

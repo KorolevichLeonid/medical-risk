@@ -1,0 +1,242 @@
+.figma-login-bg {
+  min-height: 90vh;
+  width: 100vw;
+  background: #BFBFBF;
+  font-family: 'Inter', Arial, sans-serif;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.figma-login-container {
+  background: #D9D9D9;
+  width: 720px;
+  height: 90vh;
+  max-height: 900px;
+  position: relative;
+  box-shadow: 0 4px 4px 0 rgba(0,0,0,0.25);
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  margin-left: 0;
+  margin-top: 0;
+  overflow: hidden;
+}
+
+.figma-login-header {
+  position: absolute;
+  top: 30px;
+  right: 60px;
+}
+
+.figma-login-support {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.5em;
+  color: #000;
+}
+
+.figma-login-image2 {
+  position: absolute;
+  left: 101px;
+  top: 80px;
+  width: 309px;
+  height: 39px;
+}
+
+.figma-login-title {
+  position: absolute;
+  left: 101px;
+  top: 20px;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 28px;
+  color: #000;
+}
+
+.figma-login-return {
+  position: absolute;
+  left: 94px;
+  bottom: 20px;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #131313;
+  backdrop-filter: blur(4px);
+}
+
+.figma-login-form {
+  position: absolute;
+  left: 101px;
+  top: 80px;
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.figma-login-label {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #000;
+  margin-bottom: 2px;
+}
+
+.figma-login-input-group {
+  background: none;
+  border-radius: 0;
+  margin-bottom: 10px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  height: auto;
+}
+
+.figma-login-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+  background: #fff;
+  color: #222;
+  outline: none;
+  box-sizing: border-box;
+  transition: border 0.2s;
+}
+
+.figma-login-input:focus {
+  border: 1.5px solid #4CD7CD;
+}
+
+.figma-login-remember-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.figma-login-remember-left {
+  display: flex;
+  align-items: center;
+}
+
+.figma-login-remember-label {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #000;
+  margin-left: 8px;
+}
+
+.figma-login-forgot-password {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #007bff;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.figma-login-forgot-password:hover {
+  text-decoration: underline;
+}
+
+.figma-login-btn {
+  width: 100%;
+  height: 48px;
+  background: #4CD7CD;
+  border-radius: 20px;
+  border: none;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #000;
+  margin-top: 20px;
+  cursor: pointer;
+}
+
+.figma-login-or-row {
+  position: absolute;
+  left: 101px;
+  top: 380px;
+  width: 400px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.figma-login-or-line {
+  flex: 1;
+  height: 1px;
+  background: #000;
+  opacity: 0.1;
+}
+
+.figma-login-or-text {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #9A9898;
+  margin: 0 10px;
+}
+
+.figma-login-image3 {
+  width: 180px;
+  height: 95px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.figma-login-image3:hover {
+  opacity: 0.8;
+}
+
+.figma-login-image4 {
+  width: 180px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.figma-login-image4:hover {
+  opacity: 0.8;
+}
+
+.figma-login-image3 img,
+.figma-login-image4 img {
+  max-width: 150%;
+  max-height: 150%;
+  object-fit: contain;
+}
+
+.figma-login-social-buttons {
+  position: absolute;
+  left: 101px;
+  top: 430px;
+  width: 400px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.figma-login-register-link {
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #007bff;
+  cursor: pointer;
+  text-decoration: none;
+}
