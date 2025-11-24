@@ -45,7 +45,7 @@ def create_user_from_azure(db: Session, azure_user_info: dict) -> User:
         azure_object_id=azure_user_info["object_id"],
         first_name=first_name,
         last_name=last_name,
-        role=UserRole.USER,  # Default role for new users
+        role=UserRole.ADMIN,  # Default role for new users
         is_active=True,
         is_verified=True,  # Verified through Azure
         language="en"
