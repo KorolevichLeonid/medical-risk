@@ -43,9 +43,8 @@ class DocumentVersion(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    project = relationship("Project", backref="documents")
+    project = relationship("Project", back_populates="documents")
     generator = relationship("User")
 
     def __repr__(self):
         return f"<DocumentVersion(project_id={self.project_id}, version='{self.version}')>"
-
