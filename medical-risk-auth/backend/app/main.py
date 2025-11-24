@@ -57,10 +57,7 @@ app.include_router(changelog.router)
 app.include_router(admin_auth.router, tags=["admin"])
 app.include_router(documents.router, tags=["documents"])
 
-# Mount static files for React app
-import os
-if os.path.exists("build"):
-    app.mount("/", StaticFiles(directory="build", html=True), name="static")
+# Static files not mounted since frontend is separate
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
