@@ -50,7 +50,7 @@ const ProtectedRoute = ({ children }) => {
 
       // Send Azure token to backend
       console.log('🔄 Sending Azure token to backend...');
-      const backendResponse = await fetch('http://localhost:8000/api/auth/azure-login', {
+      const backendResponse = await fetch('/api/auth/azure-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -61,15 +61,15 @@ const ProtectedRoute = ({ children }) => {
       });
 
       console.log('Backend response status:', backendResponse.status);
-      
+
       if (backendResponse.ok) {
         const data = await backendResponse.json();
         console.log('✅ Backend authentication successful');
         localStorage.setItem('token', data.access_token);
-        
+
         // Get user info from backend
         console.log('👤 Fetching user info...');
-        const userResponse = await fetch('http://localhost:8000/api/auth/me', {
+        const userResponse = await fetch('/api/auth/me', {
           headers: {
             'Authorization': `Bearer ${data.access_token}`
           }
@@ -172,4 +172,3 @@ const ProtectedRoute = ({ children }) => {
 };
 
 export default ProtectedRoute;
-
