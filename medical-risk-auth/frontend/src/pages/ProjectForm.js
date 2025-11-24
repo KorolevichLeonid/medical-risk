@@ -694,7 +694,7 @@ const ProjectForm = () => {
       try {
         const token = localStorage.getItem('token');
         const projectId = id; // id доступен в компоненте
-        const response = await fetch(`http://localhost:8000/api/users/me/permissions?project_id=${projectId}`, {
+        const response = await fetch(`/api/users/me/permissions?project_id=${projectId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -737,7 +737,7 @@ const ProjectForm = () => {
   const loadAvailableUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/users/', {
+      const response = await fetch('/api/users/', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -772,7 +772,7 @@ const ProjectForm = () => {
       console.log('Loading project data for ID:', id);
       console.log('Token exists:', !!token);
 
-      const response = await fetch(`http://localhost:8000/api/projects/${id}`, {
+      const response = await fetch(`/api/projects/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -786,7 +786,7 @@ const ProjectForm = () => {
         console.log('Project data loaded:', projectData);
 
         // Загружаем членов проекта
-        const membersResponse = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
+        const membersResponse = await fetch(`/api/projects/${id}/members`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
