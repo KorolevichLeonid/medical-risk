@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -54,16 +55,8 @@ app.include_router(changelog.router)
 app.include_router(admin_auth.router, tags=["admin"])
 app.include_router(documents.router, tags=["documents"])
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    print("🔥 DEBUG: Root endpoint called - server is running with new code!")
-    return {
-        "message": "Medical Risk Analysis API",
-        "version": "1.0.1",  # Увеличили версию
-        "docs": "/docs",
-        "debug": "Server updated with new code"
-    }
+# Mount static files for React app
+app.mount("/", StaticFiles(directory="build", html=True), name="static")
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
