@@ -1173,9 +1173,9 @@ const ProjectForm = () => {
       }
 
       const token = localStorage.getItem('token');
-      const url = isEditMode 
-        ? `http://localhost:8000/api/projects/${id}`
-        : 'http://localhost:8000/api/projects/';
+      const url = isEditMode
+        ? `/api/projects/${id}`
+        : '/api/projects/';
       
       const method = isEditMode ? 'PUT' : 'POST';
       
@@ -1223,7 +1223,7 @@ const ProjectForm = () => {
         
         if (isEditMode) {
           // Для режима редактирования сначала получаем текущих членов и удаляем тех, кто не выбран
-          const currentMembersResponse = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
+          const currentMembersResponse = await fetch(`/api/projects/${id}/members`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
