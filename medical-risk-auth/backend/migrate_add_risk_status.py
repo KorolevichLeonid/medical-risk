@@ -11,14 +11,18 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.database import DATABASE_URL
+# from app.database import DATABASE_URL
+DATABASE_URL = "postgresql://medical_risk_db_user:QHKxPv6M1OunwMBR4rN5XPFHx6Lg8wif@dpg-d4ib6ummcj7s73c12i70-a.oregon-postgres.render.com/medical_risk_db"
 from app.models.risk_analysis import RiskTableRow
 
 def migrate_add_risk_status():
     """Add risk_status='new' to all existing risks that don't have it"""
     
     # Create engine and session
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    if DATABASE_URL.startswith("sqlite"):
+        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    else:
+        engine = create_engine(DATABASE_URL)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = SessionLocal()
     
@@ -77,4 +81,3 @@ if __name__ == "__main__":
         migrate_add_risk_status()
     else:
         print("Migration cancelled")
-
