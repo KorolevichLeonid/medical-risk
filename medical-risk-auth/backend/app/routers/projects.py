@@ -31,7 +31,7 @@ def get_project(db: Session, project_id: int) -> Project:
 def check_project_access(project: Project, user: User, db: Session):
     """Check if user has access to project"""
     # System admin can access all projects
-    if user.role == UserRole.SYS_ADMIN:
+    if user.role == UserRole.ADMIN:
         return True
 
     # Project owner can access their project
@@ -50,7 +50,7 @@ def check_project_access(project: Project, user: User, db: Session):
 def check_user_permission(user: User, permission_key: str, project_id: int = None, db: Session = None):
     """Check if user has a specific permission"""
     # System admin has all permissions
-    if user.role == UserRole.SYS_ADMIN:
+    if user.role == UserRole.ADMIN:
         return True
 
     if not db or not project_id:
@@ -111,7 +111,7 @@ async def read_projects(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get all projects accessible to the user"""
-    if current_user.role == UserRole.SYS_ADMIN:
+    if current_user.role == UserRole.ADMIN:
         # System admin can see all projects
         projects = db.query(Project).offset(skip).limit(limit).all()
     else:
@@ -127,7 +127,7 @@ async def read_projects(
 
         # Determine user's role in this project
         user_role = None
-        if current_user.role == UserRole.SYS_ADMIN:
+        if current_user.role == UserRole.ADMIN:
             # Sys admin is always admin in every project
             user_role = "admin"
         else:
@@ -249,7 +249,7 @@ async def create_project(
     member_responses.append(owner_member)
 
     # For sys admin: add them as admin if they're not the owner
-    if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
+    if current_user.role == UserRole.ADMIN and current_user.id != db_project.owner_id:
         sysadmin_member = ProjectMemberResponse(
             id=-1,  # Special ID for sys admin
             project_id=db_project.id,
@@ -372,7 +372,7 @@ async def read_project(
     member_responses.append(owner_member)
     
     # For sys admin: add them as admin if they're not the owner
-    if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
+    if current_user.role == UserRole.ADMIN and current_user.id != db_project.owner_id:
         sysadmin_member = ProjectMemberResponse(
             id=-1,  # Special ID for sys admin
             project_id=project_id,
