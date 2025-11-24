@@ -19,11 +19,11 @@ def create_admin_user():
     db = SessionLocal()
     try:
         # Check if any admin user exists
-        admin_count = db.query(User).filter(User.role == UserRole.SYS_ADMIN).count()
+        admin_count = db.query(User).filter(User.role == UserRole.ADMIN).count()
         if admin_count == 0:
             print("[!] No system administrator found!")
-            print("   After first Azure login, manually assign sys_admin role:")
-            print("   UPDATE users SET role = 'sys_admin' WHERE email = 'your-admin-email@domain.com';")
+            print("   After first Azure login, manually assign ADMIN role:")
+            print("   UPDATE users SET role = 'ADMIN' WHERE email = 'your-admin-email@domain.com';")
         else:
             print(f"[i] Found {admin_count} system administrator(s)")
     finally:
