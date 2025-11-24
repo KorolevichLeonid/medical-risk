@@ -38,7 +38,7 @@ const ProtectedRoute = ({ children }) => {
   const authenticateWithLocalToken = async (token) => {
     try {
       console.log('👤 Verifying local token...');
-      const userResponse = await fetch('/api/auth/me', {
+      const userResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -81,7 +81,7 @@ const ProtectedRoute = ({ children }) => {
 
       // Send Azure token to backend
       console.log('🔄 Sending Azure token to backend...');
-      const backendResponse = await fetch('/api/auth/azure-login', {
+      const backendResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/azure-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -100,7 +100,7 @@ const ProtectedRoute = ({ children }) => {
 
         // Get user info from backend
         console.log('👤 Fetching user info...');
-        const userResponse = await fetch('/api/auth/me', {
+        const userResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${data.access_token}`
           }
@@ -157,7 +157,7 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated || !isBackendAuthenticated) {
+  if (!isBackendAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
