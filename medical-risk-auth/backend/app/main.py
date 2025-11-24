@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer
+from fastapi.responses import FileResponse
+from fastapi.exceptions import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -55,8 +57,10 @@ app.include_router(changelog.router)
 app.include_router(admin_auth.router, tags=["admin"])
 app.include_router(documents.router, tags=["documents"])
 
-# Mount static files for React app (commented out for local development)
-# app.mount("/", StaticFiles(directory="build", html=True), name="static")
+# Mount static files for React app
+import os
+if os.path.exists("build"):
+    app.mount("/", StaticFiles(directory="build", html=True), name="static")
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
@@ -68,3 +72,5 @@ async def health_check(db: Session = Depends(get_db)):
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+
+# SPA is handled by StaticFiles with html=True, no need for catch-all
