@@ -26,14 +26,22 @@ function App() {
   const isAuthenticated = useIsAuthenticated();
 
   useEffect(() => {
-    // Handle redirect response after login
-    instance.handleRedirectPromise().then((response) => {
-      if (response) {
-        console.log('Login successful:', response);
+    const initializeApp = async () => {
+      try {
+        await instance.initialize();
+        // Handle redirect response after login
+        instance.handleRedirectPromise().then((response) => {
+          if (response) {
+            console.log('Login successful:', response);
+          }
+        }).catch((error) => {
+          console.error('Login error:', error);
+        });
+      } catch (error) {
+        console.error('MSAL initialization error:', error);
       }
-    }).catch((error) => {
-      console.error('Login error:', error);
-    });
+    };
+    initializeApp();
   }, [instance]);
 
   const PublicPageWrapper = ({ children }) => (
