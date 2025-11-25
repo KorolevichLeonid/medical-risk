@@ -13,5 +13,5 @@ export const msalConfig = {
 };
 
 export const loginRequest = {
-  scopes: ["openid", "profile", "email", "User.Read"]
+  scopes: ["openid", "profile", "email"]
 };
