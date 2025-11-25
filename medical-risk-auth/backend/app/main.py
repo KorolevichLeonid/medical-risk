@@ -59,6 +59,17 @@ app.include_router(documents.router, tags=["documents"])
 
 # Static files not mounted since frontend is separate
 
+@app.get("/")
+async def root():
+    """Root endpoint with API information"""
+    return {
+        "message": "Welcome to Medical Risk Analysis API",
+        "version": "1.0.0",
+        "documentation": "/docs",
+        "redoc": "/redoc",
+        "health": "/health"
+    }
+
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint"""
@@ -69,5 +80,3 @@ async def health_check(db: Session = Depends(get_db)):
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
-
-# SPA is handled by StaticFiles with html=True, no need for catch-all
