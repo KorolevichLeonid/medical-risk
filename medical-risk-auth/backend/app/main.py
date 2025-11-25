@@ -58,7 +58,7 @@ app.include_router(admin_auth.router, tags=["admin"])
 app.include_router(documents.router, tags=["documents"])
 
 # Mount static files for the built frontend
-app.mount("/static", StaticFiles(directory="../build/static"), name="static")
+app.mount("/static", StaticFiles(directory="./statics/static"), name="static")
 
 # Catch-all route to serve the React SPA
 @app.get("/{path:path}")
@@ -68,18 +68,12 @@ async def catch_all(path: str):
         # If it's an API path not handled, return 404
         raise HTTPException(status_code=404, detail="API endpoint not found")
     # Otherwise, serve the React app
-    return FileResponse("../build/index.html", media_type="text/html")
+    return FileResponse("./statics/index.html", media_type="text/html")
 
 @app.get("/")
 async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": "Welcome to Medical Risk Analysis API",
-        "version": "1.0.0",
-        "documentation": "/docs",
-        "redoc": "/redoc",
-        "health": "/health"
-    }
+    """Serve the React SPA root"""
+    return FileResponse("./statics/index.html", media_type="text/html")
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
