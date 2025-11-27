@@ -30,19 +30,47 @@ function App() {
       try {
         await instance.initialize();
         // Handle redirect response after login
-        instance.handleRedirectPromise().then((response) => {
+        instance.handleRedirectPromise().then(async (response) => {
           if (response) {
             console.log('Login successful:', response);
+            // Acquire ID token and exchange for local token
+            try {
+              const accounts = instance.getAllAccounts();
+              if (accounts.length > 0) {
+                const silentRequest = {
+                  scopes: ["openid", "profile", "email", "User.Read"],
+                  account: accounts[0],
+                };
+                const tokenResponse = await instance.acquireTokenSilent(silentRequest);
+                const idToken = tokenResponse.idToken;
+
+                // Send to backend for local token
+                const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/azure-login`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ azure_token: idToken })
+                });
+                if (apiResponse.ok) {
+                  const data = await apiResponse.json();
+                  localStorage.setItem('token', data.access_token);
+                } else {
+                  console.error('Failed to exchange token');
+                }
+              }
+            } catch (error) {
+              console.error('Token exchange error:', error);
+            }
           }
         }).catch((error) => {
           console.error('Login error:', error);
+          navigate('/auth-error');
         });
       } catch (error) {
         console.error('MSAL initialization error:', error);
       }
     };
     initializeApp();
-  }, [instance]);
+  }, [instance, navigate]);
 
   const PublicPageWrapper = ({ children }) => (
     <>
