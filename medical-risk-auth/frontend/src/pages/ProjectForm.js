@@ -1239,7 +1239,7 @@ const ProjectForm = () => {
             for (const memberId of currentMemberIds) {
               if (!formData.teamMembers.includes(memberId)) {
                 try {
-                  await fetch(`http://localhost:8000/api/projects/${id}/members/${memberId}`, {
+                  await fetch(`${process.env.REACT_APP_API_URL}/api/projects/${id}/members/${memberId}`, {
                     method: 'DELETE',
                     headers: {
                       'Authorization': `Bearer ${token}`
@@ -1256,7 +1256,7 @@ const ProjectForm = () => {
         // Добавляем новых членов команды
         for (const userId of formData.teamMembers) {
           try {
-            const memberResponse = await fetch(`http://localhost:8000/api/projects/${projectData.id}/members`, {
+            const memberResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/projects/${projectData.id}/members`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
