@@ -63,14 +63,14 @@ function App() {
           }
         }).catch((error) => {
           console.error('Login error:', error);
-          navigate('/auth-error');
+          window.location.href = '/auth-error';
         });
       } catch (error) {
         console.error('MSAL initialization error:', error);
       }
     };
     initializeApp();
-  }, [instance, navigate]);
+  }, [instance]);
 
   const PublicPageWrapper = ({ children }) => (
     <>
