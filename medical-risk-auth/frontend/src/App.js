@@ -33,17 +33,10 @@ function App() {
         instance.handleRedirectPromise().then(async (response) => {
           if (response) {
             console.log('Login successful:', response);
-            // Acquire ID token and exchange for local token
-            try {
-              const accounts = instance.getAllAccounts();
-              if (accounts.length > 0) {
-                const silentRequest = {
-                  scopes: ["openid", "profile", "email", "User.Read"],
-                  account: accounts[0],
-                };
-                const tokenResponse = await instance.acquireTokenSilent(silentRequest);
-                const idToken = tokenResponse.idToken;
-
+            // Use the ID token from the redirect response
+            const idToken = response.idToken;
+            if (idToken) {
+              try {
                 // Send to backend for local token
                 const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/azure-login`, {
                   method: 'POST',
@@ -53,12 +46,16 @@ function App() {
                 if (apiResponse.ok) {
                   const data = await apiResponse.json();
                   localStorage.setItem('token', data.access_token);
+                  console.log('Token exchanged successfully');
                 } else {
-                  console.error('Failed to exchange token');
+                  const err = await apiResponse.text();
+                  console.error('Failed to exchange token:', err);
                 }
+              } catch (error) {
+                console.error('Token exchange error:', error);
               }
-            } catch (error) {
-              console.error('Token exchange error:', error);
+            } else {
+              console.error('No ID token in redirect response');
             }
           }
         }).catch((error) => {
