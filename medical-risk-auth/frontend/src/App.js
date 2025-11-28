@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SupportButton from './components/SupportButton';
@@ -22,52 +21,6 @@ import DocumentView from './pages/DocumentView';
 import './App.css';
 
 function App() {
-  const { instance, accounts } = useMsal();
-  const isAuthenticated = useIsAuthenticated();
-
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        await instance.initialize();
-        // Handle redirect response after login
-        instance.handleRedirectPromise().then(async (response) => {
-          if (response) {
-            console.log('Login successful:', response);
-            // Use the ID token from the redirect response
-            const idToken = response.idToken;
-            if (idToken) {
-              try {
-                // Send to backend for local token
-                const apiResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/azure-login`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ azure_token: idToken })
-                });
-                if (apiResponse.ok) {
-                  const data = await apiResponse.json();
-                  localStorage.setItem('token', data.access_token);
-                  console.log('Token exchanged successfully');
-                } else {
-                  const err = await apiResponse.text();
-                  console.error('Failed to exchange token:', err);
-                }
-              } catch (error) {
-                console.error('Token exchange error:', error);
-              }
-            } else {
-              console.error('No ID token in redirect response');
-            }
-          }
-        }).catch((error) => {
-          console.error('Login error:', error);
-          window.location.href = '/auth-error';
-        });
-      } catch (error) {
-        console.error('MSAL initialization error:', error);
-      }
-    };
-    initializeApp();
-  }, [instance]);
 
   const PublicPageWrapper = ({ children }) => (
     <>
