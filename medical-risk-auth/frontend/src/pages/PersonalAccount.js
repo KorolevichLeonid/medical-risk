@@ -189,7 +189,7 @@ const PersonalAccount = () => {
     }
   };
 
-};
+
 
 
 
@@ -557,5 +557,8 @@ const PersonalAccount = () => {
       </button>
     </div>
   );
+  
+};
+
 
 export default PersonalAccount;
