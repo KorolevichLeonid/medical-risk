@@ -21,3 +21,12 @@ class TokenData(BaseModel):
     email: Optional[str] = None
     object_id: Optional[str] = None
 
+
+class RegisterUser(BaseModel):
+    name: str
+    email: EmailStr
+
+
+class LoginUser(BaseModel):
+    email: EmailStr
+    password: Optional[str] = None

@@ -10,7 +10,7 @@ from typing import Optional
 from ..database import get_db
 from ..models.user import User, UserRole
 from ..schemas.user import UserResponse
-from ..schemas.auth import Token, AzureTokenLogin
+from ..schemas.auth import Token, AzureTokenLogin, RegisterUser, LoginUser
 from ..core.azure_auth_mock import verify_azure_token_mock, create_local_token, verify_local_token
 from ..core.config import settings
 from ..core.logging import log_user_login
@@ -30,6 +30,54 @@ def get_user_by_azure_id(db: Session, azure_object_id: str) -> User:
 
 
 def create_user_from_azure(db: Session, azure_user_info: dict) -> User:
+    """Create a new user from Azure user information"""
+    # Parse name if first_name/last_name are empty
+    if not azure_user_info["first_name"] or not azure_user_info["last_name"]:
+        name_parts = azure_user_info.get("name", "").split(" ", 1)
+        first_name = name_parts[0] if name_parts else "User"
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+    else:
+        first_name = azure_user_info["first_name"]
+        last_name = azure_user_info["last_name"]
+
+    user = User(
+        email=azure_user_info["email"],
+        azure_object_id=azure_user_info["object_id"],
+        first_name=first_name,
+        last_name=last_name,
+        role=UserRole.ADMIN,  # Default role for new users - force deploy
+        is_active=True,
+        is_verified=True,  # Verified through Azure
+        language="en"
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def create_user_from_register(db: Session, register_data) -> User:
+    """Create a new user from registration data"""
+    name_parts = register_data.name.split(" ", 1)
+    first_name = name_parts[0]
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+    user = User(
+        email=register_data.email,
+        azure_object_id=None,  # No Azure, local user
+        first_name=first_name,
+        last_name=last_name,
+        role=UserRole.ADMIN,
+        is_active=True,
+        is_verified=False,  # Not verified
+        language="en"
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
     """Create a new user from Azure user information"""
     # Parse name if first_name/last_name are empty
     if not azure_user_info["first_name"] or not azure_user_info["last_name"]:
@@ -174,6 +222,67 @@ async def azure_login(
             detail=f"Authentication failed: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+@router.post("/register", response_model=Token)
+async def register(
+    register_data: RegisterUser,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Register a new user"""
+    # Check if user exists
+    existing = get_user_by_email(db, register_data.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    # Create user
+    user = create_user_from_register(db, register_data)
+
+    # Update last login
+    user.last_login = datetime.now()
+    db.commit()
+
+    # Log user login
+    await log_user_login(db=db, user=user, request=request)
+
+    # Create local token
+    access_token = create_local_token({
+        "email": user.email,
+        "object_id": f"local-{user.id}"
+    })
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/login", response_model=Token)
+async def local_login(
+    login_data: LoginUser,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Login with email (password not required for temp)"""
+    user = get_user_by_email(db, login_data.email)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="User not active")
+
+    # Update last login
+    user.last_login = datetime.now()
+    db.commit()
+
+    # Log user login
+    await log_user_login(db=db, user=user, request=request)
+
+    # Create local token
+    access_token = create_local_token({
+        "email": user.email,
+        "object_id": user.azure_object_id or f"local-{user.id}"
+    })
+
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=UserResponse)
