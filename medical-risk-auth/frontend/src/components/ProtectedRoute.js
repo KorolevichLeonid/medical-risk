@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { loginRequest } from '../authConfig';
+import API_BASE_URL from '../config';
 
 const ProtectedRoute = ({ children }) => {
   const { instance, accounts } = useMsal();
@@ -50,7 +51,7 @@ const ProtectedRoute = ({ children }) => {
 
       // Send Azure token to backend
       console.log('🔄 Sending Azure token to backend...');
-      const backendResponse = await fetch('http://localhost:8000/api/auth/azure-login', {
+      const backendResponse = await fetch(`${API_BASE_URL}/api/auth/azure-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -69,7 +70,7 @@ const ProtectedRoute = ({ children }) => {
         
         // Get user info from backend
         console.log('👤 Fetching user info...');
-        const userResponse = await fetch('http://localhost:8000/api/auth/me', {
+        const userResponse = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${data.access_token}`
           }
@@ -172,4 +173,3 @@ const ProtectedRoute = ({ children }) => {
 };
 
 export default ProtectedRoute;
-
