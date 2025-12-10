@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -36,7 +37,7 @@ const Dashboard = () => {
   const loadProjects = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/projects/', {
+      const response = await fetch(`${API_BASE_URL}/api/projects/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -151,7 +152,7 @@ const Dashboard = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/projects/${projectId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../config';
 import './PersonalAccount.css';
 
 const PersonalAccount = () => {
@@ -9,6 +10,7 @@ const PersonalAccount = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -25,10 +27,10 @@ const PersonalAccount = () => {
     }
   });
 
-
   useEffect(() => {
     loadUserData();
     loadStatistics();
+
     const content = document.querySelector('.content-body');
     const onScroll = () => {
       const scrollTop = content ? content.scrollTop : (window.pageYOffset || document.documentElement.scrollTop);
@@ -49,7 +51,8 @@ const PersonalAccount = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/auth/me', {
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -57,8 +60,7 @@ const PersonalAccount = () => {
 
       if (response.ok) {
         const userData = await response.json();
-        
-        // Создаем объект пользователя с пустыми полями, если они не заполнены
+
         const user = {
           id: userData.id,
           firstName: userData.first_name || '',
@@ -78,9 +80,9 @@ const PersonalAccount = () => {
             browser: userData.browser_notifications !== false,
             mobile: userData.mobile_notifications !== false
           },
-          recentActivity: [] // TODO: получать из API
+          recentActivity: []
         };
-        
+
         setUser(user);
         setFormData({
           firstName: user.firstName,
@@ -106,7 +108,8 @@ const PersonalAccount = () => {
   const loadStatistics = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/users/me/statistics', {
+
+      const response = await fetch(`${API_BASE_URL}/api/users/me/statistics`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -125,7 +128,7 @@ const PersonalAccount = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (name.startsWith('notifications.')) {
       const notificationKey = name.split('.')[1];
       setFormData(prev => ({
@@ -147,7 +150,8 @@ const PersonalAccount = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/users/${user.id}`, {
+
+      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -170,9 +174,7 @@ const PersonalAccount = () => {
 
       if (response.ok) {
         const updatedUser = await response.json();
-        // Update localStorage
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        // Reload user data and statistics
         loadUserData();
         loadStatistics();
         setIsEditing(false);
@@ -186,6 +188,11 @@ const PersonalAccount = () => {
       alert('Server connection error');
     }
   };
+
+
+
+
+
 
 
 
@@ -550,6 +557,8 @@ const PersonalAccount = () => {
       </button>
     </div>
   );
+  
 };
+
 
 export default PersonalAccount;
