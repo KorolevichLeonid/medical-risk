@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './ChangelogDetail.css';
+import API_BASE_URL from '../config';
 
 const ChangelogDetail = () => {
     const { changelogId } = useParams();
@@ -20,7 +21,7 @@ const ChangelogDetail = () => {
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(
-                `http://localhost:8000/api/changelog/${changelogId}`,
+                `${API_BASE_URL}/api/changelog/${changelogId}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import './ProjectView.css';
 import ExcelTable from '../components/ExcelTable';
+import API_BASE_URL from '../config';
 
 const ProjectView = () => {
   const { id } = useParams();
@@ -23,7 +24,7 @@ const ProjectView = () => {
       
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8000/api/projects/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -74,7 +75,7 @@ const ProjectView = () => {
           setProject(transformedProject);
           
           // Load project members
-          const membersResponse = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
+          const membersResponse = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -97,7 +98,7 @@ const ProjectView = () => {
           }
           
           // Load risk statistics
-          const risksResponse = await fetch(`http://localhost:8000/api/risk-analyses/project/${id}/factors`, {
+          const risksResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/project/${id}/factors`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -195,7 +196,7 @@ const ProjectView = () => {
   const loadAvailableUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/users/project-members/selectable', {
+      const response = await fetch(`${API_BASE_URL}/api/users/project-members/selectable`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -256,7 +257,7 @@ const ProjectView = () => {
     setAddingMember(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -293,7 +294,7 @@ const ProjectView = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/projects/${id}/members/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

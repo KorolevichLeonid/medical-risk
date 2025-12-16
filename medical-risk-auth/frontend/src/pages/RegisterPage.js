@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './AuthPage.css';
+import API_BASE_URL from '../config';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ const RegisterPage = () => {
 
     try {
       // Real API call to backend
-      const response = await fetch('http://localhost:8000/api/users/register', {
+      const response = await fetch(`${API_BASE_URL}/api/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

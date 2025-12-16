@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import './ExcelTable.css';
 import RiskEvaluationWizard from './RiskEvaluationWizard';
 import BatchRiskEvaluation from './BatchRiskEvaluation';
+import API_BASE_URL from '../config';
 
 const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [data, setData] = useState([]);
@@ -28,6 +29,16 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [showBatchEvaluation, setShowBatchEvaluation] = useState(false);
   const [risksToEvaluate, setRisksToEvaluate] = useState([]);
   const [dataBeforeChanges, setDataBeforeChanges] = useState(null); // Snapshot данных при последнем сохранении
+
+  // Глобальное отслеживание изменений по всем листам
+  const [allSheetsChanges, setAllSheetsChanges] = useState(() => {
+    const saved = localStorage.getItem(`project_${projectId}_all_sheet_changes`);
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [currentSheetData, setCurrentSheetData] = useState(() => {
+    const saved = localStorage.getItem(`project_${projectId}_current_sheet_data`);
+    return saved ? JSON.parse(saved) : {};
+  });
   
   // Для редактирования названий листов и столбцов
   const [editingSheetId, setEditingSheetId] = useState(null);
@@ -611,7 +622,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const logUserData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8000/api/users/me/permissions?project_id=${projectId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/users/me/permissions?project_id=${projectId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -679,7 +690,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       console.log('Найден токен, загружаем роль пользователя для проекта:', projectId);
 
       // Загружаем роль пользователя в проекте из API
-      const response = await fetch(`http://localhost:8000/api/projects/${projectId}/my-role`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/my-role`, {
         headers: {
           'Authorization': `Bearer ${finalToken}`,
           'Content-Type': 'application/json',
@@ -761,7 +772,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       }
 
       // Загружаем данные таблицы из API без авторизации (тест)
-      const response = await fetch(`http://localhost:8000/api/risk-tables/project/${projectId}/sheets/${activeSheet}`); // Убираем Authorization header
+      const response = await fetch(`${API_BASE_URL}/api/risk-tables/project/${projectId}/sheets/${activeSheet}`); // Убираем Authorization header
 
       if (response.ok) {
         const tableData = await response.json();
@@ -863,11 +874,36 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
     setData(newData);
 
-    // Отслеживаем измененные ячейки
+    // Обновляем данные текущего листа
+    setCurrentSheetData(prev => ({
+      ...prev,
+      [activeSheet]: newData
+    }));
+
+    // Отслеживаем измененные ячейки для текущего листа
     const cellKey = `${activeSheet}_${rowIndex}_${columnKey}`;
     setModifiedCells(prev => new Set([...prev, cellKey]));
 
+    // Обновляем глобальное отслеживание изменений
+    setAllSheetsChanges(prev => ({
+      ...prev,
+      [activeSheet]: new Set([...(prev[activeSheet] || []), rowIndex])
+    }));
+
     setHasChanges(true);
+
+    // Сохраняем глобальное состояние в localStorage
+    const updatedAllSheetsChanges = {
+      ...allSheetsChanges,
+      [activeSheet]: new Set([...(allSheetsChanges[activeSheet] || []), rowIndex])
+    };
+    localStorage.setItem(`project_${projectId}_all_sheet_changes`, JSON.stringify(updatedAllSheetsChanges));
+
+    const updatedCurrentSheetData = {
+      ...currentSheetData,
+      [activeSheet]: newData
+    };
+    localStorage.setItem(`project_${projectId}_current_sheet_data`, JSON.stringify(updatedCurrentSheetData));
   };
 
   const handleCellDoubleClick = (rowIndex, columnKey) => {
@@ -1078,16 +1114,111 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const handleSave = async () => {
     // Проверяем, есть ли риски требующие оценки
     const risksNeedingEval = findRisksNeedingEvaluation();
-    
+
     if (risksNeedingEval.length > 0) {
       // Показываем batch evaluation (snapshot уже создан при загрузке данных)
       setRisksToEvaluate(risksNeedingEval);
       setShowBatchEvaluation(true);
       return; // Не продолжаем сохранение, пока не будет оценка
     }
-    
+
     // Продолжаем обычное сохранение
     await performSave();
+  };
+
+  // Функция сохранения всех листов
+  const handleSaveAllSheets = async () => {
+    setSaving(true);
+    try {
+      const sheetsToSave = Object.keys(allSheetsChanges).filter(sheetId =>
+        allSheetsChanges[sheetId].size > 0
+      );
+
+      if (sheetsToSave.length === 0) {
+        alert('Нет изменений для сохранения');
+        return;
+      }
+
+      // Сохраняем каждый лист отдельно
+      for (const sheetId of sheetsToSave) {
+        await saveSheetData(sheetId, currentSheetData[sheetId]);
+      }
+
+      // Очищаем состояние изменений
+      setAllSheetsChanges({});
+      setCurrentSheetData({});
+      localStorage.removeItem(`project_${projectId}_all_sheet_changes`);
+      localStorage.removeItem(`project_${projectId}_current_sheet_data`);
+
+      // Сбрасываем локальные изменения для текущего листа
+      setHasChanges(false);
+      setModifiedCells(new Set());
+
+      alert(`Успешно сохранено ${sheetsToSave.length} листов!`);
+    } catch (error) {
+      console.error('Failed to save all sheets:', error);
+      alert('Ошибка при сохранении. Проверьте подключение к серверу.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Вспомогательная функция для сохранения данных листа
+  const saveSheetData = async (sheetId, sheetData) => {
+    const columns = getColumnStructure(sheetId);
+    const flatColumns = flattenColumns(columns);
+
+    // Подготавливаем данные для отправки на API
+    const columnDefinitions = flatColumns.map((col, index) => ({
+      key: col.key,
+      label: col.label,
+      width: col.width,
+      column_index: index
+    }));
+
+    const rowData = sheetData.map((row, index) => {
+      // Извлекаем данные строки, исключая вспомогательные поля
+      const rowDataOnly = { ...row };
+      delete rowDataOnly.number;
+      delete rowDataOnly.id;
+      delete rowDataOnly.isNew;
+      delete rowDataOnly.cell_colors;
+
+      // Получаем цвета ячеек для конкретной строки
+      const cellColorsForRow = {};
+      Object.entries(cellColors)
+        .filter(([key, color]) => key.startsWith(`${sheetId}_${index}_`))
+        .forEach(([key, color]) => {
+          const parts = key.split('_');
+          const columnKey = parts.slice(2).join('_');
+          cellColorsForRow[columnKey] = color;
+        });
+
+      return {
+        row_number: row.number,
+        row_index: index,
+        data: rowDataOnly,
+        cell_colors: Object.keys(cellColorsForRow).length > 0 ? cellColorsForRow : null
+      };
+    });
+
+    // Отправляем данные на API
+    const response = await fetch(`${API_BASE_URL}/api/risk-tables/project/${projectId}/sheets/${sheetId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sheet_name: customSheetNames[sheetId] || null,
+        sheet_icon: sheets.find(s => s.id === sheetId)?.icon || null,
+        columns: columnDefinitions,
+        rows: rowData
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
   };
 
   const performSave = async () => {
@@ -1128,7 +1259,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       });
 
       // Отправляем данные на API без авторизации (тест)
-      const response = await fetch(`http://localhost:8000/api/risk-tables/project/${projectId}/sheets/${activeSheet}`, {
+      const response = await fetch(`${API_BASE_URL}/api/risk-tables/project/${projectId}/sheets/${activeSheet}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1153,10 +1284,24 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       localStorage.setItem(`project_${projectId}_column_widths`, JSON.stringify(columnWidths));
       localStorage.setItem(`project_${projectId}_row_heights`, JSON.stringify(rowHeights));
 
-      alert('Данные успешно сохранены на сервере!');
+      // Сбрасываем состояние изменений для текущего листа
       setHasChanges(false);
       setModifiedCells(new Set());
-      
+
+      // Очищаем глобальное отслеживание изменений для текущего листа
+      const updatedAllSheetsChanges = { ...allSheetsChanges };
+      delete updatedAllSheetsChanges[activeSheet];
+      setAllSheetsChanges(updatedAllSheetsChanges);
+      localStorage.setItem(`project_${projectId}_all_sheet_changes`, JSON.stringify(updatedAllSheetsChanges));
+
+      // Очищаем данные текущего листа из localStorage
+      const updatedCurrentSheetData = { ...currentSheetData };
+      delete updatedCurrentSheetData[activeSheet];
+      setCurrentSheetData(updatedCurrentSheetData);
+      localStorage.setItem(`project_${projectId}_current_sheet_data`, JSON.stringify(updatedCurrentSheetData));
+
+      alert('Данные успешно сохранены на сервере!');
+
       // Перезагружаем данные с сервера, чтобы обновить цвета и другие изменения
       await loadData();
     } catch (error) {
@@ -1173,10 +1318,9 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       alert('⚠️ Нельзя добавлять строки вручную в этом листе.\nСтроки добавляются автоматически при создании рисков в Risk Analysis.');
       return;
     }
-    
-    const cols = getColumns(activeSheet);
+
     const newRow = { number: data.length + 1, id: null, isNew: true };
-    cols.forEach(col => {
+    columns.forEach(col => {
       if (col.key !== 'number') {
         newRow[col.key] = '';
       }
@@ -1185,7 +1329,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     setHasChanges(true);
 
     // Помечаем новую строку как измененную
-    cols.forEach(col => {
+    columns.forEach(col => {
       if (col.key !== 'number') {
         const cellKey = `${activeSheet}_${data.length}_${col.key}`;
         setModifiedCells(prev => new Set([...prev, cellKey]));
@@ -1499,7 +1643,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         };
       });
 
-      const response = await fetch(`http://localhost:8000/api/risk-tables/project/${projectId}/sheets/${activeSheet}`, {
+      const response = await fetch(`${API_BASE_URL}/api/risk-tables/project/${projectId}/sheets/${activeSheet}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1631,7 +1775,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         <div className="excel-toolbar">
           <div className="excel-toolbar-left">
             <h2>Таблица управления рисками</h2>
-            {hasChanges && <span className="changes-indicator">● Есть несохраненные изменения</span>}
+            {hasChanges && (
+              <span className="changes-indicator">
+                ● {modifiedCells.size} несохранен{modifiedCells.size === 1 ? 'ная' : modifiedCells.size < 5 ? 'ные' : 'ных'} изменени{modifiedCells.size === 1 ? 'е' : 'й'}
+              </span>
+            )}
           </div>
           <div className="excel-toolbar-center">
             {/* Индикатор роли пользователя */}
@@ -1711,51 +1859,63 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
         {/* Вкладки листов */}
         <div className="excel-tabs">
-          {sheets.map(sheet => (
-            <div
-              key={sheet.id}
-              className={`excel-tab ${activeSheet === sheet.id ? 'active' : ''}`}
-              onClick={() => setActiveSheet(sheet.id)}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                handleSheetDoubleClick(sheet.id);
-              }}
-            >
-              <span className="tab-icon">{sheet.icon}</span>
-              {editingSheetId === sheet.id ? (
-                <input
-                  type="text"
-                  className="sheet-name-input"
-                  value={editingSheetName}
-                  onChange={(e) => setEditingSheetName(e.target.value)}
-                  onBlur={handleSheetNameSave}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSheetNameSave();
-                    } else if (e.key === 'Escape') {
-                      setEditingSheetId(null);
-                      setEditingSheetName('');
-                    }
-                  }}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <span className="tab-name">{getSheetName(sheet.id)}</span>
-              )}
-              
-              {/* Кнопка удаления для пользовательских листов */}
-              {sheet.id.startsWith('custom_sheet_') && (
-                <button
-                  className="delete-sheet-btn"
-                  onClick={(e) => handleDeleteSheet(sheet.id, e)}
-                  title="Удалить лист"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
+          {sheets.map(sheet => {
+            const sheetChanges = allSheetsChanges[sheet.id]?.size || 0;
+            return (
+              <div
+                key={sheet.id}
+                className={`excel-tab ${activeSheet === sheet.id ? 'active' : ''}`}
+                onClick={() => {
+                  // Проверяем изменения в текущем листе перед переключением
+                  if (hasChanges && activeSheet !== sheet.id) {
+                    const confirmSwitch = window.confirm(
+                      'У вас есть несохраненные изменения в текущем листе. Переключение на другой лист отменит эти изменения. Продолжить?'
+                    );
+                    if (!confirmSwitch) return;
+                  }
+                  setActiveSheet(sheet.id);
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  handleSheetDoubleClick(sheet.id);
+                }}
+              >
+                <span className="tab-icon">{sheet.icon}</span>
+                {editingSheetId === sheet.id ? (
+                  <input
+                    type="text"
+                    className="sheet-name-input"
+                    value={editingSheetName}
+                    onChange={(e) => setEditingSheetName(e.target.value)}
+                    onBlur={handleSheetNameSave}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSheetNameSave();
+                      } else if (e.key === 'Escape') {
+                        setEditingSheetId(null);
+                        setEditingSheetName('');
+                      }
+                    }}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span className="tab-name">{getSheetName(sheet.id)}</span>
+                )}
+
+                {/* Кнопка удаления для пользовательских листов */}
+                {sheet.id.startsWith('custom_sheet_') && (
+                  <button
+                    className="delete-sheet-btn"
+                    onClick={(e) => handleDeleteSheet(sheet.id, e)}
+                    title="Удалить лист"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
           
           {/* Кнопка добавления нового листа */}
           {canAddElements() && (

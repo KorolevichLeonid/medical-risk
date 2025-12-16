@@ -156,6 +156,7 @@ class RiskTableRowCreate(RiskTableRowBase):
 
 class RiskTableRowUpdate(BaseModel):
     """Schema for updating a table row"""
+    row_id: int  # Required for batch updates
     row_number: Optional[int] = None
     row_index: Optional[int] = None
     data: Optional[Dict[str, Any]] = None

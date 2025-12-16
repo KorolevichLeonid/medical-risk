@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './RoleManagement.css';
+import API_BASE_URL from '../config';
 
 const RoleManagement = () => {
   const [users, setUsers] = useState([]);
@@ -27,7 +28,7 @@ const RoleManagement = () => {
   const loadCurrentUser = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/auth/me', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -46,7 +47,7 @@ const RoleManagement = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/users/with-projects', {
+      const response = await fetch(`${API_BASE_URL}/api/users/with-projects`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -170,7 +171,7 @@ const RoleManagement = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

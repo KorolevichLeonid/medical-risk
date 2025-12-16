@@ -15,7 +15,7 @@ from ..models.risk_analysis import (
 from ..schemas.risk_analysis import (
     RiskManagementTableResponse, RiskManagementTableCreate,
     RiskManagementTableUpdate, RiskTableDataBulkUpdate,
-    RiskTableRowResponse, RiskTableColumnResponse
+    RiskTableRowResponse, RiskTableColumnResponse, RiskTableRowUpdate
 )
 from ..routers.auth import get_current_active_user
 from ..routers.projects import get_project, check_project_access
@@ -799,3 +799,189 @@ async def sync_risks_to_table(
         "message": "Risks synchronized successfully",
         "synced_count": synced_count
     }
+
+
+@router.put("/project/{project_id}/sheets/{sheet_id}/batch-update")
+async def batch_update_rows(
+    project_id: int,
+    sheet_id: str,
+    updates: List[RiskTableRowUpdate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Update multiple rows in a risk table incrementally.
+    Only updates the specified fields in each row.
+    """
+    db_project = get_project(db, project_id=project_id)
+    if db_project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not check_risk_table_edit_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risk tables in this project"
+        )
+
+    # Get the table
+    table = db.query(RiskManagementTable).filter(
+        RiskManagementTable.project_id == project_id,
+        RiskManagementTable.sheet_id == sheet_id
+    ).first()
+
+    if not table:
+        raise HTTPException(status_code=404, detail="Risk management table not found")
+
+    updated_rows = []
+    sync_needed = False
+
+    # Get lifecycle stages to check if we need to sync with risk factors
+    lifecycle_stages = []
+    if db_project.lifecycle_stages:
+        if isinstance(db_project.lifecycle_stages, str):
+            import json
+            lifecycle_stages = json.loads(db_project.lifecycle_stages)
+        else:
+            lifecycle_stages = db_project.lifecycle_stages
+
+    if db_project.custom_lifecycle_stages:
+        if isinstance(db_project.custom_lifecycle_stages, str):
+            import json
+            custom_stages = json.loads(db_project.custom_lifecycle_stages)
+            lifecycle_stages.extend(custom_stages)
+        else:
+            lifecycle_stages.extend(db_project.custom_lifecycle_stages)
+
+    needs_risk_sync = sheet_id in lifecycle_stages
+
+    for update_data in updates:
+        row = db.query(RiskTableRow).filter(RiskTableRow.id == update_data.row_id).first()
+        if not row:
+            logger.warning(f"Row with id {update_data.row_id} not found, skipping")
+            continue
+
+        # Update only the specified fields
+        if update_data.data:
+            # Merge with existing data
+            updated_data = {**row.data, **update_data.data}
+            row.data = updated_data
+
+        if update_data.cell_colors is not None:
+            row.cell_colors = update_data.cell_colors
+
+        updated_rows.append(row)
+
+        # Check if this update affects risk scores that need syncing
+        if needs_risk_sync and update_data.data:
+            score_fields = ['severity_score', 'probability_score', 'risk_score']
+            if any(field in update_data.data for field in score_fields):
+                sync_needed = True
+
+    if updated_rows:
+        db.commit()
+        # Refresh all updated rows
+        for row in updated_rows:
+            db.refresh(row)
+
+        # Sync with risk factors if needed
+        if sync_needed:
+            await sync_table_to_risks(db, table, project_id)
+
+    return {
+        "message": f"Updated {len(updated_rows)} rows successfully",
+        "updated_count": len(updated_rows),
+        "sync_performed": sync_needed
+    }
+
+
+@router.put("/project/{project_id}/sheets/{sheet_id}/incremental", response_model=RiskManagementTableResponse)
+async def create_or_update_table_incremental(
+    project_id: int,
+    sheet_id: str,
+    table_data: RiskTableDataBulkUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Create or update risk management table with incremental updates.
+    Updates only changed rows instead of replacing the entire table.
+    """
+    db_project = get_project(db, project_id=project_id)
+    if db_project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not check_risk_table_edit_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to edit risk tables in this project"
+        )
+
+    # Find existing table or create new one
+    table = db.query(RiskManagementTable).filter(
+        RiskManagementTable.project_id == project_id,
+        RiskManagementTable.sheet_id == sheet_id
+    ).first()
+
+    if not table:
+        # Create new table
+        table = RiskManagementTable(
+            project_id=project_id,
+            sheet_id=sheet_id,
+            name=table_data.sheet_name,
+            icon=table_data.sheet_icon
+        )
+        db.add(table)
+        db.flush()  # Get table ID
+
+        # Create columns
+        for col_data in table_data.columns:
+            column = RiskTableColumn(
+                table_id=table.id,
+                key=col_data.key,
+                label=col_data.label,
+                width=col_data.width,
+                column_index=col_data.column_index
+            )
+            db.add(column)
+    else:
+        # Update existing table metadata
+        if table_data.sheet_name is not None:
+            table.name = table_data.sheet_name
+        if table_data.sheet_icon is not None:
+            table.icon = table_data.sheet_icon
+
+        # Update columns if provided
+        if table_data.columns:
+            # Delete existing columns and create new ones
+            db.query(RiskTableColumn).filter(RiskTableColumn.table_id == table.id).delete()
+            for col_data in table_data.columns:
+                column = RiskTableColumn(
+                    table_id=table.id,
+                    key=col_data.key,
+                    label=col_data.label,
+                    width=col_data.width,
+                    column_index=col_data.column_index
+                )
+                db.add(column)
+
+    # For incremental updates, we assume rows are already managed and only update if explicitly provided
+    # This endpoint is mainly for compatibility - prefer batch_update_rows for row changes
+    if table_data.rows:
+        logger.warning("Incremental endpoint received full row data - consider using batch_update_rows for better performance")
+
+        # Delete existing rows and create new ones (fallback to full update)
+        db.query(RiskTableRow).filter(RiskTableRow.table_id == table.id).delete()
+        for row_data in table_data.rows:
+            row = RiskTableRow(
+                table_id=table.id,
+                row_number=row_data.row_number,
+                row_index=row_data.row_index,
+                data=row_data.data,
+                cell_colors=row_data.cell_colors
+            )
+            db.add(row)
+
+    db.commit()
+    db.refresh(table)
+
+    return table

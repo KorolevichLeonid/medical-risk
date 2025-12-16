@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import './RiskAnalysis.css';
+import API_BASE_URL from '../config';
 
 const RiskAnalysis = () => {
   const { id } = useParams();
@@ -44,7 +45,7 @@ const RiskAnalysis = () => {
     const logUserData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8000/api/users/me/permissions?project_id=${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/users/me/permissions?project_id=${id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -73,7 +74,7 @@ const RiskAnalysis = () => {
   const loadUserProjectRole = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/projects/${id}/my-role`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}/my-role`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -134,7 +135,7 @@ const RiskAnalysis = () => {
       const token = localStorage.getItem('token');
       
       // Load project data
-      const projectResponse = await fetch(`http://localhost:8000/api/projects/${id}`, {
+      const projectResponse = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -193,7 +194,7 @@ const RiskAnalysis = () => {
       }
       
       // Load risk factors
-      const risksResponse = await fetch(`http://localhost:8000/api/risk-analyses/project/${id}/factors`, {
+      const risksResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/project/${id}/factors`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -367,7 +368,7 @@ const RiskAnalysis = () => {
       const token = localStorage.getItem('token');
       
       // First, get or create risk analysis for the project
-      const analysisResponse = await fetch(`http://localhost:8000/api/risk-analyses/project/${id}`, {
+      const analysisResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/project/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -379,7 +380,7 @@ const RiskAnalysis = () => {
         analysisId = analysisData.id;
       } else {
         // Create new risk analysis if it doesn't exist
-        const createAnalysisResponse = await fetch(`http://localhost:8000/api/risk-analyses/project/${id}`, {
+        const createAnalysisResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/project/${id}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -439,7 +440,7 @@ const RiskAnalysis = () => {
         // severity_score, probability_score, control_measures are now optional
       };
       
-      const addRiskResponse = await fetch(`http://localhost:8000/api/risk-analyses/${analysisId}/factors`, {
+      const addRiskResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/${analysisId}/factors`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -520,7 +521,7 @@ const RiskAnalysis = () => {
         // severity_score, probability_score, control_measures are optional
       };
       
-      const updateRiskResponse = await fetch(`http://localhost:8000/api/risk-analyses/factors/${selectedRisk.id}`, {
+      const updateRiskResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/factors/${selectedRisk.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -557,7 +558,7 @@ const RiskAnalysis = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const deleteRiskResponse = await fetch(`http://localhost:8000/api/risk-analyses/factors/${riskId}`, {
+      const deleteRiskResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/factors/${riskId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

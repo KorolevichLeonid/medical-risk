@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './ChangelogHistory.css';
+import API_BASE_URL from '../config';
 
 const ChangelogHistory = () => {
     const { projectId } = useParams();
@@ -31,7 +32,7 @@ const ChangelogHistory = () => {
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(
-                `http://localhost:8000/api/changelog/project/${projectId}?page=${currentPage}&size=${pageSize}`,
+                `${API_BASE_URL}/api/changelog/project/${projectId}?page=${currentPage}&size=${pageSize}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,

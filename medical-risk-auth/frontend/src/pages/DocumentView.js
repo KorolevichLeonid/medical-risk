@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import './DocumentView.css';
+import API_BASE_URL from '../config';
 
 const DocumentView = () => {
   const { id } = useParams();
@@ -35,7 +36,7 @@ const DocumentView = () => {
   const loadProjectData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/projects/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -55,7 +56,7 @@ const DocumentView = () => {
   const loadCurrentDocument = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/documents/projects/${id}/current`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/projects/${id}/current`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -75,7 +76,7 @@ const DocumentView = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/documents/projects/${id}/versions`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/projects/${id}/versions`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -97,7 +98,7 @@ const DocumentView = () => {
       const token = localStorage.getItem('token');
       
       // Загружаем проект для получения lifecycle stages и hazard categories
-      const projectResponse = await fetch(`http://localhost:8000/api/projects/${id}`, {
+      const projectResponse = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -141,7 +142,7 @@ const DocumentView = () => {
       }
       
       // Загружаем все риски
-      const risksResponse = await fetch(`http://localhost:8000/api/risk-analyses/project/${id}/factors`, {
+      const risksResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/project/${id}/factors`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -214,7 +215,7 @@ const DocumentView = () => {
     setGenerating(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/api/documents/projects/${id}/generate`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/projects/${id}/generate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -261,7 +262,7 @@ const DocumentView = () => {
       }
 
       const response = await fetch(
-        `http://localhost:8000/api/documents/projects/${id}/versions/${versionId}/download`,
+        `${API_BASE_URL}/api/documents/projects/${id}/versions/${versionId}/download`,
         {
           method: 'GET',
           headers: {
@@ -376,7 +377,7 @@ const DocumentView = () => {
       console.log(`Loading preview for project ${id}, version ${versionId}`);
       
       const response = await fetch(
-        `http://localhost:8000/api/documents/projects/${id}/versions/${versionId}/preview`,
+        `${API_BASE_URL}/api/documents/projects/${id}/versions/${versionId}/preview`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -424,7 +425,7 @@ const DocumentView = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:8000/api/documents/projects/${id}/versions/${versionId}`,
+        `${API_BASE_URL}/api/documents/projects/${id}/versions/${versionId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -671,4 +672,3 @@ const DocumentView = () => {
 };
 
 export default DocumentView;
-
