@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './ProjectForm.css';
+import API_BASE_URL from '../config';
 
 // Detailed hazard checklist data
 const hazardDetails = {
@@ -694,7 +695,7 @@ const ProjectForm = () => {
       try {
         const token = localStorage.getItem('token');
         const projectId = id; // id доступен в компоненте
-        const response = await fetch(`http://localhost:8000/api/users/me/permissions?project_id=${projectId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/users/me/permissions?project_id=${projectId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -737,7 +738,7 @@ const ProjectForm = () => {
   const loadAvailableUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/users/', {
+      const response = await fetch(`${API_BASE_URL}/api/users/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -772,7 +773,7 @@ const ProjectForm = () => {
       console.log('Loading project data for ID:', id);
       console.log('Token exists:', !!token);
 
-      const response = await fetch(`http://localhost:8000/api/projects/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -786,7 +787,7 @@ const ProjectForm = () => {
         console.log('Project data loaded:', projectData);
 
         // Загружаем членов проекта
-        const membersResponse = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
+        const membersResponse = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -1173,9 +1174,9 @@ const ProjectForm = () => {
       }
 
       const token = localStorage.getItem('token');
-      const url = isEditMode 
-        ? `http://localhost:8000/api/projects/${id}`
-        : 'http://localhost:8000/api/projects/';
+      const url = isEditMode
+        ? `${API_BASE_URL}/api/projects/${id}`
+        : `${API_BASE_URL}/api/projects/`;
       
       const method = isEditMode ? 'PUT' : 'POST';
       
@@ -1223,7 +1224,7 @@ const ProjectForm = () => {
         
         if (isEditMode) {
           // Для режима редактирования сначала получаем текущих членов и удаляем тех, кто не выбран
-          const currentMembersResponse = await fetch(`http://localhost:8000/api/projects/${id}/members`, {
+          const currentMembersResponse = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -1239,7 +1240,7 @@ const ProjectForm = () => {
             for (const memberId of currentMemberIds) {
               if (!formData.teamMembers.includes(memberId)) {
                 try {
-                  await fetch(`http://localhost:8000/api/projects/${id}/members/${memberId}`, {
+                  await fetch(`${API_BASE_URL}/api/projects/${id}/members/${memberId}`, {
                     method: 'DELETE',
                     headers: {
                       'Authorization': `Bearer ${token}`
@@ -1256,7 +1257,7 @@ const ProjectForm = () => {
         // Добавляем новых членов команды
         for (const userId of formData.teamMembers) {
           try {
-            const memberResponse = await fetch(`http://localhost:8000/api/projects/${projectData.id}/members`, {
+            const memberResponse = await fetch(`${API_BASE_URL}/api/projects/${projectData.id}/members`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
