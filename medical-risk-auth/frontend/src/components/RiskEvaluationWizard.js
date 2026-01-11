@@ -3,21 +3,30 @@ import './RiskEvaluationWizard.css';
 
 /**
  * RiskEvaluationWizard - Wizard для оценки одного риска
- * 
+ *
  * Используется для первичной или вторичной оценки рисков.
+ * Допустимость риска определяется автоматически на основе порогового значения.
  * Включает шаги:
- * 1. Выбор допустимости риска (Доп/Не доп)
+ * 1. Автоматическая оценка допустимости риска
  * 2. Дополнительные действия (закрытие риска / комментарий / новый риск)
  * 3. Подтверждение
  */
-const RiskEvaluationWizard = ({ 
-  risk, 
+const RiskEvaluationWizard = ({
+  risk,
   evaluationType, // 'first' или 'second'
-  onComplete, 
+  onComplete,
   onCancel,
   showCancelButton = true, // Показывать ли кнопку "Отменить"
-  onCancelRisk // Отмена оценки ЭТОГО риска (помечает как отмененный)
+  onCancelRisk, // Отмена оценки ЭТОГО риска (помечает как отмененный)
+  acceptableRiskLevel = 10, // Пороговое значение уровня риска
+  onSaveAllChanges // Функция для сохранения всех изменений в Excel таблице
 }) => {
+  // Определяем какие столбцы оцениваются
+  const isFirstEvaluation = evaluationType === 'first';
+  const riskScore = isFirstEvaluation ? risk.risk_score : risk.residual_risk_score;
+  const severityScore = isFirstEvaluation ? risk.severity_score : risk.residual_risk_level;
+  const probabilityScore = isFirstEvaluation ? risk.probability_score : risk.residual_probability;
+
   const [step, setStep] = useState(1);
   const [evaluation, setEvaluation] = useState({
     isAcceptable: null, // true = Доп, false = Не доп
@@ -32,27 +41,23 @@ const RiskEvaluationWizard = ({
   // Сброс state при смене риска
   useEffect(() => {
     setStep(1);
+    // Автоматически определяем допустимость риска на основе порогового значения
+    const autoAcceptable = riskScore <= acceptableRiskLevel;
     setEvaluation({
-      isAcceptable: null,
+      isAcceptable: autoAcceptable,
       shouldCloseRisk: false,
       comment: '',
       shouldCreateNewRisk: false,
       newRiskDescription: '',
     });
     setErrors({});
-  }, [risk.id, risk.rowIndex]); // Сбрасываем при изменении ID или индекса риска
+  }, [risk.id, risk.rowIndex, riskScore, acceptableRiskLevel]); // Сбрасываем при изменении ID, индекса риска или параметров оценки
 
-  // Определяем какие столбцы оцениваются
-  const isFirstEvaluation = evaluationType === 'first';
-  const riskScore = isFirstEvaluation ? risk.risk_score : risk.residual_risk_score;
-  const severityScore = isFirstEvaluation ? risk.severity_score : risk.residual_risk_level;
-  const probabilityScore = isFirstEvaluation ? risk.probability_score : risk.residual_probability;
-
-  // Шаг 1: Выбор допустимости
+  // Шаг 1: Автоматическая оценка допустимости
   const renderStep1 = () => (
     <div className="wizard-step">
-      <h3>Оценка допустимости риска</h3>
-      
+      <h3>Автоматическая оценка допустимости риска</h3>
+
       <div className="risk-info-card">
         <div className="risk-info-row">
           <span className="label">Риск:</span>
@@ -76,34 +81,30 @@ const RiskEvaluationWizard = ({
             {riskScore || 'Не рассчитано'}
           </span>
         </div>
+        <div className="risk-info-row">
+          <span className="label">Пороговое значение:</span>
+          <span className="value">{acceptableRiskLevel}</span>
+        </div>
       </div>
 
-      <div className="evaluation-choice">
-        <p className="choice-question">
-          Является ли данный риск допустимым?
+      <div className="evaluation-result">
+        <p className="result-statement">
+          На основе автоматической оценки, данный риск является:
         </p>
-        
-        <div className="choice-buttons">
-          <button
-            className={`choice-btn acceptable ${evaluation.isAcceptable === true ? 'selected' : ''}`}
-            onClick={() => setEvaluation({ ...evaluation, isAcceptable: true })}
-          >
-            <span className="icon">✓</span>
-            <span className="text">Допустимый</span>
-          </button>
-          
-          <button
-            className={`choice-btn not-acceptable ${evaluation.isAcceptable === false ? 'selected' : ''}`}
-            onClick={() => setEvaluation({ ...evaluation, isAcceptable: false })}
-          >
-            <span className="icon">✗</span>
-            <span className="text">Не допустимый</span>
-          </button>
+
+        <div className={`result-indicator ${evaluation.isAcceptable ? 'acceptable' : 'not-acceptable'}`}>
+          <span className="result-icon">
+            {evaluation.isAcceptable ? '✓' : '✗'}
+          </span>
+          <span className="result-text">
+            {evaluation.isAcceptable ? 'Допустимый' : 'Не допустимый'}
+          </span>
         </div>
-        
-        {errors.isAcceptable && (
-          <div className="error-message">{errors.isAcceptable}</div>
-        )}
+
+        <div className="info-box" style={{ marginTop: '15px' }}>
+          <strong>ℹ️ Автоматическая оценка:</strong> Риск считается допустимым, если его балл
+          не превышает пороговое значение ({acceptableRiskLevel}), установленное при создании проекта.
+        </div>
       </div>
     </div>
   );
@@ -346,12 +347,8 @@ const RiskEvaluationWizard = ({
   // Валидация перед переходом к следующему шагу
   const validateStep = () => {
     const newErrors = {};
-    
-    if (step === 1) {
-      if (evaluation.isAcceptable === null) {
-        newErrors.isAcceptable = 'Необходимо выбрать допустимость риска';
-      }
-    }
+
+    // Шаг 1 теперь всегда проходит валидацию, так как допустимость определяется автоматически
     
     if (step === 2) {
       // Для ПЕРВИЧНОЙ оценки:
@@ -471,24 +468,35 @@ const RiskEvaluationWizard = ({
           </div>
           
           <div className="footer-right">
-            {step > 1 && (
-              <button 
-                className="btn btn-secondary" 
+            {/* Кнопка сохранения всех изменений только на 3-м шаге */}
+            {step === 3 && onSaveAllChanges && (
+              <button
+                className="btn btn-success"
+                onClick={onSaveAllChanges}
+                title="Сохранить все изменения в Excel таблице"
+              >
+                💾 Сохранить все изменения
+              </button>
+            )}
+
+            {step > 1 && step < 3 && (
+              <button
+                className="btn btn-secondary"
                 onClick={handleBack}
               >
                 ← Назад
               </button>
             )}
-            
+
             {step < 3 && (
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="btn btn-primary"
                 onClick={handleNext}
               >
                 Далее →
               </button>
             )}
-            
+
             {/* Шаг 3 - автоматическое сохранение, кнопки не нужны */}
           </div>
         </div>

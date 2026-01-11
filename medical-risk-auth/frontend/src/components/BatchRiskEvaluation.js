@@ -11,7 +11,7 @@ import './BatchRiskEvaluation.css';
  * - Возможность отмены оценки
  * - Финальная кнопка "Сохранить все изменения"
  */
-const BatchRiskEvaluation = ({ risks, onComplete, onCancel }) => {
+const BatchRiskEvaluation = ({ risks, acceptableRiskLevel, onComplete, onCancel, onSaveAllChanges }) => {
   const [currentRiskIndex, setCurrentRiskIndex] = useState(0);
   const [evaluations, setEvaluations] = useState({}); // { riskIndex: evaluation }
   const [cancelledRisks, setCancelledRisks] = useState(new Set()); // Отмененные оценки
@@ -28,18 +28,31 @@ const BatchRiskEvaluation = ({ risks, onComplete, onCancel }) => {
   const handleRiskEvaluated = (evaluation) => {
     const currentRisk = risks[currentRiskIndex];
     const rowIndex = currentRisk.rowIndex;
-    
+
     // Сохраняем оценку по rowIndex (реальный индекс в таблице)
     const newEvaluations = {
       ...evaluations,
       [rowIndex]: evaluation
     };
     setEvaluations(newEvaluations);
-    
+
     // Удаляем из отмененных, если был отменен ранее
     const newCancelled = new Set(cancelledRisks);
     newCancelled.delete(rowIndex);
     setCancelledRisks(newCancelled);
+
+    // Автоматически переходим к следующему неоцененному риску
+    const nextIndex = risks.findIndex((risk, idx) =>
+      idx > currentRiskIndex &&
+      !newCancelled.has(risks[idx].rowIndex) &&
+      !newEvaluations[risks[idx].rowIndex]
+    );
+
+    if (nextIndex !== -1) {
+      // Есть следующий риск для оценки - переходим к нему
+      setCurrentRiskIndex(nextIndex);
+    }
+    // Если нет следующего риска, остаемся на текущем - пользователь должен явно сохранить или отменить
   };
 
   // Отмена оценки текущего риска (помечаем как отмененный)
@@ -162,6 +175,8 @@ const BatchRiskEvaluation = ({ risks, onComplete, onCancel }) => {
             onCancel={handleCancelWizard}
             showCancelButton={false}
             onCancelRisk={handleCancelCurrentRisk}
+            acceptableRiskLevel={acceptableRiskLevel}
+            onSaveAllChanges={onSaveAllChanges}
           />
           
           {/* Индикаторы рисков внизу wizard */}

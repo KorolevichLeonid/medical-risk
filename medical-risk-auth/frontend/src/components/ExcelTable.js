@@ -64,6 +64,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [lifecycleStages, setLifecycleStages] = useState([]);
   const [customLifecycleStages, setCustomLifecycleStages] = useState([]);
 
+  // Состояние для порогового значения уровня риска
+  const [acceptableRiskLevel, setAcceptableRiskLevel] = useState(10);
+
+  // Флаг для отслеживания первоначальной загрузки
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
   // Определение всех листов из Excel файла + пользовательские
   const baseSheets = useMemo(() => {
     // Если есть настроенные этапы жизненного цикла, использовать их
@@ -90,8 +96,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
       // Добавляем статические листы
       const staticSheets = [
-        { id: 'sheet5', name: '14931', icon: '' },
-        { id: 'sheet6', name: 'Определения 62366', icon: '' },
         { id: 'sheet7', name: 'Заключения-Выводы', icon: '' }
       ];
 
@@ -104,8 +108,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         { id: 'storage', name: 'Хранение', icon: '' },
         { id: 'transport', name: 'Транспортировка', icon: '' },
         { id: 'disposal', name: 'Утилизация', icon: '' },
-        { id: 'sheet5', name: '14931', icon: '' },
-        { id: 'sheet6', name: 'Определения 62366', icon: '' },
         { id: 'sheet7', name: 'Заключения-Выводы', icon: '' }
       ];
     }
@@ -156,12 +158,13 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     }
     
     // ДО ПЕРВИЧНОЙ ОЦЕНКИ - блокируем ВСЁ что после первичной оценки + допуск и комментарий (9, 10)
+    // risk_level_1 оставляем доступным для автоматического окрашивания
     if (!row.first_evaluation_done) {
       const lockedUntilFirstEval = [
-        'risk_level_1', 'comment_1', // ← Добавили допуск и комментарий первичной оценки
+        'comment_1', // ← Добавили допуск и комментарий первичной оценки
         'control_measure_1', 'control_measure_2', 'control_measure_3',
         'verification_1', 'verification_2', 'verification_3',
-        'residual_risk_level', 'residual_probability', 'residual_risk_score', 
+        'residual_risk_level', 'residual_probability', 'residual_risk_score',
         'risk_level_2', 'comment_2',
         'risk_benefit_analysis', 'new_risks'
       ];
@@ -645,10 +648,26 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Обновление активного листа при изменении initialSheet
   useEffect(() => {
-    if (initialSheet) {
-      setActiveSheet(initialSheet);
+    if (isInitialLoad) {
+      if (initialSheet === 'first') {
+        // Если указан 'first', установим его при следующей загрузке данных
+        // Не устанавливаем сразу, чтобы дождаться загрузки sheets
+      } else {
+        // Для других значений initialSheet устанавливаем сразу
+        setActiveSheet(initialSheet);
+        setIsInitialLoad(false);
+      }
     }
-  }, [initialSheet]);
+  }, [initialSheet, isInitialLoad]);
+
+  // Отдельный useEffect для установки первого листа после загрузки данных (только один раз)
+  useEffect(() => {
+    if (initialSheet === 'first' && isInitialLoad && sheets.length > 0) {
+      const firstSheetId = sheets[0]?.id || 'operation';
+      setActiveSheet(firstSheetId);
+      setIsInitialLoad(false);
+    }
+  }, [sheets]); // Убираем initialSheet и isInitialLoad из зависимостей, чтобы избежать повторных вызовов
 
   const loadUserRole = async () => {
     setLoadingRole(true);
@@ -721,6 +740,23 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         setUserRole(roleData.user_role);
         setLifecycleStages(roleData.lifecycle_stages || []);
         setCustomLifecycleStages(roleData.custom_lifecycle_stages || []);
+
+        // Получаем информацию о проекте для получения acceptableRiskLevel
+        try {
+          const projectResponse = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+            headers: {
+              'Authorization': `Bearer ${finalToken}`,
+            },
+          });
+
+          if (projectResponse.ok) {
+            const projectData = await projectResponse.json();
+            setAcceptableRiskLevel(projectData.acceptable_risk_level || 10);
+          }
+        } catch (error) {
+          console.error('Failed to load project acceptable risk level:', error);
+          setAcceptableRiskLevel(10); // Default value
+        }
       } else if (response.status === 401) {
         console.warn('Ошибка авторизации - токен недействителен');
         setUserRole('guest');
@@ -831,14 +867,21 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   const handleCellChange = (rowIndex, columnKey, value) => {
     // Валидация для столбцов с ограничением 0-10
-    if (columnKey === 'severity_score' || columnKey === 'probability_score') {
+    if (columnKey === 'severity_score' || columnKey === 'probability_score' ||
+        columnKey === 'residual_risk_level' || columnKey === 'residual_probability') {
       // Разрешаем только цифры
       const numericValue = value.replace(/[^0-9]/g, '');
 
       // Ограничиваем диапазон 0-10
       const numValue = parseInt(numericValue);
       if (numericValue !== '' && (isNaN(numValue) || numValue < 0 || numValue > 10)) {
-        alert(`Значение для "${columnKey === 'severity_score' ? 'Тяжесть вреда' : 'Вероятность причинения вреда'}" должно быть цифрой в диапазоне 0-10`);
+        let fieldName = '';
+        if (columnKey === 'severity_score') fieldName = 'Тяжесть вреда';
+        else if (columnKey === 'probability_score') fieldName = 'Вероятность причинения вреда';
+        else if (columnKey === 'residual_risk_level') fieldName = 'Тяжесть вреда (контроль риска)';
+        else if (columnKey === 'residual_probability') fieldName = 'Вероятность причинения вреда (контроль риска)';
+
+        alert(`Значение для "${fieldName}" должно быть цифрой в диапазоне 0-10`);
         return;
       }
 
@@ -862,6 +905,19 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       const severity = parseInt(newData[rowIndex].severity_score) || 0;
       const probability = parseInt(newData[rowIndex].probability_score) || 0;
       newData[rowIndex].risk_score = severity * probability;
+
+      // Автоматически обновляем уровень риска при изменении risk_score
+      const riskScore = newData[rowIndex].risk_score;
+      if (riskScore >= acceptableRiskLevel) {
+        newData[rowIndex].risk_level_1 = 'не допустимый';
+        handleCellColorChange(rowIndex, 'risk_level_1', '#FF4444');
+      } else if (riskScore > 0 && riskScore < acceptableRiskLevel) {
+        newData[rowIndex].risk_level_1 = 'допустимый';
+        handleCellColorChange(rowIndex, 'risk_level_1', '#4CAF50');
+      } else {
+        newData[rowIndex].risk_level_1 = '';
+        handleCellColorChange(rowIndex, 'risk_level_1', '#FFFFFF');
+      }
     }
 
     // Автоматический расчет остаточного риска
@@ -870,6 +926,18 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       const probability = parseInt(newData[rowIndex].residual_probability) || 0;
       const residualScore = severity * probability;
       newData[rowIndex].residual_risk_score = residualScore;
+
+      // Автоматически обновляем уровень остаточного риска при изменении residual_risk_score
+      if (residualScore >= acceptableRiskLevel) {
+        newData[rowIndex].risk_level_2 = 'не допустимый';
+        handleCellColorChange(rowIndex, 'risk_level_2', '#FF4444');
+      } else if (residualScore > 0 && residualScore < acceptableRiskLevel) {
+        newData[rowIndex].risk_level_2 = 'допустимый';
+        handleCellColorChange(rowIndex, 'risk_level_2', '#4CAF50');
+      } else {
+        newData[rowIndex].risk_level_2 = '';
+        handleCellColorChange(rowIndex, 'risk_level_2', '#FFFFFF');
+      }
     }
 
     setData(newData);
@@ -887,15 +955,16 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     // Обновляем глобальное отслеживание изменений
     setAllSheetsChanges(prev => ({
       ...prev,
-      [activeSheet]: new Set([...(prev[activeSheet] || []), rowIndex])
+      [activeSheet]: new Set([...(prev[activeSheet] ? Array.from(prev[activeSheet]) : []), rowIndex])
     }));
 
     setHasChanges(true);
 
     // Сохраняем глобальное состояние в localStorage
+    const currentSheetChanges = allSheetsChanges[activeSheet] ? Array.from(allSheetsChanges[activeSheet]) : [];
     const updatedAllSheetsChanges = {
       ...allSheetsChanges,
-      [activeSheet]: new Set([...(allSheetsChanges[activeSheet] || []), rowIndex])
+      [activeSheet]: new Set([...currentSheetChanges, rowIndex])
     };
     localStorage.setItem(`project_${projectId}_all_sheet_changes`, JSON.stringify(updatedAllSheetsChanges));
 
@@ -1044,22 +1113,13 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         row.first_evaluation_done = true;
         row.evaluation_timestamp = now;
         row.evaluated_by = currentUserId;
-        
-        // Устанавливаем уровень риска и цвет
-        const riskLevelColumn = 'risk_level_1';
-        const commentColumn = 'comment_1';
-        
-        if (evaluation.isAcceptable) {
-          row[riskLevelColumn] = 'Доп';
-          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#4CAF50'; // Зеленый
-        } else {
-          row[riskLevelColumn] = 'Не доп';
-          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#FF4444'; // Красный
-        }
-        
+
+        // Уровень риска теперь определяется автоматически на основе acceptableRiskLevel
+        // Нет необходимости вручную устанавливать "Доп"/"Не доп"
+
         // Добавляем комментарий если есть
         if (evaluation.comment) {
-          row[commentColumn] = evaluation.comment;
+          row.comment_1 = evaluation.comment;
         }
         
         // Если риск закрыт при первичной оценке - переводим в pending_closure (на проверке)
@@ -1074,35 +1134,24 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         row.second_evaluation_done = true;
         row.evaluation_timestamp = now;
         row.evaluated_by = currentUserId;
-        
-        // Устанавливаем уровень остаточного риска и цвет
-        const riskLevelColumn = 'risk_level_2';
-        const commentColumn = 'comment_2';
-        const newRisksColumn = 'new_risks';
-        
-        if (evaluation.isAcceptable) {
-          row[riskLevelColumn] = 'Доп';
-          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#4CAF50'; // Зеленый
-          row.risk_status = 'pending_closure'; // На проверке, ожидает финального закрытия
-        } else {
-          row[riskLevelColumn] = 'Не доп';
-          newCellColors[`${activeSheet}_${rowIndex}_${riskLevelColumn}`] = '#FF4444'; // Красный
-          row.risk_status = 'pending_closure'; // На проверке, ожидает финального закрытия
-        }
-        
-        // В ЛЮБОМ случае (и Доп, и Не доп) блокируем столбцы 1-21 (до comment_2 включительно)
+
+        // Уровень риска теперь определяется автоматически на основе acceptableRiskLevel
+        // Нет необходимости вручную устанавливать "Доп"/"Не доп"
+
+        // В ЛЮБОМ случае блокируем столбцы 1-21 (до comment_2 включительно)
         // Остаются редактируемыми: risk_benefit_analysis (22), new_risks (23)
         row.locked_after_second = true;
-        
+        row.risk_status = 'pending_closure'; // На проверке, ожидает финального закрытия
+
         // Добавляем комментарий если есть (не обязательно для вторичной оценки)
         if (evaluation.comment && evaluation.comment.trim()) {
-          row[commentColumn] = evaluation.comment;
+          row.comment_2 = evaluation.comment;
         }
-        
+
         // Если созданы новые риски
         if (evaluation.shouldCreateNewRisk && evaluation.newRiskDescription) {
-          row[newRisksColumn] = evaluation.newRiskDescription;
-          newCellColors[`${activeSheet}_${rowIndex}_${newRisksColumn}`] = '#FF4444'; // Красный
+          row.new_risks = evaluation.newRiskDescription;
+          newCellColors[`${activeSheet}_${rowIndex}_new_risks`] = '#FF4444'; // Красный
         }
       }
     });
@@ -1679,11 +1728,38 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   const renderCell = (row, column, rowIndex) => {
     const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
-    const value = row[column.key] || '';
+    let value = row[column.key] || '';
     const cellColor = getCellColor(rowIndex, column.key);
     const canEdit = canEditColumn(column.key);
     const cellStyle = getCellStyle(column.key, cellColor);
     const isLocked = isCellLocked(rowIndex, column.key);
+
+    // Автоматическое определение уровня риска для столбцов risk_level_1 и risk_level_2
+    if ((column.key === 'risk_level_1' || column.key === 'risk_level_2') && !isEditing) {
+      const riskScore = column.key === 'risk_level_1'
+        ? (parseInt(row.risk_score) || 0)
+        : (parseInt(row.residual_risk_score) || 0);
+
+      if (riskScore >= acceptableRiskLevel) {
+        value = 'не допустимый';
+        // Автоматически устанавливаем красный цвет для не допустимого риска
+        if (cellColor !== '#FF4444') {
+          handleCellColorChange(rowIndex, column.key, '#FF4444');
+        }
+      } else if (riskScore > 0 && riskScore < acceptableRiskLevel) {
+        value = 'допустимый';
+        // Автоматически устанавливаем зеленый цвет для допустимого риска
+        if (cellColor !== '#4CAF50') {
+          handleCellColorChange(rowIndex, column.key, '#4CAF50');
+        }
+      } else if (riskScore === 0) {
+        value = '';
+        // Для нулевого риска устанавливаем белый цвет
+        if (cellColor !== '#FFFFFF') {
+          handleCellColorChange(rowIndex, column.key, '#FFFFFF');
+        }
+      }
+    }
 
     // Проверяем, является ли ячейка измененной
     const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
@@ -1693,11 +1769,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const cellBackgroundStyle = cellColor && cellColor !== '#FFFFFF' ? { backgroundColor: cellColor } : {};
 
     return (
-      <div 
-        className="excel-cell-wrapper" 
-        style={{ 
-          height: '100%', 
-          width: '100%', 
+      <div
+        className="excel-cell-wrapper"
+        style={{
+          height: '100%',
+          width: '100%',
           position: 'relative',
           backgroundColor: isLocked ? '#f0f0f0' : 'transparent'
         }}
@@ -1929,31 +2005,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           )}
         </div>
 
-        {/* Информационный баннер для листов с рисками */}
-        {isAutoManagedSheet() && (
-          <div style={{
-            backgroundColor: '#E3F2FD',
-            padding: '12px 20px',
-            margin: '10px 0',
-            borderRadius: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '14px',
-            color: '#1976D2',
-            border: '1px solid #90CAF9'
-          }}>
-            <span>ℹ️</span>
-            <div>
-              <strong>Автоматическое управление:</strong>
-              <ul style={{ margin: '5px 0', paddingLeft: '20px', lineHeight: '1.6' }}>
-                <li>Первые 5 столбцов (отмечены 🔒): Категория опасности, Наименование опасности, Последовательность событий, Опасная ситуация, Вред - заполняются автоматически из Risk Analysis</li>
-                <li>Строки добавляются и удаляются автоматически при изменении рисков в Risk Analysis</li>
-                <li>Вы можете редактировать остальные столбцы для добавления оценок и мер контроля</li>
-              </ul>
-            </div>
-          </div>
-        )}
+
 
         {/* Таблица */}
         <div className="excel-table-scroll">
@@ -2124,6 +2176,8 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       {showBatchEvaluation && risksToEvaluate.length > 0 && (
         <BatchRiskEvaluation
           risks={risksToEvaluate}
+          acceptableRiskLevel={acceptableRiskLevel}
+          onSaveAllChanges={handleSaveAllSheets}
           onComplete={(evaluations, cancelledRiskIndices = []) => {
             // Восстанавливаем данные для отмененных рисков из snapshot (откат изменений)
             restoreDataForCancelledRisks(cancelledRiskIndices);
@@ -2152,3 +2206,4 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 };
 
 export default ExcelTable;
+

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './ProjectForm.css';
 import API_BASE_URL from '../config';
+import RiskMatrixTable from '../components/RiskMatrixTable';
 
 // Detailed hazard checklist data
 const hazardDetails = {
@@ -581,7 +582,6 @@ const ProjectForm = () => {
     deviceDescription: '',
     deviceClassification: '',
     intendedUse: '',
-    userProfile: '',
     operatingEnvironment: '',
 
     // Технические характеристики
@@ -589,15 +589,15 @@ const ProjectForm = () => {
     regulatoryRequirements: '',
     standards: '',
 
-    // Параметры оценки рисков
-    contactType: 'no_contact',
-    duration: 'temporary',
-    invasiveness: 'non_invasive',
-    energySource: 'none',
-
     // Назначение команды
     projectLead: '',
     teamMembers: [],
+
+    // Уровень риска (доп./не доп.)
+    acceptableRiskLevel: 10,
+
+    // Матрица рисков
+    riskMatrix: null,
 
     // Этапы жизненного цикла
     lifecycleStages: [],
@@ -682,6 +682,7 @@ const ProjectForm = () => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState('doctor');
+  const [riskMatrix, setRiskMatrix] = useState(null);
 
   useEffect(() => {
     loadCurrentUser();
@@ -819,17 +820,14 @@ const ProjectForm = () => {
           deviceDescription: projectData.device_description || '',
           deviceClassification: projectData.device_classification || '',
           intendedUse: projectData.intended_use || '',
-          userProfile: projectData.user_profile || '',
           operatingEnvironment: projectData.operating_environment || '',
           technicalSpecs: projectData.technical_specs || '',
           regulatoryRequirements: projectData.regulatory_requirements || '',
           standards: projectData.standards || '',
-          contactType: projectData.contact_type || 'no_contact',
-          duration: projectData.duration || 'temporary',
-          invasiveness: projectData.invasiveness || 'non_invasive',
-          energySource: projectData.energy_source || 'none',
           projectLead: projectLead,
           teamMembers: teamMembers,
+          acceptableRiskLevel: projectData.acceptable_risk_level || 10,
+          riskMatrix: projectData.risk_matrix || null,
           lifecycleStages: projectData.lifecycle_stages || [],
           customLifecycleStages: projectData.custom_lifecycle_stages || [],
           hazardQuestions: projectData.hazard_questions || {
@@ -1200,16 +1198,13 @@ const ProjectForm = () => {
           device_description: formData.deviceDescription,
           device_classification: formData.deviceClassification,
           intended_use: formData.intendedUse,
-          user_profile: formData.userProfile,
           operating_environment: formData.operatingEnvironment,
           technical_specs: formData.technicalSpecs,
           regulatory_requirements: formData.regulatoryRequirements,
           standards: formData.standards,
-          contact_type: formData.contactType,
-          duration: formData.duration,
-          invasiveness: formData.invasiveness,
-          energy_source: formData.energySource,
           status: formData.status,
+          acceptable_risk_level: parseInt(formData.acceptableRiskLevel) || 10,
+          risk_matrix: riskMatrix,
           lifecycle_stages: formData.lifecycleStages,
           custom_lifecycle_stages: formData.customLifecycleStages,
           hazard_questions: formData.hazardQuestions,
@@ -1367,7 +1362,7 @@ const ProjectForm = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="name">Название проекта *</label>
+              <label htmlFor="name">Название проекта</label>
               <input
                 type="text"
                 id="name"
@@ -1423,7 +1418,7 @@ const ProjectForm = () => {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="deviceName">Название устройства *</label>
+              <label htmlFor="deviceName">Название устройства</label>
               <input
                 type="text"
                 id="deviceName"
@@ -1449,7 +1444,7 @@ const ProjectForm = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="devicePurpose">Назначение устройства *</label>
+            <label htmlFor="devicePurpose">Назначение устройства</label>
             <textarea
               id="devicePurpose"
               name="devicePurpose"
@@ -1492,18 +1487,6 @@ const ProjectForm = () => {
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="userProfile">Профиль пользователя</label>
-              <input
-                type="text"
-                id="userProfile"
-                name="userProfile"
-                value={formData.userProfile}
-                onChange={handleInputChange}
-                placeholder="Кто будет использовать устройство?"
-              />
-            </div>
-
             <div className="form-group">
               <label htmlFor="operatingEnvironment">Условия эксплуатации</label>
               <input
@@ -1559,75 +1542,7 @@ const ProjectForm = () => {
           </div>
         </div>
 
-        {/* Параметры оценки рисков */}
-        <div className="form-section">
-          <h2>Параметры оценки рисков</h2>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="contactType">Тип контакта</label>
-              <select
-                id="contactType"
-                name="contactType"
-                value={formData.contactType}
-                onChange={handleInputChange}
-              >
-                <option value="no_contact">Без контакта</option>
-                <option value="indirect_contact">Косвенный контакт</option>
-                <option value="surface_contact">Поверхностный контакт</option>
-                <option value="external_communicating">Внешнее сообщение</option>
-                <option value="implantable">Имплантируемое</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="duration">Продолжительность контакта</label>
-              <select
-                id="duration"
-                name="duration"
-                value={formData.duration}
-                onChange={handleInputChange}
-              >
-                <option value="temporary">Временный (≤ 24ч)</option>
-                <option value="short_term">Короткий срок (24ч - 30 дней)</option>
-                <option value="long_term">Долгий срок (30+ дней)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="invasiveness">Инвазивность</label>
-              <select
-                id="invasiveness"
-                name="invasiveness"
-                value={formData.invasiveness}
-                onChange={handleInputChange}
-              >
-                <option value="non_invasive">Неинвазивное</option>
-                <option value="invasive">Инвазивное</option>
-                <option value="active_implantable">Активное имплантируемое</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="energySource">Источник энергии</label>
-              <select
-                id="energySource"
-                name="energySource"
-                value={formData.energySource}
-                onChange={handleInputChange}
-              >
-                <option value="none">Отсутствует</option>
-                <option value="electrical">Электрический</option>
-                <option value="mechanical">Механический</option>
-                <option value="thermal">Тепловой</option>
-                <option value="chemical">Химический</option>
-                <option value="radioactive">Радиоактивный</option>
-              </select>
-            </div>
-          </div>
-        </div>
 
         {/* Назначение команды */}
         <div className="form-section">
@@ -1665,6 +1580,35 @@ const ProjectForm = () => {
                 ))}
               </div>
             </div>
+        </div>
+
+        {/* Матрица рисков */}
+        <div className="form-section">
+          <RiskMatrixTable
+            onMatrixChange={setRiskMatrix}
+            initialMatrix={riskMatrix}
+          />
+        </div>
+
+        {/* Уровень риска (доп./не доп.) */}
+        <div className="form-section">
+          <h2>Уровень риска (доп./не доп.)</h2>
+          <p>Укажите пороговое значение уровня риска. Если значение "Риск, балл" в Excel таблице будет больше или равно этому значению, то ячейка "Уровень риска (доп./не доп.)" будет подсвечиваться красным и показывать "не допустимый". Если меньше - зеленым и "допустимый".</p>
+
+          <div className="form-group">
+            <label htmlFor="acceptableRiskLevel">Пороговое значение уровня риска</label>
+            <input
+              type="number"
+              id="acceptableRiskLevel"
+              name="acceptableRiskLevel"
+              value={formData.acceptableRiskLevel}
+              onChange={handleInputChange}
+              min="0"
+              max="100"
+              placeholder="Введите пороговое значение (например, 10)"
+            />
+            <small className="form-help">Значение должно быть числом от 0 до 100</small>
+          </div>
         </div>
 
         {/* Этапы жизненного цикла */}

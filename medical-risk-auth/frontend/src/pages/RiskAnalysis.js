@@ -608,14 +608,23 @@ const RiskAnalysis = () => {
           <Link to={`/project/${id}`} className="btn btn-secondary">
             Back to Project
           </Link>
-                     {canAddRisks() && (
-             <button 
-               className="btn btn-primary"
-               onClick={() => setShowAddRisk(true)}
-             >
-               + Add Risk
-             </button>
-           )}
+          <button
+            className="btn btn-info"
+            onClick={() => {
+              // Открываем таблицу управления рисками с первым листом
+              navigate(`/project/${id}?openRiskTable=true&sheet=first`);
+            }}
+          >
+            📊 Risk Management Table
+          </button>
+          {canAddRisks() && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowAddRisk(true)}
+            >
+              + Add Risk
+            </button>
+          )}
         </div>
       </div>
 

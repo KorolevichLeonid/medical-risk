@@ -1,0 +1,362 @@
+/* Risk Matrix Table Styles */
+.risk-matrix-table {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.risk-matrix-table h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #131313;
+  margin: 0 0 25px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #E8E8E8;
+}
+
+.form-section-description {
+  font-size: 18px;
+  color: #4A4A4A;
+  margin: 0 0 20px 0;
+  line-height: 1.6;
+}
+
+.matrix-section {
+  margin-bottom: 30px;
+}
+
+.matrix-section h4 {
+  color: #495057;
+  font-size: 18px;
+  margin-bottom: 15px;
+  font-weight: 500;
+  border-bottom: 2px solid #8b9dc3;
+  padding-bottom: 5px;
+}
+
+.matrix-table-container {
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+/* Base table styles */
+.severity-table,
+.probability-table,
+.risk-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.severity-table th,
+.probability-table th,
+.risk-matrix-table th {
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4);
+  color: white;
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  border: 1px solid #dee2e6;
+}
+
+/* Specific column widths for severity table */
+.severity-table th:nth-child(1),
+.severity-table td:nth-child(1) {
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+}
+
+.severity-table th:nth-child(2),
+.severity-table td:nth-child(2) {
+  width: 200px;
+  min-width: 200px;
+}
+
+.severity-table th:nth-child(3),
+.severity-table td:nth-child(3) {
+  width: 400px;
+  min-width: 300px;
+}
+
+.severity-table th:nth-child(4),
+.severity-table td:nth-child(4) {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  text-align: center;
+}
+
+.severity-table td,
+.probability-table td,
+.risk-matrix-table td {
+  padding: 8px;
+  border: 1px solid #dee2e6;
+  vertical-align: middle;
+}
+
+.severity-table tbody tr:nth-child(even),
+.probability-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.severity-table tbody tr:hover,
+.probability-table tbody tr:hover {
+  background-color: #e3f2fd;
+}
+
+/* Editable cells */
+.matrix-cell-content {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  min-height: 20px;
+}
+
+.matrix-cell-content:hover {
+  background-color: rgba(139, 157, 195, 0.1);
+  border: 1px dashed #8b9dc3;
+}
+
+.matrix-cell-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 2px solid #8b9dc3;
+  border-radius: 3px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background: #f0f4ff;
+}
+
+.matrix-cell-input:focus {
+  border-color: #9fa8b4;
+  box-shadow: 0 0 0 2px rgba(139, 157, 195, 0.2);
+}
+
+/* Risk Matrix specific styles */
+.risk-matrix-table {
+  margin-top: 20px;
+}
+
+.risk-matrix-table th {
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 13px;
+}
+
+.severity-header {
+  background: linear-gradient(135deg, #8b9dc3, #9fa8b4);
+  color: white;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px 8px;
+  min-width: 150px;
+}
+
+.risk-cell {
+  text-align: center;
+  min-width: 80px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.risk-cell:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+}
+
+.risk-cell .matrix-cell-content {
+  font-weight: 600;
+  color: #212529;
+}
+
+/* Legend styles */
+.matrix-legend {
+  margin-top: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.matrix-legend h4 {
+  margin: 0 0 15px 0;
+  color: #495057;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #495057;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+  flex-shrink: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .risk-matrix-table {
+    padding: 15px;
+  }
+
+  .matrix-header h3 {
+    font-size: 20px;
+  }
+
+  .matrix-table-container {
+    overflow-x: auto;
+  }
+
+  .severity-table,
+  .probability-table,
+  .risk-matrix-table {
+    font-size: 12px;
+    min-width: 600px;
+  }
+
+  .severity-table th,
+  .probability-table th,
+  .risk-matrix-table th,
+  .severity-table td,
+  .probability-table td,
+  .risk-matrix-table td {
+    padding: 6px 4px;
+  }
+
+  .legend-items {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+/* Color coding for risk levels */
+.risk-low {
+  background-color: #4CAF50 !important;
+  color: white;
+}
+
+.risk-medium {
+  background-color: #FFC107 !important;
+  color: black;
+}
+
+.risk-high {
+  background-color: #FF9800 !important;
+  color: white;
+}
+
+.risk-critical {
+  background-color: #F44336 !important;
+  color: white;
+}
+
+/* Animation for editing */
+@keyframes cell-edit-flash {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(139, 157, 195, 0.3); }
+}
+
+.matrix-cell-content:focus {
+  animation: cell-edit-flash 0.5s ease;
+}
+
+/* Hover effects for better UX */
+.severity-table tbody tr:hover td,
+.probability-table tbody tr:hover td {
+  background-color: rgba(139, 157, 195, 0.05);
+}
+
+/* Special styling for score columns */
+.severity-table td:last-child,
+.probability-table td:last-child {
+  font-weight: 600;
+  color: #8b9dc3;
+  text-align: center;
+  background-color: rgba(139, 157, 195, 0.05);
+}
+
+/* Save Section */
+.matrix-save-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.matrix-save-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+.matrix-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.matrix-save-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.matrix-save-btn.has-changes {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  animation: pulse-blue 2s infinite;
+}
+
+@keyframes pulse-blue {
+  0%, 100% {
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.4);
+  }
+}
+
+.unsaved-warning {
+  font-size: 13px;
+  color: #856404;
+  background: #fff3cd;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #ffeaa7;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

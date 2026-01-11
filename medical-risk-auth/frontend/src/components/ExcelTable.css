@@ -316,6 +316,15 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+/* Sticky table header */
+.excel-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 /* Table */
 .excel-table {
   width: 100%;
@@ -337,7 +346,7 @@
   background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
   font-weight: 600;
   color: #495057;
-  height: 42px;
+  height: 18px;
   border-bottom: 2px solid #8b9dc3;
 }
 
@@ -363,7 +372,7 @@
   text-align: center;
   font-weight: 700;
   color: white;
-  padding: 10px !important;
+  padding: 2px !important;
   min-width: 60px;
   position: relative !important;
   cursor: pointer !important;
@@ -424,14 +433,14 @@
 
 /* Column header */
 .column-header {
-  padding: 8px !important;
+  padding: 2px !important;
 }
 
 .column-header-content {
   word-wrap: break-word;
   overflow-wrap: break-word;
   white-space: normal;
-  padding: 4px;
+  padding: 2px;
 }
 
 /* Стили для групповых заголовков */

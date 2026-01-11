@@ -592,7 +592,7 @@ const ProjectView = () => {
       {showRiskTable && (
         <ExcelTable
           projectId={parseInt(id)}
-          initialSheet={searchParams.get('sheet') || 'operation'}
+          initialSheet={searchParams.get('sheet') || 'first'}
           onClose={() => {
             setShowRiskTable(false);
             // Clear URL params
