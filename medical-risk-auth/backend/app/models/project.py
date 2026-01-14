@@ -114,6 +114,10 @@ class Project(Base):
     # Active hazard categories (determined by checklist answers)
     active_hazard_categories = Column(Text, nullable=True)  # JSON array of active hazard category names
 
+    # Risk severity levels configuration
+    severity_levels = Column(Text, nullable=True)  # JSON array of severity levels: [{level: 1, name: "...", description: "..."}]
+    risk_threshold = Column(Integer, default=10)  # Threshold value for acceptable/unacceptable risk
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

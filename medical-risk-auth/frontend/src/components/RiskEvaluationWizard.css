@@ -19,15 +19,15 @@
 }
 
 .risk-evaluation-wizard {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  width: 90%;
-  max-width: 700px;
-  max-height: 90vh;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  width: 100%;
+  max-width: none;
+  max-height: none;
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.3s ease-out;
+  animation: none;
 }
 
 @keyframes slideUp {
@@ -184,18 +184,18 @@
 
 /* Карточка информации о риске */
 .risk-info-card {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 25px;
-  border-left: 4px solid #667eea;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 16px;
+  border-left: none;
 }
 
 .risk-info-row {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 6px 0;
+  border-bottom: none;
 }
 
 .risk-info-row:last-child {
@@ -223,8 +223,8 @@
 .risk-info-row .value.score-result {
   font-weight: 700;
   font-size: 18px;
-  padding: 4px 12px;
-  border-radius: 6px;
+  padding: 0;
+  border-radius: 0;
 }
 
 .risk-info-row .value.score-result.risk-high {
@@ -357,6 +357,26 @@
   margin-top: 20px;
 }
 
+.wizard-actions.simple-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 14px;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.wizard-actions-left,
+.wizard-actions-right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.wizard-actions.simple-actions .bre-btn {
+  white-space: nowrap;
+}
+
 .form-label {
   display: block;
   font-weight: 600;
@@ -372,7 +392,9 @@
   border-radius: 8px;
   font-size: 14px;
   font-family: inherit;
-  resize: vertical;
+  height: 160px;
+  resize: none;
+  overflow-y: auto;
   transition: all 0.2s;
 }
 
@@ -610,6 +632,17 @@
   .footer-right {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .wizard-actions.simple-actions {
+    flex-wrap: wrap;
+  }
+
+  .wizard-actions-left,
+  .wizard-actions-right {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }
 

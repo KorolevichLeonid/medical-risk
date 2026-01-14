@@ -18,6 +18,7 @@ const RiskAnalysis = () => {
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [riskThreshold, setRiskThreshold] = useState(10);
   const [showAddRisk, setShowAddRisk] = useState(false);
   const [showEditRisk, setShowEditRisk] = useState(false);
   const [showViewRisk, setShowViewRisk] = useState(false);
@@ -152,6 +153,7 @@ const RiskAnalysis = () => {
           customLifecycleStages: projectData.custom_lifecycle_stages || [],
           activeHazardCategories: projectData.active_hazard_categories || []
         });
+        setRiskThreshold(projectData.risk_threshold || projectData.acceptable_risk_level || 10);
 
         // Load lifecycle stages
         const stages = [];
@@ -248,12 +250,10 @@ const RiskAnalysis = () => {
     let filtered = risks;
     
     if (filterSeverity !== 'all') {
-      const severityRange = {
-        low: [1, 2, 3],
-        medium: [4, 6, 8],
-        high: [9, 10, 12, 15, 16, 20, 25]
-      };
-      filtered = filtered.filter(risk => severityRange[filterSeverity].includes(risk.riskScore));
+      filtered = filtered.filter(risk => {
+        if (!risk.riskScore) return false;
+        return getRiskLevel(risk.riskScore).level === filterSeverity;
+      });
     }
     
     if (filterCategory !== 'all') {
@@ -272,9 +272,12 @@ const RiskAnalysis = () => {
   };
 
   const getRiskLevel = (score) => {
-    if (score <= 3) return { level: 'low', color: '#00AA44' };
-    if (score <= 8) return { level: 'medium', color: '#FF8800' };
-    return { level: 'high', color: '#FF4444' };
+    const threshold = Number(riskThreshold) || 10;
+    const mediumCutoff = Math.max(1, Math.ceil(threshold / 2));
+
+    if (score >= threshold) return { level: 'high', color: '#FF4444' };
+    if (score >= mediumCutoff) return { level: 'medium', color: '#FF8800' };
+    return { level: 'low', color: '#00AA44' };
   };
 
   const getStatusBadge = (status) => {
@@ -315,7 +318,10 @@ const RiskAnalysis = () => {
         matrix[stage][hazard] = {
           new: 0,
           evaluated: 0,
+          pending_second: 0,
+          pending_benefit: 0,
           pending_closure: 0,
+          closed: 0,
           fully_closed: 0,
           total: 0
         };
@@ -707,7 +713,7 @@ const RiskAnalysis = () => {
                             key={hazardIdx} 
                             className={`matrix-cell ${isCovered ? 'covered' : 'missing'}`}
                             title={isCovered ? 
-                              `Total: ${cellData.total} | New: ${cellData.new} | In work: ${cellData.evaluated} | Pending: ${cellData.pending_closure} | Closed: ${cellData.fully_closed}` 
+                              `Total: ${cellData.total} | New: ${cellData.new} | In work: ${cellData.evaluated} | Pending second: ${cellData.pending_second} | Pending analysis: ${cellData.pending_benefit} | Pending closure: ${cellData.pending_closure} | Closed: ${cellData.closed} | Fully closed: ${cellData.fully_closed}` 
                               : 'No risks yet'}
                           >
                             {isCovered ? (
@@ -722,9 +728,24 @@ const RiskAnalysis = () => {
                                     🟡{cellData.evaluated}
                                   </span>
                                 )}
+                                {cellData.pending_second > 0 && (
+                                  <span className="status-badge status-pending">
+                                    🟠{cellData.pending_second}
+                                  </span>
+                                )}
+                                {cellData.pending_benefit > 0 && (
+                                  <span className="status-badge status-pending">
+                                    🟠{cellData.pending_benefit}
+                                  </span>
+                                )}
                                 {cellData.pending_closure > 0 && (
                                   <span className="status-badge status-pending">
                                     🟠{cellData.pending_closure}
+                                  </span>
+                                )}
+                                {cellData.closed > 0 && (
+                                  <span className="status-badge status-closed">
+                                    🟢{cellData.closed}
                                   </span>
                                 )}
                                 {cellData.fully_closed > 0 && (
@@ -817,8 +838,11 @@ const RiskAnalysis = () => {
               // Определяем статус риска
               const getRiskStatusIcon = (status) => {
                 switch(status) {
+                  case 'closed': return { icon: '🟢', title: 'Closed' };
                   case 'fully_closed': return { icon: '🟢', title: 'Fully Closed' };
                   case 'pending_closure': return { icon: '🟠', title: 'Pending Closure' };
+                  case 'pending_benefit': return { icon: '🟠', title: 'Pending Risk/Benefit Analysis' };
+                  case 'pending_second': return { icon: '🟠', title: 'Pending Second Evaluation' };
                   case 'evaluated': return { icon: '🟡', title: 'In Work' };
                   case 'new': return { icon: '⚪', title: 'New' };
                   default: return { icon: '⚪', title: 'New' };

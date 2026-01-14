@@ -1,203 +1,142 @@
 /* Batch Risk Evaluation */
-.batch-risk-evaluation {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  gap: 0;
-}
-
-/* Wrapper для wizard с индикаторами */
-.batch-wizard-wrapper {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  gap: 0;
-}
-
-/* Индикаторы рисков СПРАВА от wizard */
-.batch-indicators-overlay {
+/* Центрированное модальное окно */
+.batch-risk-evaluation.modal-centered {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 320px;
-  z-index: 10002; /* Над wizard */
-  animation: slideLeft 0.3s ease-out;
+  inset: 0;
+  z-index: 10002;
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
-  flex-direction: column;
-}
-
-@keyframes slideLeft {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.batch-indicators-container {
-  background: white;
-  border-radius: 0;
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+  align-items: center;
+  justify-content: center;
   padding: 20px;
-  border-left: 4px solid #667eea;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
 }
 
-.indicators-header {
+.batch-modal {
+  width: 100%;
+  max-width: 1100px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  padding: 20px 24px 16px;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 15px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #e0e0e0;
+  gap: 16px;
 }
 
-.indicators-header h4 {
-  margin: 0;
-  font-size: 15px;
-  color: #333;
-  font-weight: 600;
+.indicators-top {
   text-align: center;
 }
 
-/* Индикаторы рисков */
+.indicators-top h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.indicators-hint {
+  margin: 6px 0 12px;
+  color: #666;
+  font-size: 13px;
+}
+
 .risk-indicators {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
   gap: 10px;
-  margin-bottom: 15px;
   justify-items: center;
+  margin: 0 auto;
+  max-width: 420px;
 }
 
 .risk-indicator {
-  width: 45px;
-  height: 45px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 16px;
-  transition: all 0.3s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  position: relative;
-}
-
-.risk-indicator:hover:not(.cancelled) {
-  transform: translateY(-3px) scale(1.1);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  transition: all 0.2s;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .risk-indicator.current {
-  animation: pulse 1.5s ease-in-out infinite;
-  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.3);
-}
-
-@keyframes pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(33, 150, 243, 0.1);
-  }
-}
-
-.risk-indicator.completed {
-  color: white;
-}
-
-.risk-indicator.cancelled {
-  color: white;
-  opacity: 0.7;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.25);
 }
 
 .risk-indicator.pending {
-  color: #666;
+  color: #555;
+}
+
+.risk-indicator .indicator-number {
+  font-size: 16px;
 }
 
 .indicator-icon {
   font-size: 20px;
 }
 
-.indicator-number {
-  font-size: 16px;
+.wizard-center {
+  border: none;
+  border-radius: 10px;
+  padding: 0;
+  background: transparent;
 }
 
-/* Кнопки действий */
-.indicators-actions {
+.work-area {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
-  margin-top: auto; /* Прижимаем к низу */
+  gap: 8px;
 }
 
-.indicators-actions .btn {
-  padding: 10px 20px;
+/* Универсальные кнопки */
+.bre-btn {
+  padding: 12px 18px;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.indicators-actions .btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.bre-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
 }
 
-.indicators-actions .btn:disabled {
-  opacity: 0.5;
+.bre-btn:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-.indicators-actions .btn-secondary {
-  background: #e0e0e0;
+.bre-btn-secondary {
+  background: linear-gradient(135deg, #f1f1f1, #e2e2e2);
   color: #333;
-  width: 100%;
 }
 
-.indicators-actions .btn-secondary:hover {
-  background: #d0d0d0;
+.bre-btn-primary,
+.bre-btn-success {
+  background: linear-gradient(135deg, #5cb85c, #4CAF50);
+  color: #fff;
 }
 
-.indicators-actions .btn-success {
-  background: #4CAF50;
-  color: white;
-  width: 100%;
-}
-
-.indicators-actions .btn-success:hover:not(:disabled) {
-  background: #45a049;
-}
-
-/* Легенда */
-.indicators-legend {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #666;
+.bre-btn-warn {
+  background: linear-gradient(135deg, #f5a623, #f39c12);
+  color: #fff;
 }
 
 .legend-color {

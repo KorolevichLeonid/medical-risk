@@ -194,7 +194,9 @@ async def create_project(
         hazard_questions=json.dumps(project.hazard_questions) if project.hazard_questions else None,
         custom_hazard=project.custom_hazard,
         hazard_checklist_answers=json.dumps(project.hazard_checklist_answers) if project.hazard_checklist_answers else None,
-        active_hazard_categories=json.dumps(project.active_hazard_categories) if project.active_hazard_categories else None
+        active_hazard_categories=json.dumps(project.active_hazard_categories) if project.active_hazard_categories else None,
+        severity_levels=json.dumps(project.severity_levels) if project.severity_levels else None,
+        risk_threshold=project.risk_threshold if project.risk_threshold else 10
     )
     db.add(db_project)
     db.commit()
@@ -295,6 +297,7 @@ async def create_project(
     hazard_questions_data = safe_json_load(db_project.hazard_questions)
     hazard_checklist_answers_data = safe_json_load(db_project.hazard_checklist_answers)
     active_hazard_categories_data = safe_json_load(db_project.active_hazard_categories)
+    severity_levels_data = safe_json_load(db_project.severity_levels)
 
     # Create response manually to avoid ORM serialization issues
     response_data = ProjectResponse(
@@ -324,6 +327,8 @@ async def create_project(
         custom_hazard=db_project.custom_hazard,
         hazard_checklist_answers=hazard_checklist_answers_data,
         active_hazard_categories=active_hazard_categories_data,
+        severity_levels=severity_levels_data,
+        risk_threshold=db_project.risk_threshold if db_project.risk_threshold else 10,
         owner_id=db_project.owner_id,
         created_at=db_project.created_at,
         updated_at=db_project.updated_at,
@@ -410,6 +415,7 @@ async def read_project(
     hazard_questions_data = json.loads(db_project.hazard_questions) if db_project.hazard_questions else None
     hazard_checklist_answers_data = json.loads(db_project.hazard_checklist_answers) if db_project.hazard_checklist_answers else None
     active_hazard_categories_data = json.loads(db_project.active_hazard_categories) if db_project.active_hazard_categories else None
+    severity_levels_data = json.loads(db_project.severity_levels) if db_project.severity_levels else None
 
     # Create response manually to avoid ORM serialization issues
     response_data = ProjectResponse(
@@ -439,6 +445,8 @@ async def read_project(
         custom_hazard=db_project.custom_hazard,
         hazard_checklist_answers=hazard_checklist_answers_data,
         active_hazard_categories=active_hazard_categories_data,
+        severity_levels=severity_levels_data,
+        risk_threshold=db_project.risk_threshold if db_project.risk_threshold else 10,
         owner_id=db_project.owner_id,
         created_at=db_project.created_at,
         updated_at=db_project.updated_at,
@@ -492,6 +500,8 @@ async def update_project(
         update_data['hazard_checklist_answers'] = json.dumps(update_data['hazard_checklist_answers']) if update_data['hazard_checklist_answers'] else None
     if 'active_hazard_categories' in update_data:
         update_data['active_hazard_categories'] = json.dumps(update_data['active_hazard_categories']) if update_data['active_hazard_categories'] else None
+    if 'severity_levels' in update_data:
+        update_data['severity_levels'] = json.dumps(update_data['severity_levels']) if update_data['severity_levels'] else None
 
     for field, value in update_data.items():
         setattr(db_project, field, value)
@@ -603,6 +613,7 @@ async def update_project(
     hazard_questions_data = safe_json_load(db_project.hazard_questions)
     hazard_checklist_answers_data = safe_json_load(db_project.hazard_checklist_answers)
     active_hazard_categories_data = safe_json_load(db_project.active_hazard_categories)
+    severity_levels_data = safe_json_load(db_project.severity_levels)
 
     # Create response data
     response_data = ProjectResponse(
@@ -632,6 +643,8 @@ async def update_project(
         custom_hazard=db_project.custom_hazard,
         hazard_checklist_answers=hazard_checklist_answers_data,
         active_hazard_categories=active_hazard_categories_data,
+        severity_levels=severity_levels_data,
+        risk_threshold=db_project.risk_threshold if db_project.risk_threshold else 10,
         owner_id=db_project.owner_id,
         created_at=db_project.created_at,
         updated_at=db_project.updated_at,

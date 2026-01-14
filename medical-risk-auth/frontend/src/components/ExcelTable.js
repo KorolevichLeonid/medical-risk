@@ -64,8 +64,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [lifecycleStages, setLifecycleStages] = useState([]);
   const [customLifecycleStages, setCustomLifecycleStages] = useState([]);
 
-  // Состояние для порогового значения уровня риска
+  // Состояние для порогового значения уровня риска и уровней тяжести
   const [acceptableRiskLevel, setAcceptableRiskLevel] = useState(10);
+  const [severityLevels, setSeverityLevels] = useState([
+    { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 }
+  ]);
 
   // Флаг для отслеживания первоначальной загрузки
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -128,6 +131,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     // Получаем данные строки
     const row = data[rowIndex];
     if (!row) return false;
+
+    // Эти поля всегда только для автоматического расчета
+    if (['risk_level_1', 'risk_level_2', 'residual_risk_score'].includes(columnKey)) {
+      return true;
+    }
     
     // Если риск полностью закрыт (fully_closed) - ВСЕ ячейки заблокированы
     if (row.risk_status === 'fully_closed') {
@@ -139,10 +147,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     if (row.locked_after_second === true) {
       const lockedUntilColumn20 = [
         'hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm',
-        'severity_score', 'probability_score', 'risk_score', 'risk_level_1', 'comment_1',
+        'severity_score', 'probability_score', 'risk_score', 'risk_level_1',
         'control_measure_1', 'control_measure_2', 'control_measure_3',
         'verification_1', 'verification_2', 'verification_3',
-        'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2', 'comment_2'
+        'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2'
       ];
       if (lockedUntilColumn20.includes(columnKey)) {
         return true;
@@ -155,6 +163,25 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       if (lockedAfterFirstEval.includes(columnKey)) {
         return true;
       }
+    }
+
+    // Анализ остаточный риск/польза доступен только после завершения оценок
+    if (columnKey === 'risk_benefit_analysis') {
+      if (!row.first_evaluation_done) return true;
+      if (row.risk_status === 'pending_second') return true;
+    }
+
+    // Новые риски доступны только после закрытия риска
+    if (columnKey === 'new_risks') {
+      return row.risk_status !== 'closed' && row.risk_status !== 'fully_closed';
+    }
+
+    if (columnKey === 'comment_1') {
+      return !row.first_evaluation_done;
+    }
+
+    if (columnKey === 'comment_2') {
+      return !row.second_evaluation_done;
     }
     
     // ДО ПЕРВИЧНОЙ ОЦЕНКИ - блокируем ВСЁ что после первичной оценки + допуск и комментарий (9, 10)
@@ -741,7 +768,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         setLifecycleStages(roleData.lifecycle_stages || []);
         setCustomLifecycleStages(roleData.custom_lifecycle_stages || []);
 
-        // Получаем информацию о проекте для получения acceptableRiskLevel
+        // Получаем информацию о проекте для получения порога риска и уровней тяжести
         try {
           const projectResponse = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
             headers: {
@@ -751,11 +778,21 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
           if (projectResponse.ok) {
             const projectData = await projectResponse.json();
-            setAcceptableRiskLevel(projectData.acceptable_risk_level || 10);
+            // Порог риска: сначала новое поле, потом старое, потом дефолт
+            setAcceptableRiskLevel(projectData.risk_threshold || projectData.acceptable_risk_level || 10);
+            // Уровни тяжести: если нет, дефолт 1..5
+            if (projectData.severity_levels && projectData.severity_levels.length > 0) {
+              setSeverityLevels(projectData.severity_levels);
+            } else {
+              setSeverityLevels([
+                { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 }
+              ]);
+            }
           }
         } catch (error) {
           console.error('Failed to load project acceptable risk level:', error);
           setAcceptableRiskLevel(10); // Default value
+          setSeverityLevels([{ level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 }]);
         }
       } else if (response.status === 401) {
         console.warn('Ошибка авторизации - токен недействителен');
@@ -865,23 +902,29 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     }
   };
 
+  // Максимальный балл из настроенных уровней тяжести
+  const maxSeverityLevel = useMemo(() => {
+    if (!severityLevels || severityLevels.length === 0) return 10;
+    return Math.max(...severityLevels.map((lvl) => Number(lvl.level) || 0));
+  }, [severityLevels]);
+
   const handleCellChange = (rowIndex, columnKey, value) => {
-    // Валидация для столбцов с ограничением 0-10
+    // Валидация для столбцов с ограничением 1..maxSeverityLevel
     if (columnKey === 'severity_score' || columnKey === 'probability_score' ||
         columnKey === 'residual_risk_level' || columnKey === 'residual_probability') {
       // Разрешаем только цифры
       const numericValue = value.replace(/[^0-9]/g, '');
 
-      // Ограничиваем диапазон 0-10
+      // Ограничиваем диапазон 1..maxSeverityLevel (пустое значение разрешено для очистки)
       const numValue = parseInt(numericValue);
-      if (numericValue !== '' && (isNaN(numValue) || numValue < 0 || numValue > 10)) {
+      if (numericValue !== '' && (isNaN(numValue) || numValue < 1 || numValue > maxSeverityLevel)) {
         let fieldName = '';
         if (columnKey === 'severity_score') fieldName = 'Тяжесть вреда';
         else if (columnKey === 'probability_score') fieldName = 'Вероятность причинения вреда';
         else if (columnKey === 'residual_risk_level') fieldName = 'Тяжесть вреда (контроль риска)';
         else if (columnKey === 'residual_probability') fieldName = 'Вероятность причинения вреда (контроль риска)';
 
-        alert(`Значение для "${fieldName}" должно быть цифрой в диапазоне 0-10`);
+        alert(`Значение для "${fieldName}" должно быть числом от 1 до ${maxSeverityLevel}`);
         return;
       }
 
@@ -899,6 +942,14 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       [columnKey]: value,
       isNew: false
     };
+
+    if (columnKey === 'risk_benefit_analysis') {
+      if (value === 'да' || value === 'нет') {
+        newData[rowIndex].risk_status = 'closed';
+      } else {
+        newData[rowIndex].risk_status = 'pending_benefit';
+      }
+    }
 
     // Автоматический расчет риска
     if (columnKey === 'severity_score' || columnKey === 'probability_score') {
@@ -1109,50 +1160,34 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       if (!row) return;
       
       if (evaluation.evaluationType === 'first') {
-        // Первичная оценка
         row.first_evaluation_done = true;
         row.evaluation_timestamp = now;
         row.evaluated_by = currentUserId;
 
-        // Уровень риска теперь определяется автоматически на основе acceptableRiskLevel
-        // Нет необходимости вручную устанавливать "Доп"/"Не доп"
-
-        // Добавляем комментарий если есть
         if (evaluation.comment) {
           row.comment_1 = evaluation.comment;
         }
-        
-        // Если риск закрыт при первичной оценке - переводим в pending_closure (на проверке)
-        if (evaluation.shouldCloseRisk) {
-          row.risk_status = 'pending_closure'; // Требует финального подтверждения
-          row.locked_after_second = true; // Блокируем столбцы 1-21
+
+        // Если риск допустим — закрываем и блокируем
+        if (evaluation.isAcceptable) {
+          row.risk_status = 'pending_benefit';
+          row.locked_after_second = true;
         } else {
-          row.risk_status = 'evaluated'; // В работе
+          // Недопустим — нужен переход ко вторичной оценке
+          row.risk_status = 'pending_second';
         }
       } else if (evaluation.evaluationType === 'second') {
-        // Вторичная оценка
         row.second_evaluation_done = true;
         row.evaluation_timestamp = now;
         row.evaluated_by = currentUserId;
 
-        // Уровень риска теперь определяется автоматически на основе acceptableRiskLevel
-        // Нет необходимости вручную устанавливать "Доп"/"Не доп"
-
-        // В ЛЮБОМ случае блокируем столбцы 1-21 (до comment_2 включительно)
-        // Остаются редактируемыми: risk_benefit_analysis (22), new_risks (23)
-        row.locked_after_second = true;
-        row.risk_status = 'pending_closure'; // На проверке, ожидает финального закрытия
-
-        // Добавляем комментарий если есть (не обязательно для вторичной оценки)
         if (evaluation.comment && evaluation.comment.trim()) {
           row.comment_2 = evaluation.comment;
         }
 
-        // Если созданы новые риски
-        if (evaluation.shouldCreateNewRisk && evaluation.newRiskDescription) {
-          row.new_risks = evaluation.newRiskDescription;
-          newCellColors[`${activeSheet}_${rowIndex}_new_risks`] = '#FF4444'; // Красный
-        }
+        // Во вторичной оценке риск всегда закрывается
+        row.locked_after_second = true;
+        row.risk_status = 'pending_benefit';
       }
     });
     
@@ -1522,6 +1557,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Проверить, может ли пользователь редактировать данный столбец
   const canEditColumn = (columnKey) => {
+    if (['risk_level_1', 'risk_level_2', 'residual_risk_score'].includes(columnKey)) {
+      return false;
+    }
+
     // Определяем столбцы с баллами риска
     const riskScoreColumns = ['severity_score', 'probability_score', 'risk_score', 'residual_risk_level', 'residual_probability', 'residual_risk_score'];
 
@@ -1581,6 +1620,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         title: 'Риск полностью закрыт' 
       };
     }
+
+    // Риск закрыт после анализа остаточного риска/пользы
+    if (row.risk_status === 'closed') {
+      return {
+        icon: '🟢',
+        color: '#4CAF50',
+        title: 'Риск закрыт'
+      };
+    }
     
     // Риск на проверке (после вторичной оценки, ожидает финального закрытия)
     if (row.risk_status === 'pending_closure') {
@@ -1588,6 +1636,14 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         icon: '🟠', 
         color: '#FF9800', 
         title: 'Риск на проверке - ожидает финального закрытия' 
+      };
+    }
+
+    if (row.risk_status === 'pending_benefit') {
+      return {
+        icon: '🟠',
+        color: '#FF9800',
+        title: 'Ожидается анализ остаточный риск/польза'
       };
     }
     
@@ -1779,26 +1835,48 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         }}
       >
         {isEditing && canEdit && !isLocked ? (
-          <input
-            type="text"
-            className="excel-cell-input"
-            value={value}
-            onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
-            onBlur={handleCellBlur}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            style={{
-              backgroundColor: 'transparent',
-              width: '100%',
-              height: '100%',
-              boxSizing: 'border-box',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-              whiteSpace: 'normal',
-              position: 'relative',
-              zIndex: 2
-            }}
-          />
+          column.key === 'risk_benefit_analysis' ? (
+            <select
+              className="excel-cell-input"
+              value={value}
+              onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
+              onBlur={handleCellBlur}
+              autoFocus
+              style={{
+                backgroundColor: 'transparent',
+                width: '100%',
+                height: '100%',
+                boxSizing: 'border-box',
+                position: 'relative',
+                zIndex: 2
+              }}
+            >
+              <option value="">—</option>
+              <option value="да">да</option>
+              <option value="нет">нет</option>
+            </select>
+          ) : (
+            <input
+              type="text"
+              className="excel-cell-input"
+              value={value}
+              onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
+              onBlur={handleCellBlur}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              style={{
+                backgroundColor: 'transparent',
+                width: '100%',
+                height: '100%',
+                boxSizing: 'border-box',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+                whiteSpace: 'normal',
+                position: 'relative',
+                zIndex: 2
+              }}
+            />
+          )
         ) : (
           <div
             className="excel-cell-content"
@@ -2177,7 +2255,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         <BatchRiskEvaluation
           risks={risksToEvaluate}
           acceptableRiskLevel={acceptableRiskLevel}
-          onSaveAllChanges={handleSaveAllSheets}
           onComplete={(evaluations, cancelledRiskIndices = []) => {
             // Восстанавливаем данные для отмененных рисков из snapshot (откат изменений)
             restoreDataForCancelledRisks(cancelledRiskIndices);

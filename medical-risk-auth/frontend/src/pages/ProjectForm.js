@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import './ProjectForm.css';
 import API_BASE_URL from '../config';
 import RiskMatrixTable from '../components/RiskMatrixTable';
+import SeverityLevelsConfig from '../components/SeverityLevelsConfig';
 
 // Detailed hazard checklist data
 const hazardDetails = {
@@ -599,6 +600,16 @@ const ProjectForm = () => {
     // Матрица рисков
     riskMatrix: null,
 
+    // Уровни тяжести последствий
+    severityLevels: [
+      { level: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
+      { level: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
+      { level: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
+      { level: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
+      { level: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
+    ],
+    riskThreshold: 10,
+
     // Этапы жизненного цикла
     lifecycleStages: [],
     customLifecycleStages: [],
@@ -828,6 +839,14 @@ const ProjectForm = () => {
           teamMembers: teamMembers,
           acceptableRiskLevel: projectData.acceptable_risk_level || 10,
           riskMatrix: projectData.risk_matrix || null,
+          severityLevels: projectData.severity_levels || [
+            { level: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
+            { level: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
+            { level: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
+            { level: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
+            { level: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
+          ],
+          riskThreshold: projectData.risk_threshold || 10,
           lifecycleStages: projectData.lifecycle_stages || [],
           customLifecycleStages: projectData.custom_lifecycle_stages || [],
           hazardQuestions: projectData.hazard_questions || {
@@ -1203,14 +1222,14 @@ const ProjectForm = () => {
           regulatory_requirements: formData.regulatoryRequirements,
           standards: formData.standards,
           status: formData.status,
-          acceptable_risk_level: parseInt(formData.acceptableRiskLevel) || 10,
-          risk_matrix: riskMatrix,
           lifecycle_stages: formData.lifecycleStages,
           custom_lifecycle_stages: formData.customLifecycleStages,
           hazard_questions: formData.hazardQuestions,
           hazard_checklist_answers: formData.hazardChecklistAnswers,
           active_hazard_categories: formData.activeHazardCategories,
-          custom_hazard: formData.customHazards.join('\n')
+          custom_hazard: formData.customHazards.join('\n'),
+          severity_levels: formData.severityLevels,
+          risk_threshold: parseInt(formData.riskThreshold) || 10
         })
       });
 
@@ -1582,33 +1601,19 @@ const ProjectForm = () => {
             </div>
         </div>
 
-        {/* Матрица рисков */}
+        {/* Уровни тяжести и пороговое значение риска */}
         <div className="form-section">
-          <RiskMatrixTable
-            onMatrixChange={setRiskMatrix}
-            initialMatrix={riskMatrix}
+          <SeverityLevelsConfig
+            severityLevels={formData.severityLevels}
+            riskThreshold={formData.riskThreshold}
+            onChange={(data) => {
+              setFormData({
+                ...formData,
+                severityLevels: data.severity_levels,
+                riskThreshold: data.risk_threshold
+              });
+            }}
           />
-        </div>
-
-        {/* Уровень риска (доп./не доп.) */}
-        <div className="form-section">
-          <h2>Уровень риска (доп./не доп.)</h2>
-          <p>Укажите пороговое значение уровня риска. Если значение "Риск, балл" в Excel таблице будет больше или равно этому значению, то ячейка "Уровень риска (доп./не доп.)" будет подсвечиваться красным и показывать "не допустимый". Если меньше - зеленым и "допустимый".</p>
-
-          <div className="form-group">
-            <label htmlFor="acceptableRiskLevel">Пороговое значение уровня риска</label>
-            <input
-              type="number"
-              id="acceptableRiskLevel"
-              name="acceptableRiskLevel"
-              value={formData.acceptableRiskLevel}
-              onChange={handleInputChange}
-              min="0"
-              max="100"
-              placeholder="Введите пороговое значение (например, 10)"
-            />
-            <small className="form-help">Значение должно быть числом от 0 до 100</small>
-          </div>
         </div>
 
         {/* Этапы жизненного цикла */}

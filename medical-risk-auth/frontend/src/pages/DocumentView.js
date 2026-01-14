@@ -181,10 +181,10 @@ const DocumentView = () => {
         };
       }
       
-      // Проверка 2: Все риски закрыты (fully_closed)
+      // Проверка 2: Все риски закрыты (closed / fully_closed)
       const notClosedRisks = risks.filter(risk => {
         const status = risk.risk_status || 'new';
-        return status !== 'fully_closed';
+        return status !== 'fully_closed' && status !== 'closed';
       });
       
       if (notClosedRisks.length > 0) {

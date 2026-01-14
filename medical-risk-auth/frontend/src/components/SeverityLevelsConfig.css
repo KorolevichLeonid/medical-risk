@@ -1,0 +1,276 @@
+.severity-levels-config {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.config-section {
+  margin-bottom: 30px;
+}
+
+.config-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.3rem;
+  color: #2c3e50;
+}
+
+.config-description {
+  margin: 0 0 20px 0;
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.error-message {
+  background: #fee;
+  border: 1px solid #fcc;
+  color: #c33;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+/* Таблица уровней */
+.levels-table {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.levels-header {
+  display: grid;
+  grid-template-columns: 80px 1fr 2fr 80px;
+  gap: 10px;
+  background: #f8f9fa;
+  padding: 12px 15px;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.level-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 2fr 80px;
+  gap: 10px;
+  padding: 12px 15px;
+  border-bottom: 1px solid #e9ecef;
+  align-items: center;
+}
+
+.level-row:last-child {
+  border-bottom: none;
+}
+
+.level-row:hover {
+  background: #f8f9fa;
+}
+
+.col-level {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #007bff;
+  color: white;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.level-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.level-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.col-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-remove {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #dc3545;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.btn-remove:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.btn-remove:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-add-level {
+  padding: 10px 20px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-add-level:hover {
+  background: #218838;
+}
+
+/* Секция порогового значения */
+.threshold-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.threshold-input-group {
+  margin-bottom: 20px;
+}
+
+.threshold-input-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.threshold-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.threshold-input {
+  width: 150px;
+  padding: 10px 15px;
+  border: 2px solid #ced4da;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  transition: border-color 0.2s;
+}
+
+.threshold-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.threshold-range {
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.threshold-info {
+  margin-top: 20px;
+}
+
+.info-box {
+  background: #e7f3ff;
+  border-left: 4px solid #007bff;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.risk-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.example {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.example-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.example-value {
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 4px;
+}
+
+.example-value.acceptable {
+  background: #d4edda;
+  color: #155724;
+}
+
+.example-value.unacceptable {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* Цвета для текста */
+.acceptable {
+  color: #28a745;
+}
+
+.unacceptable {
+  color: #dc3545;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .levels-header,
+  .level-row {
+    grid-template-columns: 60px 1fr 60px;
+    gap: 8px;
+  }
+
+  .col-description {
+    display: none;
+  }
+
+  .threshold-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .example {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

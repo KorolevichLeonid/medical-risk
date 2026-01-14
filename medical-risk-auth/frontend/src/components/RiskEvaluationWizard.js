@@ -2,62 +2,75 @@ import React, { useState, useEffect } from 'react';
 import './RiskEvaluationWizard.css';
 
 /**
- * RiskEvaluationWizard - Wizard для оценки одного риска
- *
- * Используется для первичной или вторичной оценки рисков.
- * Допустимость риска определяется автоматически на основе порогового значения.
- * Включает шаги:
- * 1. Автоматическая оценка допустимости риска
- * 2. Дополнительные действия (закрытие риска / комментарий / новый риск)
- * 3. Подтверждение
+ * Упрощенный модуль оценки риска (один экран)
+ * - Краткая информация о риске
+ * - Автодопустимость по порогу (без ручной галочки)
+ * - Комментарий обязателен только для недопустимого риска
+ * - Кнопки: Сохранить риск / Отменить изменения
  */
 const RiskEvaluationWizard = ({
   risk,
-  evaluationType, // 'first' или 'second'
-  onComplete,
-  onCancel,
-  showCancelButton = true, // Показывать ли кнопку "Отменить"
-  onCancelRisk, // Отмена оценки ЭТОГО риска (помечает как отмененный)
-  acceptableRiskLevel = 10, // Пороговое значение уровня риска
-  onSaveAllChanges // Функция для сохранения всех изменений в Excel таблице
+  evaluationType, // 'first' | 'second'
+  acceptableRiskLevel = 10,
+  onSaveRisk,
+  onCancelRisk,
+  showCancel = false,
+  extraActionsLeft = null,
+  extraActionsRight = null,
+  currentEvaluation = null, // {isAcceptable, comment}
 }) => {
-  // Определяем какие столбцы оцениваются
   const isFirstEvaluation = evaluationType === 'first';
   const riskScore = isFirstEvaluation ? risk.risk_score : risk.residual_risk_score;
   const severityScore = isFirstEvaluation ? risk.severity_score : risk.residual_risk_level;
   const probabilityScore = isFirstEvaluation ? risk.probability_score : risk.residual_probability;
 
-  const [step, setStep] = useState(1);
-  const [evaluation, setEvaluation] = useState({
-    isAcceptable: null, // true = Доп, false = Не доп
-    shouldCloseRisk: false, // только для первичной оценки если Доп
-    comment: '', // обязательный для Не доп
-    shouldCreateNewRisk: false, // только для вторичной оценки если Не доп
-    newRiskDescription: '', // описание нового риска
-  });
-
+  const [isAcceptable, setIsAcceptable] = useState(true);
+  const [comment, setComment] = useState('');
   const [errors, setErrors] = useState({});
 
-  // Сброс state при смене риска
   useEffect(() => {
-    setStep(1);
-    // Автоматически определяем допустимость риска на основе порогового значения
-    const autoAcceptable = riskScore <= acceptableRiskLevel;
-    setEvaluation({
-      isAcceptable: autoAcceptable,
-      shouldCloseRisk: false,
-      comment: '',
-      shouldCreateNewRisk: false,
-      newRiskDescription: '',
-    });
+    const autoAcceptable = (riskScore || 0) < acceptableRiskLevel;
+    setIsAcceptable(currentEvaluation?.isAcceptable ?? autoAcceptable);
+    setComment(currentEvaluation?.comment ?? '');
     setErrors({});
-  }, [risk.id, risk.rowIndex, riskScore, acceptableRiskLevel]); // Сбрасываем при изменении ID, индекса риска или параметров оценки
+  }, [risk.id, risk.rowIndex, riskScore, acceptableRiskLevel, currentEvaluation]);
 
-  // Шаг 1: Автоматическая оценка допустимости
-  const renderStep1 = () => (
-    <div className="wizard-step">
-      <h3>Автоматическая оценка допустимости риска</h3>
+  const getRiskLevelClass = (score) => {
+    if (score === null || score === undefined) return '';
+    if (score >= acceptableRiskLevel) return 'not-acceptable';
+    return 'acceptable';
+  };
 
+  const validate = () => {
+    const newErrors = {};
+    if (!isAcceptable && !comment.trim()) {
+      newErrors.comment = 'Комментарий обязателен для недопустимого риска';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = () => {
+    if (!validate()) return;
+    onSaveRisk &&
+      onSaveRisk({
+        rowIndex: risk.rowIndex,
+        evaluationType,
+        isAcceptable,
+        comment: comment.trim(),
+      });
+  };
+
+  const handleCancel = () => {
+    onCancelRisk && onCancelRisk(risk);
+    const autoAcceptable = (riskScore || 0) < acceptableRiskLevel;
+    setIsAcceptable(autoAcceptable);
+    setComment('');
+    setErrors({});
+  };
+
+  return (
+    <div className="risk-evaluation-wizard simple">
       <div className="risk-info-card">
         <div className="risk-info-row">
           <span className="label">Риск:</span>
@@ -69,436 +82,64 @@ const RiskEvaluationWizard = ({
         </div>
         <div className="risk-info-row">
           <span className="label">Тяжесть вреда:</span>
-          <span className="value score">{severityScore || 'Не оценено'}</span>
+          <span className="value score">{severityScore || '—'}</span>
         </div>
         <div className="risk-info-row">
           <span className="label">Вероятность:</span>
-          <span className="value score">{probabilityScore || 'Не оценено'}</span>
+          <span className="value score">{probabilityScore || '—'}</span>
         </div>
         <div className="risk-info-row">
           <span className="label">Итоговый балл:</span>
           <span className={`value score-result ${getRiskLevelClass(riskScore)}`}>
-            {riskScore || 'Не рассчитано'}
+            {riskScore || '—'}
           </span>
         </div>
         <div className="risk-info-row">
-          <span className="label">Пороговое значение:</span>
+          <span className="label">Порог:</span>
           <span className="value">{acceptableRiskLevel}</span>
         </div>
       </div>
 
       <div className="evaluation-result">
-        <p className="result-statement">
-          На основе автоматической оценки, данный риск является:
-        </p>
-
-        <div className={`result-indicator ${evaluation.isAcceptable ? 'acceptable' : 'not-acceptable'}`}>
+        <p className="result-statement">Автооценка риска:</p>
+        <div className={`result-indicator ${isAcceptable ? 'acceptable' : 'not-acceptable'}`}>
           <span className="result-icon">
-            {evaluation.isAcceptable ? '✓' : '✗'}
+            {isAcceptable ? '✓' : '✗'}
           </span>
           <span className="result-text">
-            {evaluation.isAcceptable ? 'Допустимый' : 'Не допустимый'}
+            {isAcceptable ? 'Допустимый' : 'Не допустимый'}
           </span>
         </div>
-
-        <div className="info-box" style={{ marginTop: '15px' }}>
-          <strong>ℹ️ Автоматическая оценка:</strong> Риск считается допустимым, если его балл
-          не превышает пороговое значение ({acceptableRiskLevel}), установленное при создании проекта.
-        </div>
       </div>
-    </div>
-  );
 
-  // Шаг 2: Дополнительные действия
-  const renderStep2 = () => {
-    // Первичная оценка + Доп
-    if (isFirstEvaluation && evaluation.isAcceptable === true) {
-      return (
-        <div className="wizard-step">
-          <h3>Закрытие риска</h3>
-          <p className="step-description">
-            Риск оценен как <strong className="acceptable-text">допустимый</strong>.
-          </p>
-          
-          <div className="close-risk-option">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={evaluation.shouldCloseRisk}
-                onChange={(e) => setEvaluation({ ...evaluation, shouldCloseRisk: e.target.checked })}
-              />
-              <span className="checkbox-text">
-                Закрыть риск (дальнейшая работа не требуется)
-              </span>
-            </label>
-            
-            {evaluation.shouldCloseRisk && (
-              <div className="info-box">
-                <strong>ℹ️ Важно:</strong> При закрытии риска поля оценки и меры контроля будут заблокированы.
-                Поля для анализа остаточного риска останутся доступными. Закрытие нельзя отменить.
-              </div>
-            )}
-          </div>
-          
-          {/* Если НЕ закрывать риск - нужен комментарий (как для не допустимых) */}
-          {!evaluation.shouldCloseRisk && (
-            <div className="comment-section" style={{ marginTop: '20px' }}>
-              <label className="form-label">Комментарий (обязательно):</label>
-              <textarea
-                className="form-textarea"
-                rows="4"
-                placeholder="Опишите причины допустимости и планируемые меры управления..."
-                value={evaluation.comment}
-                onChange={(e) => setEvaluation({ ...evaluation, comment: e.target.value })}
-              />
-              {errors.comment && (
-                <div className="error-message">{errors.comment}</div>
-              )}
-              <div className="info-box" style={{ marginTop: '10px' }}>
-                <strong>ℹ️ Внимание:</strong> Даже для допустимых рисков требуется комментарий, 
-                если работа над риском продолжается.
-              </div>
-            </div>
+      <div className="comment-section">
+        <label className="form-label">
+          Комментарий {isAcceptable ? '(опционально)' : '(обязательно)'}
+        </label>
+        <textarea
+          className="form-textarea"
+          rows="3"
+          placeholder={isAcceptable ? 'Добавьте при необходимости' : 'Опишите причины и меры управления'}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+        {errors.comment && <div className="error-message">{errors.comment}</div>}
+      </div>
+
+      <div className="wizard-actions simple-actions">
+        <div className="wizard-actions-left">
+          <button type="button" className="bre-btn bre-btn-success" onClick={handleSave}>
+            Сохранить риск
+          </button>
+          {showCancel && (
+            <button type="button" className="bre-btn bre-btn-secondary" onClick={handleCancel}>
+              Отменить изменения
+            </button>
           )}
+          {extraActionsLeft}
         </div>
-      );
-    }
-    
-    // Первичная оценка + Не доп (требуется комментарий)
-    if (isFirstEvaluation && evaluation.isAcceptable === false) {
-      return (
-        <div className="wizard-step">
-          <h3>Комментарий к риску</h3>
-          <p className="step-description">
-            Риск оценен как <strong className="not-acceptable-text">не допустимый</strong>.
-            Необходимо оставить комментарий.
-          </p>
-          
-          <div className="comment-section">
-            <label className="form-label">Комментарий (обязательно):</label>
-            <textarea
-              className="form-textarea"
-              rows="4"
-              placeholder="Опишите причины и планируемые меры по управлению риском..."
-              value={evaluation.comment}
-              onChange={(e) => setEvaluation({ ...evaluation, comment: e.target.value })}
-            />
-            {errors.comment && (
-              <div className="error-message">{errors.comment}</div>
-            )}
-          </div>
-        </div>
-      );
-    }
-    
-    // Вторичная оценка (и Доп, и Не доп - одинаковая логика)
-    if (!isFirstEvaluation) {
-      return (
-        <div className="wizard-step">
-          <h3>{evaluation.isAcceptable ? 'Остаточный риск допустим' : 'Остаточный риск не допустим'}</h3>
-          <p className="step-description">
-            Остаточный риск оценен как{' '}
-            <strong className={evaluation.isAcceptable ? 'acceptable-text' : 'not-acceptable-text'}>
-              {evaluation.isAcceptable ? 'допустимый' : 'не допустимый'}
-            </strong>.
-          </p>
-          
-          {/* Комментарий (НЕ обязательный для вторичной оценки) */}
-          <div className="comment-section">
-            <label className="form-label">Комментарий (опционально):</label>
-            <textarea
-              className="form-textarea"
-              rows="3"
-              placeholder={evaluation.isAcceptable 
-                ? "Можете добавить комментарий по остаточному риску..." 
-                : "Можете описать причины недостаточности мер управления..."}
-              value={evaluation.comment}
-              onChange={(e) => setEvaluation({ ...evaluation, comment: e.target.value })}
-            />
-            <div className="info-box" style={{ marginTop: '10px' }}>
-              <strong>ℹ️ Информация:</strong> Для вторичной оценки комментарий не обязателен.
-            </div>
-          </div>
-          
-          {/* Вопрос про новые риски (для ВСЕХ вторичных оценок) */}
-          <div className="new-risk-section" style={{ marginTop: '20px' }}>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={evaluation.shouldCreateNewRisk}
-                onChange={(e) => setEvaluation({ 
-                  ...evaluation, 
-                  shouldCreateNewRisk: e.target.checked,
-                  newRiskDescription: e.target.checked ? evaluation.newRiskDescription : ''
-                })}
-              />
-              <span className="checkbox-text">
-                Возник новый риск после применения мер
-              </span>
-            </label>
-            
-            {evaluation.shouldCreateNewRisk && (
-              <div className="new-risk-input" style={{ marginTop: '15px' }}>
-                <label className="form-label">Описание нового риска (обязательно):</label>
-                <textarea
-                  className="form-textarea"
-                  rows="3"
-                  placeholder="Опишите новый риск, который возник после применения мер управления..."
-                  value={evaluation.newRiskDescription}
-                  onChange={(e) => setEvaluation({ ...evaluation, newRiskDescription: e.target.value })}
-                />
-                {errors.newRiskDescription && (
-                  <div className="error-message">{errors.newRiskDescription}</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-    
-    return null;
-  };
-
-  // Автоматическое сохранение при достижении шага 3
-  useEffect(() => {
-    if (step === 3) {
-      // Формируем результат оценки
-      const result = {
-        riskId: risk.id,
-        rowIndex: risk.rowIndex,
-        evaluationType,
-        isAcceptable: evaluation.isAcceptable,
-        comment: evaluation.comment,
-        shouldCloseRisk: evaluation.shouldCloseRisk,
-        shouldCreateNewRisk: evaluation.shouldCreateNewRisk,
-        newRiskDescription: evaluation.newRiskDescription,
-      };
-      
-      // Автоматически сохраняем оценку
-      onComplete(result);
-    }
-  }, [step]); // Срабатывает при переходе на шаг 3
-
-  // Шаг 3: Подтверждение (теперь только для отображения)
-  const renderStep3 = () => (
-    <div className="wizard-step">
-      <h3>✓ Оценка подготовлена</h3>
-      <p className="step-description" style={{ color: '#4CAF50', fontWeight: 600 }}>
-        Оценка автоматически добавлена в очередь на сохранение.
-      </p>
-      
-      <div className="confirmation-card">
-        <div className="confirmation-row">
-          <span className="label">Риск:</span>
-          <span className="value">{risk.hazard_name || 'Без названия'}</span>
-        </div>
-        
-        <div className="confirmation-row">
-          <span className="label">Тип оценки:</span>
-          <span className="value">
-            {isFirstEvaluation ? 'Первичная оценка' : 'Оценка остаточного риска'}
-          </span>
-        </div>
-        
-        <div className="confirmation-row">
-          <span className="label">Итоговый балл:</span>
-          <span className={`value score-result ${getRiskLevelClass(riskScore)}`}>
-            {riskScore}
-          </span>
-        </div>
-        
-        <div className="confirmation-row">
-          <span className="label">Результат:</span>
-          <span className={`value ${evaluation.isAcceptable ? 'acceptable-text' : 'not-acceptable-text'}`}>
-            {evaluation.isAcceptable ? '✓ Допустимый' : '✗ Не допустимый'}
-          </span>
-        </div>
-        
-        {isFirstEvaluation && evaluation.isAcceptable && evaluation.shouldCloseRisk && (
-          <div className="confirmation-row highlight">
-            <span className="label">Действие:</span>
-            <span className="value">🔒 Риск будет закрыт</span>
-          </div>
-        )}
-        
-        {evaluation.comment && (
-          <div className="confirmation-row">
-            <span className="label">Комментарий:</span>
-            <span className="value comment-text">{evaluation.comment}</span>
-          </div>
-        )}
-        
-        {evaluation.shouldCreateNewRisk && evaluation.newRiskDescription && (
-          <div className="confirmation-row highlight">
-            <span className="label">Новый риск:</span>
-            <span className="value comment-text">{evaluation.newRiskDescription}</span>
-          </div>
-        )}
-      </div>
-      
-      <div className="info-box">
-        <strong>ℹ️ Готово:</strong> Вы можете вернуться назад чтобы изменить оценку, или перейти к другому риску. 
-        Все изменения будут сохранены после нажатия кнопки "Сохранить все риски".
-      </div>
-    </div>
-  );
-
-  // Валидация перед переходом к следующему шагу
-  const validateStep = () => {
-    const newErrors = {};
-
-    // Шаг 1 теперь всегда проходит валидацию, так как допустимость определяется автоматически
-    
-    if (step === 2) {
-      // Для ПЕРВИЧНОЙ оценки:
-      if (isFirstEvaluation) {
-        // Не допустимый риск - комментарий ОБЯЗАТЕЛЕН
-        if (evaluation.isAcceptable === false && !evaluation.comment.trim()) {
-          newErrors.comment = 'Комментарий обязателен для не допустимых рисков';
-        }
-        
-        // Допустимый риск БЕЗ закрытия - комментарий тоже обязателен
-        if (evaluation.isAcceptable === true && 
-            !evaluation.shouldCloseRisk && !evaluation.comment.trim()) {
-          newErrors.comment = 'Комментарий обязателен, если работа над риском продолжается';
-        }
-      }
-      
-      // Для ВТОРИЧНОЙ оценки комментарий НЕ обязателен (ни для Доп, ни для Не доп)
-      
-      // Если выбрано создание нового риска, описание обязательно
-      if (evaluation.shouldCreateNewRisk && !evaluation.newRiskDescription.trim()) {
-        newErrors.newRiskDescription = 'Необходимо описать новый риск';
-      }
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Обработчики навигации
-  const handleNext = () => {
-    if (!validateStep()) return;
-    
-    if (step < 3) {
-      setStep(step + 1);
-    }
-  };
-
-  const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-      setErrors({});
-    }
-  };
-
-  // Больше не используется - автосохранение на шаге 3
-  const handleComplete = () => {
-    // Функция оставлена для совместимости, но не используется
-  };
-
-  // Определение класса для уровня риска
-  const getRiskLevelClass = (score) => {
-    if (!score) return '';
-    if (score >= 16) return 'risk-high';
-    if (score >= 8) return 'risk-medium';
-    if (score >= 4) return 'risk-low';
-    return 'risk-minimal';
-  };
-
-  return (
-    <div className="risk-evaluation-wizard-overlay">
-      <div className="risk-evaluation-wizard">
-        {/* Заголовок */}
-        <div className="wizard-header">
-          <h2>
-            {isFirstEvaluation ? 'Первичная оценка риска' : 'Оценка остаточного риска'}
-          </h2>
-          <button className="close-btn" onClick={onCancel}>×</button>
-        </div>
-        
-        {/* Прогресс */}
-        <div className="wizard-progress">
-          <div className={`progress-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
-            <div className="step-number">1</div>
-            <div className="step-label">Оценка</div>
-          </div>
-          <div className={`progress-line ${step > 1 ? 'active' : ''}`}></div>
-          <div className={`progress-step ${step >= 2 ? 'active' : ''} ${step > 2 ? 'completed' : ''}`}>
-            <div className="step-number">2</div>
-            <div className="step-label">Действия</div>
-          </div>
-          <div className={`progress-line ${step > 2 ? 'active' : ''}`}></div>
-          <div className={`progress-step ${step >= 3 ? 'active' : ''}`}>
-            <div className="step-number">3</div>
-            <div className="step-label">Подтверждение</div>
-          </div>
-        </div>
-        
-        {/* Контент шага */}
-        <div className="wizard-content">
-          {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
-          {step === 3 && renderStep3()}
-        </div>
-        
-        {/* Кнопки навигации */}
-        <div className="wizard-footer">
-          <div className="footer-left">
-            {showCancelButton && (
-              <button 
-                className="btn btn-secondary" 
-                onClick={onCancel}
-              >
-                Отменить
-              </button>
-            )}
-            
-            {/* Кнопка отмены оценки ЭТОГО риска */}
-            {onCancelRisk && (
-              <button 
-                className="btn btn-danger-outline" 
-                onClick={onCancelRisk}
-                title="Отменить оценку этого риска (риск будет пропущен при сохранении)"
-              >
-                ✗ Отменить оценку риска
-              </button>
-            )}
-          </div>
-          
-          <div className="footer-right">
-            {/* Кнопка сохранения всех изменений только на 3-м шаге */}
-            {step === 3 && onSaveAllChanges && (
-              <button
-                className="btn btn-success"
-                onClick={onSaveAllChanges}
-                title="Сохранить все изменения в Excel таблице"
-              >
-                💾 Сохранить все изменения
-              </button>
-            )}
-
-            {step > 1 && step < 3 && (
-              <button
-                className="btn btn-secondary"
-                onClick={handleBack}
-              >
-                ← Назад
-              </button>
-            )}
-
-            {step < 3 && (
-              <button
-                className="btn btn-primary"
-                onClick={handleNext}
-              >
-                Далее →
-              </button>
-            )}
-
-            {/* Шаг 3 - автоматическое сохранение, кнопки не нужны */}
-          </div>
+        <div className="wizard-actions-right">
+          {extraActionsRight}
         </div>
       </div>
     </div>
@@ -506,4 +147,3 @@ const RiskEvaluationWizard = ({
 };
 
 export default RiskEvaluationWizard;
-

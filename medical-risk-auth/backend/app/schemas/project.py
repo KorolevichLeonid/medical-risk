@@ -37,6 +37,10 @@ class ProjectBase(BaseModel):
     hazard_checklist_answers: Optional[dict] = None  # New field for storing checklist answers
     active_hazard_categories: Optional[list] = None  # Active hazard categories determined by checklist
 
+    # Risk severity levels configuration
+    severity_levels: Optional[list] = None  # Array of severity levels: [{level: 1, name: "...", description: "..."}]
+    risk_threshold: Optional[int] = 10  # Threshold value for acceptable/unacceptable risk
+
 
 class ProjectCreate(ProjectBase):
     """Schema for creating a new project"""
@@ -70,6 +74,8 @@ class ProjectUpdate(BaseModel):
     custom_hazard: Optional[str] = None
     hazard_checklist_answers: Optional[dict] = None
     active_hazard_categories: Optional[list] = None
+    severity_levels: Optional[list] = None
+    risk_threshold: Optional[int] = None
 
 
 class ProjectMemberBase(BaseModel):
