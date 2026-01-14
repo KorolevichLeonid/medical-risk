@@ -41,7 +41,7 @@
 
 .levels-header {
   display: grid;
-  grid-template-columns: 80px 1fr 2fr 80px;
+  grid-template-columns: 80px 80px 1fr 2fr 80px;
   gap: 10px;
   background: #f8f9fa;
   padding: 12px 15px;
@@ -52,7 +52,7 @@
 
 .level-row {
   display: grid;
-  grid-template-columns: 80px 1fr 2fr 80px;
+  grid-template-columns: 80px 80px 1fr 2fr 80px;
   gap: 10px;
   padding: 12px 15px;
   border-bottom: 1px solid #e9ecef;
@@ -93,6 +93,17 @@
   border-radius: 4px;
   font-size: 0.95rem;
   transition: border-color 0.2s;
+}
+
+/* Hide number input spinner arrows */
+.level-input[type="number"]::-webkit-outer-spin-button,
+.level-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.level-input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
 }
 
 .level-input:focus {
@@ -255,7 +266,7 @@
 @media (max-width: 768px) {
   .levels-header,
   .level-row {
-    grid-template-columns: 60px 1fr 60px;
+    grid-template-columns: 60px 60px 1fr 60px;
     gap: 8px;
   }
 

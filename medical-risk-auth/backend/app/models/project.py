@@ -115,7 +115,7 @@ class Project(Base):
     active_hazard_categories = Column(Text, nullable=True)  # JSON array of active hazard category names
 
     # Risk severity levels configuration
-    severity_levels = Column(Text, nullable=True)  # JSON array of severity levels: [{level: 1, name: "...", description: "..."}]
+    severity_levels = Column(Text, nullable=True)  # JSON array of severity levels: [{level: 1, score: 1, name: "...", description: "..."}]
     risk_threshold = Column(Integer, default=10)  # Threshold value for acceptable/unacceptable risk
 
     # Timestamps

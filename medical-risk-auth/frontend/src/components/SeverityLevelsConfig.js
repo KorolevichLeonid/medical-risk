@@ -24,11 +24,11 @@ const SeverityLevelsConfig = ({
     } else {
       // Дефолтные 5 уровней
       setLevels([
-        { level: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
-        { level: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
-        { level: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
-        { level: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
-        { level: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
+        { level: 1, score: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
+        { level: 2, score: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
+        { level: 3, score: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
+        { level: 4, score: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
+        { level: 5, score: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
       ]);
     }
 
@@ -47,20 +47,24 @@ const SeverityLevelsConfig = ({
 
   // Добавление нового уровня
   const addLevel = () => {
-    const newLevel = levels.length > 0 
-      ? Math.max(...levels.map(l => l.level)) + 1 
+    const newLevel = levels.length > 0
+      ? Math.max(...levels.map(l => l.level)) + 1
       : 1;
-    
+
+    // Ensure score is within 0-100 range
+    const newScore = Math.min(100, Math.max(0, newLevel));
+
     const newLevels = [
       ...levels,
       {
         level: newLevel,
+        score: newScore,
         name: "",
         description: ""
       }
     ];
     setLevels(newLevels);
-    
+
     // Уведомляем родителя об изменении
     if (onChange) {
       onChange({
@@ -167,6 +171,7 @@ const SeverityLevelsConfig = ({
         <div className="levels-table">
           <div className="levels-header">
             <div className="col-level">Уровень</div>
+            <div className="col-score">Баллы</div>
             <div className="col-name">Название</div>
             <div className="col-description">Описание</div>
             <div className="col-actions">Действия</div>
@@ -176,6 +181,39 @@ const SeverityLevelsConfig = ({
             <div key={index} className="level-row">
               <div className="col-level">
                 <span className="level-badge">{level.level}</span>
+              </div>
+              <div className="col-score">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={level.score !== undefined ? level.score : level.level}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || (/^\d+$/.test(value) && parseInt(value) >= 0 && parseInt(value) <= 100)) {
+                      updateLevel(index, 'score', value === '' ? '' : parseInt(value));
+                    }
+                  }}
+                  onKeyPress={(e) => {
+                    // Allow only digits and control keys
+                    if (!/[0-9]/.test(e.key) &&
+                        e.key !== 'Tab' &&
+                        e.key !== 'Escape' &&
+                        e.key !== 'Enter' &&
+                        !e.key.includes('Arrow')) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onPaste={(e) => {
+                    // Prevent pasting non-numeric content
+                    const paste = e.clipboardData.getData('text');
+                    if (!/^\d*$/.test(paste)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="Баллы"
+                  className="level-input"
+                />
               </div>
               <div className="col-name">
                 <input
