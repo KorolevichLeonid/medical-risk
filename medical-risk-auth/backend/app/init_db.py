@@ -1,17 +1,90 @@
 """
 Database initialization script
 """
+import json
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 from .database import SessionLocal, engine
 from .models.user import User, UserRole
 from .models.project import Project, ProjectMember, ProjectVersion, Permission, RolePermission
 from .models.risk_analysis import RiskAnalysis, RiskFactor
+
+# Default severity levels (5 levels)
+DEFAULT_SEVERITY_LEVELS = [
+    {
+        "level": 1,
+        "name": "Незначительный",
+        "description": "Приводит к неудобству или временному дискомфорту"
+    },
+    {
+        "level": 2,
+        "name": "Незначительный/Легкий",
+        "description": "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства"
+    },
+    {
+        "level": 3,
+        "name": "Серьезный/Значительный",
+        "description": "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства"
+    },
+    {
+        "level": 4,
+        "name": "Критический",
+        "description": "Приводит к постоянному нарушению или необратимому повреждению"
+    },
+    {
+        "level": 5,
+        "name": "Катастрофический/Фатальный",
+        "description": "Приводит к смерти"
+    }
+]
+
+DEFAULT_RISK_THRESHOLD = 10
 def create_tables():
     """Create all database tables"""
     from .models import user, project, risk_analysis
     user.Base.metadata.create_all(bind=engine)
     project.Base.metadata.create_all(bind=engine)
     risk_analysis.Base.metadata.create_all(bind=engine)
+
+
+def ensure_project_severity_columns():
+    """Ensure severity_levels and risk_threshold exist and have defaults."""
+    inspector = inspect(engine)
+    if "projects" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("projects")}
+    needs_severity = "severity_levels" not in columns
+    needs_threshold = "risk_threshold" not in columns
+
+    if not (needs_severity or needs_threshold):
+        return
+
+    default_severity_json = json.dumps(DEFAULT_SEVERITY_LEVELS, ensure_ascii=False)
+
+    with engine.begin() as conn:
+        if engine.url.drivername.startswith("sqlite"):
+            if needs_severity:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN severity_levels TEXT"))
+            if needs_threshold:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN risk_threshold INTEGER DEFAULT 10"))
+        else:
+            if needs_severity:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS severity_levels TEXT"))
+            if needs_threshold:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS risk_threshold INTEGER DEFAULT 10"))
+
+        conn.execute(
+            text(
+                """
+                UPDATE projects
+                SET severity_levels = :severity,
+                    risk_threshold = COALESCE(risk_threshold, :risk_threshold)
+                WHERE severity_levels IS NULL OR severity_levels = ''
+                """
+            ),
+            {"severity": default_severity_json, "risk_threshold": DEFAULT_RISK_THRESHOLD},
+        )
 
 
 def create_admin_user():
@@ -37,6 +110,10 @@ def init_database():
     # Create tables
     create_tables()
     print("[+] Database tables created")
+
+    # Ensure new columns exist for severity configuration
+    ensure_project_severity_columns()
+    print("[+] Project severity configuration ensured")
 
     # Initialize permissions
     import sys

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from .database import engine, get_db
+from .init_db import ensure_project_severity_columns
 from .models import user, project, risk_analysis
 from .models import changelog as changelog_model
 from .models import document as document_model
@@ -53,6 +54,12 @@ app.include_router(permissions.router, prefix="/api", tags=["permissions"])
 app.include_router(changelog.router)
 app.include_router(admin_auth.router, tags=["admin"])
 app.include_router(documents.router, tags=["documents"])
+
+
+@app.on_event("startup")
+def startup_migrations():
+    """Ensure new columns exist when running under uvicorn."""
+    ensure_project_severity_columns()
 
 @app.get("/")
 async def root():
