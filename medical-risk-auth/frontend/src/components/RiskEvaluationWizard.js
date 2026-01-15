@@ -18,6 +18,7 @@ const RiskEvaluationWizard = ({
   extraActionsLeft = null,
   extraActionsRight = null,
   currentEvaluation = null, // {isAcceptable, comment}
+  centerButtons = false,
 }) => {
   const isFirstEvaluation = evaluationType === 'first';
   const riskScore = isFirstEvaluation ? risk.risk_score : risk.residual_risk_score;
@@ -44,7 +45,7 @@ const RiskEvaluationWizard = ({
   const validate = () => {
     const newErrors = {};
     if (!isAcceptable && !comment.trim()) {
-      newErrors.comment = 'Комментарий обязателен для недопустимого риска';
+      newErrors.comment = '';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -110,6 +111,11 @@ const RiskEvaluationWizard = ({
             {isAcceptable ? 'Допустимый' : 'Не допустимый'}
           </span>
         </div>
+        {!isAcceptable && !comment.trim() && (
+          <div className="comment-required-alert">
+            ⚠️ Для недопустимого риска обязательно требуется комментарий!
+          </div>
+        )}
       </div>
 
       <div className="comment-section">
@@ -126,21 +132,34 @@ const RiskEvaluationWizard = ({
         {errors.comment && <div className="error-message">{errors.comment}</div>}
       </div>
 
-      <div className="wizard-actions simple-actions">
-        <div className="wizard-actions-left">
-          <button type="button" className="bre-btn bre-btn-success" onClick={handleSave}>
-            Сохранить риск
-          </button>
-          {showCancel && (
-            <button type="button" className="bre-btn bre-btn-secondary" onClick={handleCancel}>
-              Отменить изменения
+      <div className={`wizard-actions simple-actions ${centerButtons ? 'centered' : ''}`}>
+        {centerButtons ? (
+          <div className="wizard-actions-center">
+            <button type="button" className="bre-btn bre-btn-success" onClick={handleSave}>
+              Сохранить риск
             </button>
-          )}
-          {extraActionsLeft}
-        </div>
-        <div className="wizard-actions-right">
-          {extraActionsRight}
-        </div>
+            <button type="button" className="bre-btn bre-btn-secondary" onClick={handleCancel}>
+              ↺ Сбросить изменения риска
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="wizard-actions-left">
+              <button type="button" className="bre-btn bre-btn-success" onClick={handleSave}>
+                Сохранить риск
+              </button>
+              {showCancel && (
+                <button type="button" className="bre-btn bre-btn-secondary" onClick={handleCancel}>
+                  Отменить изменения
+                </button>
+              )}
+              {extraActionsLeft}
+            </div>
+            <div className="wizard-actions-right">
+              {extraActionsRight}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
