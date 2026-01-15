@@ -90,19 +90,11 @@ const SeverityLevelsConfig = ({
     }));
     setLevels(reindexedLevels);
 
-    // Проверяем и корректируем порог риска если нужно
-    const newMaxRisk = Math.max(...reindexedLevels.map(l => l.level)) ** 2;
-    let newThreshold = threshold;
-    if (threshold > newMaxRisk) {
-      newThreshold = newMaxRisk;
-      setThreshold(newMaxRisk);
-    }
-    
     // Уведомляем родителя об изменении
     if (onChange) {
       onChange({
         severity_levels: reindexedLevels,
-        risk_threshold: newThreshold
+        risk_threshold: threshold
       });
     }
   };
@@ -128,7 +120,6 @@ const SeverityLevelsConfig = ({
   // Изменение порогового значения
   const handleThresholdChange = (value) => {
     const numValue = parseInt(value);
-    const maxRisk = getMaxRiskValue();
 
     let newThreshold;
     if (isNaN(numValue)) {
@@ -137,14 +128,11 @@ const SeverityLevelsConfig = ({
     } else if (numValue < 1) {
       newThreshold = 1;
       setThreshold(1);
-    } else if (numValue > maxRisk) {
-      newThreshold = maxRisk;
-      setThreshold(maxRisk);
     } else {
       newThreshold = numValue;
       setThreshold(numValue);
     }
-    
+
     // Уведомляем родителя об изменении
     if (onChange && newThreshold !== '') {
       onChange({
@@ -268,36 +256,32 @@ const SeverityLevelsConfig = ({
               id="risk-threshold"
               type="number"
               min="1"
-              max={maxRiskValue}
               value={threshold}
               onChange={(e) => handleThresholdChange(e.target.value)}
               className="threshold-input"
             />
             <span className="threshold-range">
-              (от 1 до {maxRiskValue})
             </span>
           </div>
         </div>
 
         <div className="threshold-info">
           <div className="info-box">
-            <strong>ℹ️ Пояснение:</strong> Максимальное значение риска рассчитывается как квадрат максимального уровня тяжести.
-            <br />
-            При текущих настройках: максимальный уровень = <strong>{levels.length > 0 ? Math.max(...levels.map(l => l.level)) : 0}</strong>, 
-            максимальный риск = <strong>{maxRiskValue}</strong>
+            <strong>ℹ️ Пояснение:</strong> Вы можете установить любое пороговое значение риска по вашему усмотрению.
+            Значение по умолчанию - 10. Риск считается недопустимым, если его уровень превышает или равен указанному порогу.
           </div>
 
           <div className="risk-examples">
             <div className="example">
               <span className="example-label">Пример допустимого риска:</span>
               <span className="example-value acceptable">
-                Тяжесть: 2 × Вероятность: 2 = Риск: 4 {4 < threshold && '✓ допустимый'}
+                Тяжесть: 2 × Вероятность: 1 = Риск: 2 {threshold > 2 && '✓ допустимый'}
               </span>
             </div>
             <div className="example">
               <span className="example-label">Пример недопустимого риска:</span>
               <span className="example-value unacceptable">
-                Тяжесть: 5 × Вероятность: 5 = Риск: 25 {25 >= threshold && '✗ недопустимый'}
+                Тяжесть: 5 × Вероятность: 5 = Риск: 25 {threshold <= 25 && threshold > 1 && '✗ недопустимый'}
               </span>
             </div>
           </div>
