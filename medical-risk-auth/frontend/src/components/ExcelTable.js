@@ -914,24 +914,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   }, [severityLevels]);
 
   const handleCellChange = (rowIndex, columnKey, value) => {
-    // Валидация для столбцов с ограничением 1..maxSeverityLevel
+    // Валидация для столбцов - только цифры, без ограничения диапазона
     if (columnKey === 'severity_score' || columnKey === 'probability_score' ||
         columnKey === 'residual_risk_level' || columnKey === 'residual_probability') {
       // Разрешаем только цифры
       const numericValue = value.replace(/[^0-9]/g, '');
-
-      // Ограничиваем диапазон 1..maxSeverityLevel (пустое значение разрешено для очистки)
-      const numValue = parseInt(numericValue);
-      if (numericValue !== '' && (isNaN(numValue) || numValue < 1 || numValue > maxSeverityLevel)) {
-        let fieldName = '';
-        if (columnKey === 'severity_score') fieldName = 'Тяжесть вреда';
-        else if (columnKey === 'probability_score') fieldName = 'Вероятность причинения вреда';
-        else if (columnKey === 'residual_risk_level') fieldName = 'Тяжесть вреда (контроль риска)';
-        else if (columnKey === 'residual_probability') fieldName = 'Вероятность причинения вреда (контроль риска)';
-
-        alert(`Значение для "${fieldName}" должно быть числом от 1 до ${maxSeverityLevel}`);
-        return;
-      }
 
       // Если значение пустое, устанавливаем пустую строку
       if (numericValue === '') {
@@ -2347,23 +2334,20 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         <BatchRiskEvaluation
           risks={risksToEvaluate}
           acceptableRiskLevel={acceptableRiskLevel}
-          onComplete={(evaluations, cancelledRiskIndices = []) => {
+          onComplete={async (evaluations, cancelledRiskIndices = []) => {
             // Восстанавливаем данные для отмененных рисков из snapshot (откат изменений)
             restoreDataForCancelledRisks(cancelledRiskIndices);
             // Применяем оценки для НЕ отмененных рисков
             applyEvaluations(evaluations);
-            // Закрываем modal
+            // Сохраняем данные
+            await performSave();
+            // Закрываем modal только после успешного сохранения
             setShowBatchEvaluation(false);
             setRisksToEvaluate([]);
-            // Сохраняем данные
-            performSave();
           }}
           onCancel={() => {
-            // Восстанавливаем все данные из snapshot (полный откат)
-            if (dataBeforeChanges) {
-              setData(JSON.parse(JSON.stringify(dataBeforeChanges.data)));
-              setCellColors({ ...dataBeforeChanges.cellColors });
-            }
+            // При отмене оценки просто закрываем модальное окно без восстановления данных
+            // Значения в ячейках остаются как есть
             setShowBatchEvaluation(false);
             setRisksToEvaluate([]);
             setSaving(false);

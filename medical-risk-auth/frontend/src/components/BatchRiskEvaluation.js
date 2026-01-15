@@ -39,6 +39,18 @@ const BatchRiskEvaluation = ({ risks, acceptableRiskLevel, onComplete, onCancel 
     const pendingIndices = risks.filter((r) => !evaluations[r.rowIndex]).map((r) => r.rowIndex);
     onComplete(evaluationsArray, pendingIndices);
   };
+
+  // Закрыть и сохранить только завершенные риски
+  const handleCloseAndSaveCompleted = () => {
+    const evaluationsArray = Object.values(evaluations);
+    const pendingIndices = risks.filter((r) => !evaluations[r.rowIndex]).map((r) => r.rowIndex);
+    onComplete(evaluationsArray, pendingIndices);
+  };
+
+  // Сохранить одиночный риск и закрыть
+  const handleSaveSingleRisk = (evaluation) => {
+    onComplete([evaluation], []);
+  };
   
   // Сброс изменений для текущего риска (серый индикатор)
   const resetCurrentRisk = () => {
@@ -83,6 +95,15 @@ const BatchRiskEvaluation = ({ risks, acceptableRiskLevel, onComplete, onCancel 
     <div className="batch-risk-evaluation modal-centered">
       {currentRisk && (
         <div className="batch-modal">
+          {/* Кнопка закрытия для всех случаев */}
+          <button
+            className="batch-modal-close-btn"
+            onClick={risks.length === 1 ? handleCancelAll : handleCloseAndSaveCompleted}
+            title={risks.length === 1 ? "Закрыть без сохранения" : "Закрыть и сохранить завершенные риски"}
+          >
+            ×
+          </button>
+
           <div className="indicators-top">
             <h4>Оценка рисков ({Object.keys(evaluations).length} из {risks.length})</h4>
             <p className="indicators-hint">
@@ -124,25 +145,19 @@ const BatchRiskEvaluation = ({ risks, acceptableRiskLevel, onComplete, onCancel 
                 risk={currentRisk}
                 evaluationType={currentRisk.evaluationType}
                 acceptableRiskLevel={acceptableRiskLevel}
-                onSaveRisk={handleRiskSaved}
+                onSaveRisk={risks.length === 1 ? handleSaveSingleRisk : handleRiskSaved}
                 currentEvaluation={evaluations[currentRisk.rowIndex]}
                 extraActionsLeft={
-                  <>
-                    <button className="bre-btn bre-btn-secondary" onClick={resetCurrentRisk}>
-                      ↺ Сбросить изменения риска
-                    </button>
-                  </>
+                  risks.length === 1 ? null : (
+                    <>
+                      <button className="bre-btn bre-btn-secondary" onClick={resetCurrentRisk}>
+                        ↺ Сбросить изменения риска
+                      </button>
+                    </>
+                  )
                 }
-                extraActionsRight={
-                  <button
-                    className="bre-btn bre-btn-success"
-                    onClick={handleSaveAll}
-                    title="Сохранить все зеленые риски. Серые будут восстановлены."
-                  >
-                    💾 Сохранить все риски
-                    {Object.keys(evaluations).length > 0 && ` (${Object.keys(evaluations).length})`}
-                  </button>
-                }
+                extraActionsRight={null}
+                centerButtons={risks.length === 1}
               />
             </div>
           </div>
