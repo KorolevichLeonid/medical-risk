@@ -28,14 +28,14 @@
 }
 
 .logo-box {
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   background-color: #61DAFB;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 16px;
 }
 
 .logo-box svg {
@@ -45,7 +45,7 @@
 }
 
 .logo-text {
-  font-size: 18px;
+  font-size: 40px;
   font-weight: 600;
   color: #61DAFB;
 }
@@ -148,11 +148,11 @@
 .card-logo .logo-box {
   width: 30px;
   height: 30px;
-  padding: 6px;
+  padding: 12px;
 }
 
 .card-logo .logo-text {
-  font-size: 14px;
+  font-size: 20px;
 }
 
 .card-title {
@@ -312,5 +312,3 @@
   }
 
 }
-
-

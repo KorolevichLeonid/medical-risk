@@ -21,18 +21,23 @@ const ProductsPage = () => {
             </div>
             <span className="logo-text">SCICYBERLAB</span>
           </div>
-         
-            
+
+          <div className="nav-left">
+            <Link to="/products" className="nav-btn">Products</Link>
+            <Link to="/" className="nav-btn">About us</Link>
+            <Link to="/" className="nav-btn">Contacts</Link>
+          </div>
         </div>
+      </div>
+
+      {/* Centered Title Section */}
+      <div className={`products-title-section centered ${isAnimated ? 'animate' : ''}`}>
+        <h1 className="products-title">Buy a subscription</h1>
+        <p className="products-subtitle">suggested options.</p>
       </div>
 
       {/* Main Content */}
       <div className="products-main">
-        <div className={`products-title-section ${isAnimated ? 'animate' : ''}`}>
-          <h1 className="products-title">Buy a subscription</h1>
-          <p className="products-subtitle">suggested options.</p>
-        </div>
-
         <div className={`products-cards ${isAnimated ? 'animate' : ''}`}>
           {/* Standard Card */}
           <div className="product-card">
@@ -45,7 +50,7 @@ const ProductsPage = () => {
               </div>
               <h2 className="card-title">Standard</h2>
             </div>
-            
+
             <div className="card-description">
               <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
             </div>
@@ -90,7 +95,7 @@ const ProductsPage = () => {
               </div>
               <h2 className="card-title">Premium</h2>
             </div>
-            
+
             <div className="card-description">
               <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
             </div>

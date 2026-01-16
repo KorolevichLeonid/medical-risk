@@ -6,6 +6,7 @@ import './HomePage.css';
 
 const HomePage = () => {
   const [showReturn, setShowReturn] = useState(false);
+  const [showSignin, setShowSignin] = useState(true);
   const [secondScreenAnimated, setSecondScreenAnimated] = useState(false);
   const [firstScreenAnimated, setFirstScreenAnimated] = useState(false);
   const [firstScreenVisible, setFirstScreenVisible] = useState(true);
@@ -24,7 +25,11 @@ const HomePage = () => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset;
       setShowReturn(scrollTop > 100);
-      
+
+      // Проверяем, близко ли к нижнему краю страницы
+      const isNearBottom = scrollTop + window.innerHeight >= document.body.scrollHeight - 100;
+      setShowSignin(!isNearBottom);
+
       // Проверяем видимость первого экрана
       const firstScreen = document.querySelector('.first-screen');
       if (firstScreen) {
@@ -33,7 +38,7 @@ const HomePage = () => {
         setFirstScreenVisible(isVisible);
         setFirstScreenAnimated(isVisible);
       }
-      
+
       // Проверяем видимость второго экрана
       const secondScreen = document.querySelector('.second-screen');
       if (secondScreen) {
@@ -93,22 +98,25 @@ const HomePage = () => {
           <div className="home-content">
             <div className="logo-section">
               <div className="logo">
-                <div className="logo-icon">
+                <div className="logo-box">
                   <Logo />
                 </div>
-                <h1>Medical Risk Analysis</h1>
+                <span className="logo-text">SCICYBERLAB</span>
               </div>
             </div>
 
             <div className={`main-content ${firstScreenAnimated ? 'animate' : ''}`}>
               <h2 className="main-title">
-                Lower Risk<br />
-                For<br />
-                Medical Products
+                Risk analysis<br />
+                for<br />
+                medical devices
               </h2>
-              
+
               <p className="main-description">
-                Lorem ipsum dolor sit amet consectetur. Semper urna ante et erat. Vulputate vel bibendum quisque libero eget. Pretium ipsum imperdiet sit proin metus. Ut ultrices at justo tincidunt purus elementum maecenas fermentum. Aliquam est feugiat egestas pellentesque. Malesuada facilisis ac nulla pulvinar quis leo magnis. Scelerisque massa nunc viverra accumsan nam.
+                SciCyberLab Standardization FZ-LLC - employs professionals with extensive experience in international standardization and certification, including ISO standards.<br /><br />
+                We work in accordance with the most popular international standards in such industries as medicine, food safety, health, ecology, pharmaceuticals, information technology and artificial intelligence.<br /><br />
+                The key advantage of our company is auditors who have conducted inspections of enterprises around the world. Their practical experience allows us not only to consult, but to ensure the real readiness of organizations for international inspections and certification in terms of risk assessment.<br /><br />
+                Based on many years of experience, we have come to the conclusion that most manufacturers of medical devices face serious difficulties in assessing risks and hazards, especially at the design and launch stages of products on the market. Additional difficulties are created by the legislative requirements of the EU, USA and CIS countries - especially in terms of compliance with ISO 14971, MDR, FDA and other regulatory documents.
               </p>
             </div>
 
@@ -126,6 +134,13 @@ const HomePage = () => {
                 <div className="corner corner-bottom-right"></div>
               </div>
             </div>
+            <div className={`image-text ${firstScreenAnimated ? 'animate' : ''}`}>
+              <p>
+                To simplify the risk assessment process, structure the work in this area and ensure compliance with international requirements, we have developed specialized software. It allows you to significantly simplify risk analysis, takes into account current regulatory requirements and generates final documents that fully comply with ISO 14971, MDR, FDA and other applicable international standards.<br /><br />
+                Our mission is to systematically enhance the quality and safety of our clients' products - making the process accessible, transparent, and technologically advanced.<br /><br />
+                Try our application with a free 3-day version and see how much easier your work can be when assessing risks.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -136,11 +151,9 @@ const HomePage = () => {
           <div className={`why-us-content ${secondScreenAnimated ? 'animate' : ''}`}>
             <h2 className="why-us-title">Why Us?</h2>
             <p className="why-us-text">
-              Lorem ipsum dolor sit amet consectetur. Pellentesque aliquet etiam lacus natoque hendrerit eu. Massa consectetur amet commodo praesent massa. In ut vitae commodo venenatis rhoncus justo luctus bibendum nulla. Orci vel elit volutpat id mi ornare amet molestie quis. Integer tellus lectus tempor cras vestibulum congue. Sagittis tellus neque integer vel suspendisse urna egestas.
+              Not sure where to begin with risk analysis? Worried about getting lost in regulatory requirements? Our tool guides you step by step - helping you form the right team, assign roles, input the necessary data, and generate documentation that fully complies with ISO 14971, MDR, FDA, and other relevant standards.
               <br /><br />
-              Venenatis risus imperdiet nibh vitae at ultrices. Ornare vitae pellentesque egestas sed dictum dui sit lacinia. Massa tristique quis sagittis neque et. Laoreet donec id platea id massa adipiscing. Etiam nec eget lacus sed sagittis. Ipsum sapien tristique ipsum nec neque at integer donec.
-              <br /><br />
-              Tempor etiam a sodales enim maecenas ut. Et gravida habitant facilisis id facilisi nec sed faucibus massa. Faucibus vestibulum viverra nec tempus quam. Diam lobortis enim in condimentum ipsum. Vitae ultricies eu arcu donec fermentum enim. Velit volutpat diam viverra ac sed in felis arcu neque. Neque tellus dolor egestas non sed in. Lorem nam feugiat arcu amet. Donec at tempus in augue orci. Ut vitae nibh rhoncus turpis rhoncus pretium. Nunc elementum vulputate hendrerit egestas feugiat nisl. Sem ac feugiat felis elementum auctor scelerisque amet adipiscing. Metus maecenas pellentesque sed vulputate lectus tellus. Ultrices et libero scelerisque est tortor auctor amet leo eget. Vitae sed mattis ut volutpat odio eros potenti pulvinar.
+              Join the platform already trusted by medical device manufacturers around the world - and simplify risk analysis from product concept to market launch. Risk analysis doesn’t have to be complicated. Our tool guides you step by step - helping you build your team, input the right data, and generate documentation that complies with ISO 14971, MDR, FDA, and other international standards. Join us and simplify the process.
             </p>
           </div>
 
@@ -156,6 +169,15 @@ const HomePage = () => {
       <div className="third-screen">
       </div>
 
+      {/* Footer */}
+      <footer className="home-footer">
+        <div className="footer-content">
+          <p>&copy; 2025 SciCyberLab Standardization FZ-LLC</p>
+          <p>CWEP0774, Compass Building, Al Shohada Road, AL Hamra Industrial Zone-FZ, Ras Al Khaimah, United Arab Emirates</p>
+          <p>info@scicyberlab.com</p>
+        </div>
+      </footer>
+
       {/* Плавающие элементы */}
 
       <button 
@@ -165,9 +187,9 @@ const HomePage = () => {
         ↑
       </button>
 
-      <Link 
-        to="/login" 
-        className="floating-signin"
+      <Link
+        to="/login"
+        className={`floating-signin ${showSignin ? 'visible' : ''}`}
       >
         Sign In
       </Link>
