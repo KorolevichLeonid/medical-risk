@@ -69,6 +69,9 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [severityLevels, setSeverityLevels] = useState([
     { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 }
   ]);
+  const [probabilityLevels, setProbabilityLevels] = useState([
+    { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }
+  ]);
 
   // Флаг для отслеживания первоначальной загрузки
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -126,6 +129,40 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
            customLifecycleStages.includes(activeSheet);
   };
 
+  const getScoreValues = (levels = []) => {
+    const values = levels
+      .map((level) => {
+        const score = Number(level?.score);
+        if (Number.isFinite(score)) return score;
+        const fallback = Number(level?.level);
+        return Number.isFinite(fallback) ? fallback : null;
+      })
+      .filter((value) => value !== null);
+    return [...new Set(values)].sort((a, b) => a - b);
+  };
+
+  const allowedSeverityScores = useMemo(
+    () => getScoreValues(severityLevels),
+    [severityLevels]
+  );
+
+  const allowedProbabilityScores = useMemo(
+    () => getScoreValues(probabilityLevels),
+    [probabilityLevels]
+  );
+
+  const showAllowedScoresAlert = (columnKey, allowedValues) => {
+    if (!allowedValues.length) return;
+    const labelMap = {
+      severity_score: 'Тяжесть вреда',
+      residual_risk_level: 'Тяжесть вреда',
+      probability_score: 'Вероятность',
+      residual_probability: 'Вероятность'
+    };
+    const label = labelMap[columnKey] || 'Значения';
+    alert(`Недопустимое значение.\n${label}: допустимые баллы ${allowedValues.join(', ')}`);
+  };
+
   // Проверка, заблокирована ли ячейка для редактирования
   const isCellLocked = (rowIndex, columnKey) => {
     // Получаем данные строки
@@ -133,7 +170,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     if (!row) return false;
 
     // Эти поля всегда только для автоматического расчета
-    if (['risk_level_1', 'risk_level_2', 'residual_risk_score'].includes(columnKey)) {
+    if (['risk_level_1', 'risk_level_2', 'risk_score', 'residual_risk_score'].includes(columnKey)) {
       return true;
     }
 
@@ -773,7 +810,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         setLifecycleStages(roleData.lifecycle_stages || []);
         setCustomLifecycleStages(roleData.custom_lifecycle_stages || []);
 
-        // Получаем информацию о проекте для получения порога риска и уровней тяжести
+        // Получаем информацию о проекте для получения порога риска и уровней
         try {
           const projectResponse = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
             headers: {
@@ -793,11 +830,20 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                 { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 }
               ]);
             }
+            // Уровни вероятности: если нет, дефолт 1..4
+            if (projectData.probability_levels && projectData.probability_levels.length > 0) {
+              setProbabilityLevels(projectData.probability_levels);
+            } else {
+              setProbabilityLevels([
+                { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }
+              ]);
+            }
           }
         } catch (error) {
           console.error('Failed to load project acceptable risk level:', error);
           setAcceptableRiskLevel(10); // Default value
           setSeverityLevels([{ level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 }]);
+          setProbabilityLevels([{ level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }]);
         }
       } else if (response.status === 401) {
         console.warn('Ошибка авторизации - токен недействителен');
@@ -925,6 +971,16 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         value = '';
       } else {
         value = numericValue;
+      }
+
+      if (value !== '') {
+        const intValue = parseInt(value, 10);
+        const usesSeverity = ['severity_score', 'residual_risk_level'].includes(columnKey);
+        const allowedValues = usesSeverity ? allowedSeverityScores : allowedProbabilityScores;
+        if (allowedValues.length && !allowedValues.includes(intValue)) {
+          showAllowedScoresAlert(columnKey, allowedValues);
+          return;
+        }
       }
     }
 
@@ -1549,7 +1605,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Проверить, может ли пользователь редактировать данный столбец
   const canEditColumn = (columnKey) => {
-    if (['risk_level_1', 'risk_level_2', 'residual_risk_score'].includes(columnKey)) {
+    if (['risk_level_1', 'risk_level_2', 'risk_score', 'residual_risk_score'].includes(columnKey)) {
       return false;
     }
 
@@ -1781,6 +1837,16 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const canEdit = canEditColumn(column.key);
     const cellStyle = getCellStyle(column.key, cellColor);
     const isLocked = isCellLocked(rowIndex, column.key);
+    const handleCellClick = (e) => {
+      e.stopPropagation();
+      if (isLocked) {
+        return;
+      }
+      if (!isEditing && canEdit) {
+        handleCellDoubleClick(rowIndex, column.key);
+      }
+      setSelectedCell({ rowIndex, columnKey: column.key });
+    };
 
     // Автоматическое определение уровня риска для столбцов risk_level_1 и risk_level_2
     if ((column.key === 'risk_level_1' || column.key === 'risk_level_2') && !isEditing) {
@@ -1823,8 +1889,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           height: '100%',
           width: '100%',
           position: 'relative',
-          backgroundColor: isLocked ? '#f0f0f0' : 'transparent'
+          backgroundColor: isLocked ? '#f0f0f0' : 'transparent',
+          cursor: isLocked ? 'not-allowed' : canEdit ? 'text' : 'not-allowed'
         }}
+        onClick={handleCellClick}
       >
         {isEditing && canEdit && !isLocked ? (
           column.key === 'new_risks' ? (
@@ -1940,21 +2008,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
               ...cellStyle,
               backgroundColor: 'transparent',
               position: 'relative',
-              zIndex: 2,
-              cursor: isLocked ? 'not-allowed' : 'pointer'
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              // Не позволяем редактировать заблокированные ячейки
-              if (isLocked) {
-                return;
-              }
-              // Одинарный клик для редактирования только если пользователь может редактировать
-              if (!isEditing && canEdit) {
-                handleCellDoubleClick(rowIndex, column.key);
-              }
-              // Всегда устанавливаем выбранную ячейку для палитры цветов
-              setSelectedCell({ rowIndex, columnKey: column.key });
+              zIndex: 2
             }}
             title={isLocked ? (row.new_risks && row.new_risks.startsWith('нет') && column.key === 'new_risks' ? 'Выбрано "нет" - редактирование заблокировано' : 'Эта ячейка управляется из Risk Analysis') : ''}
           >

@@ -555,6 +555,81 @@ const calculateActiveHazardCategories = (hazardQuestions, customHazards = []) =>
   return Array.from(activeCategories);
 };
 
+const getNumericScore = (level) => {
+  const score = Number(level?.score);
+  if (!Number.isNaN(score)) {
+    return score;
+  }
+  const levelValue = Number(level?.level);
+  return Number.isNaN(levelValue) ? 0 : levelValue;
+};
+
+const normalizeLevelsWithScores = (levels = []) => {
+  let previousScore = null;
+  return levels.map((level, index) => {
+    const levelNumber = Number(level?.level) || index + 1;
+    let score = getNumericScore(level);
+    if (!Number.isFinite(score) || score <= 0) {
+      score = levelNumber;
+    }
+    if (previousScore !== null && score <= previousScore) {
+      score = previousScore + 1;
+    }
+    previousScore = score;
+    return {
+      ...level,
+      level: levelNumber,
+      score
+    };
+  });
+};
+
+  const getRiskThresholdRange = (severityLevels = [], probabilityLevels = []) => {
+    const severityScores = severityLevels.map(getNumericScore).filter(Number.isFinite);
+    const probabilityScores = probabilityLevels.map(getNumericScore).filter(Number.isFinite);
+
+  const minSeverity = severityScores.length ? Math.min(...severityScores) : 1;
+  const maxSeverity = severityScores.length ? Math.max(...severityScores) : 1;
+  const minProbability = probabilityScores.length ? Math.min(...probabilityScores) : 1;
+  const maxProbability = probabilityScores.length ? Math.max(...probabilityScores) : 1;
+
+  return {
+    min: minSeverity * minProbability,
+    max: maxSeverity * maxProbability
+  };
+};
+
+  const clampRiskThreshold = (threshold, severityLevels, probabilityLevels) => {
+    const { min, max } = getRiskThresholdRange(severityLevels, probabilityLevels);
+    if (!Number.isFinite(threshold)) return min;
+    return Math.min(Math.max(threshold, min), max);
+  };
+
+  const getScoreValue = (level) => {
+    if (level?.score === '' || level?.score === null || level?.score === undefined) {
+      return NaN;
+    }
+    const score = Number(level?.score);
+    return Number.isFinite(score) ? score : NaN;
+  };
+
+  const validateLevelScores = (levels = [], label) => {
+    const missingScores = levels.some((level) => !Number.isFinite(getScoreValue(level)));
+    if (missingScores) {
+      return `Заполните баллы для всех уровней (${label}).`;
+    }
+
+    for (let i = 1; i < levels.length; i += 1) {
+      const previous = getScoreValue(levels[i - 1]);
+      const current = getScoreValue(levels[i]);
+      if (current <= previous) {
+        return `Баллы должны возрастать по уровню (${label}).`;
+      }
+    }
+
+    return null;
+  };
+
 const ProjectForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -581,7 +656,6 @@ const ProjectForm = () => {
     standards: '',
 
     // Назначение команды
-    projectLead: '',
     teamMembers: [],
 
     // Уровень риска (доп./не доп.)
@@ -592,25 +666,25 @@ const ProjectForm = () => {
 
     // Уровни тяжести последствий
     severityLevels: [
-      { level: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
-      { level: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
-      { level: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
-      { level: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
-      { level: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
+      { level: 1, score: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
+      { level: 2, score: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
+      { level: 3, score: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
+      { level: 4, score: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
+      { level: 5, score: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
     ],
     // Уровни вероятностей последствий
     probabilityLevels: [
-      { level: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
-      { level: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
-      { level: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
-      { level: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
+      { level: 1, score: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
+      { level: 2, score: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
+      { level: 3, score: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
+      { level: 4, score: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
     ],
     riskThreshold: 10,
 
     // Этапы жизненного цикла
     lifecycleStages: [],
     customLifecycleStages: [],
-    customHazards: [''],
+    customHazards: [],
 
     // Вопросы об опасностях и вкладки
     hazardQuestions: {
@@ -693,11 +767,14 @@ const ProjectForm = () => {
 
   useEffect(() => {
     loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
     loadAvailableUsers();
     if (isEditMode) {
       loadProjectData();
     }
-  }, [isEditMode]);
+  }, [isEditMode, currentUser]);
 
   // Separate useEffect for logging user data only when we have a valid project ID
   useEffect(() => {
@@ -769,6 +846,7 @@ const ProjectForm = () => {
         // Преобразуем в формат для селекта
         const formattedUsers = usersData
           .filter(user => user.is_active) // Только активные пользователи
+          .filter(user => !currentUser || user.id !== currentUser.id)
           .map(user => ({
             id: user.id,
             name: `${user.first_name} ${user.last_name}`.trim() || user.email,
@@ -813,7 +891,6 @@ const ProjectForm = () => {
           }
         });
 
-        let projectLead = '';
         let teamMembers = [];
 
         if (membersResponse.ok) {
@@ -822,11 +899,6 @@ const ProjectForm = () => {
             .filter(member => member.role !== 'owner')
             .map(member => member.user_id.toString());
 
-          // Устанавливаем руководителя проекта (первый член или владелец)
-          const leadMember = membersData.find(member => member.role === 'owner') || membersData[0];
-          if (leadMember) {
-            projectLead = leadMember.user_id.toString();
-          }
         }
 
         const loadedData = {
@@ -843,23 +915,24 @@ const ProjectForm = () => {
           technicalSpecs: projectData.technical_specs || '',
           regulatoryRequirements: projectData.regulatory_requirements || '',
           standards: projectData.standards || '',
-          projectLead: projectLead,
-          teamMembers: teamMembers,
+          teamMembers: currentUser
+            ? teamMembers.filter(userId => userId !== currentUser.id.toString())
+            : teamMembers,
           acceptableRiskLevel: projectData.acceptable_risk_level || 10,
           riskMatrix: projectData.risk_matrix || null,
-          severityLevels: projectData.severity_levels || [
-            { level: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
-            { level: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
-            { level: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
-            { level: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
-            { level: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
-          ],
-          probabilityLevels: projectData.probability_levels || [
-            { level: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
-            { level: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
-            { level: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
-            { level: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
-          ],
+          severityLevels: normalizeLevelsWithScores(projectData.severity_levels || [
+            { level: 1, score: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
+            { level: 2, score: 2, name: "Незначительный/Легкий", description: "Приводит к временному повреждению или нарушению, не требующему медицинского вмешательства" },
+            { level: 3, score: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
+            { level: 4, score: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
+            { level: 5, score: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
+          ]),
+          probabilityLevels: normalizeLevelsWithScores(projectData.probability_levels || [
+            { level: 1, score: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
+            { level: 2, score: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
+            { level: 3, score: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
+            { level: 4, score: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
+          ]),
           riskThreshold: projectData.risk_threshold || 10,
           lifecycleStages: projectData.lifecycle_stages || [],
           customLifecycleStages: projectData.custom_lifecycle_stages || [],
@@ -923,7 +996,9 @@ const ProjectForm = () => {
             }
             return {};
           })(),
-          customHazards: projectData.custom_hazard ? projectData.custom_hazard.split('\n').map(line => line.trim()).filter(line => line) : [''],
+          customHazards: projectData.custom_hazard
+            ? projectData.custom_hazard.split('\n').map(line => line.trim()).filter(line => line)
+            : [],
           activeHazardCategories: (() => {
             if (!projectData.active_hazard_categories) return [];
             if (Array.isArray(projectData.active_hazard_categories)) return projectData.active_hazard_categories;
@@ -947,7 +1022,15 @@ const ProjectForm = () => {
           loadedData.customLifecycleStages = [''];
         }
 
-        setFormData(loadedData);
+        const normalizedThreshold = clampRiskThreshold(
+          loadedData.riskThreshold,
+          loadedData.severityLevels,
+          loadedData.probabilityLevels
+        );
+        setFormData({
+          ...loadedData,
+          riskThreshold: normalizedThreshold
+        });
         console.log('Form data set successfully');
       } else {
         const errorText = await response.text();
@@ -1013,6 +1096,18 @@ const ProjectForm = () => {
         : prev.teamMembers.filter(id => id !== userId)
     }));
   };
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const currentUserId = currentUser.id?.toString();
+    if (!currentUserId) return;
+    if (formData.teamMembers.includes(currentUserId)) {
+      setFormData(prev => ({
+        ...prev,
+        teamMembers: prev.teamMembers.filter(id => id !== currentUserId)
+      }));
+    }
+  }, [currentUser, formData.teamMembers]);
 
   // Handlers for dynamic custom fields
   const addCustomLifecycleStage = () => {
@@ -1210,6 +1305,16 @@ const ProjectForm = () => {
         errors.push('Назначение устройства');
       }
 
+      const severityScoreError = validateLevelScores(formData.severityLevels, 'уровни тяжести');
+      if (severityScoreError) {
+        errors.push(severityScoreError);
+      }
+
+      const probabilityScoreError = validateLevelScores(formData.probabilityLevels, 'уровни вероятностей');
+      if (probabilityScoreError) {
+        errors.push(probabilityScoreError);
+      }
+
       if (errors.length > 0) {
         throw new Error(`Пожалуйста, заполните обязательные поля: ${errors.join(', ')}`);
       }
@@ -1226,6 +1331,12 @@ const ProjectForm = () => {
       
       console.log('Selected Hazard Categories:', selectedHazardCategories);
       
+      const normalizedThreshold = clampRiskThreshold(
+        parseInt(formData.riskThreshold),
+        formData.severityLevels,
+        formData.probabilityLevels
+      );
+
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -1254,7 +1365,7 @@ const ProjectForm = () => {
           custom_hazard: formData.customHazards.join('\n'),
           severity_levels: formData.severityLevels,
           probability_levels: formData.probabilityLevels,
-          risk_threshold: parseInt(formData.riskThreshold) || 10
+          risk_threshold: normalizedThreshold
         })
       });
 
@@ -1401,6 +1512,11 @@ const ProjectForm = () => {
     clinicalError: 'Опасности клинического применения'
   };
 
+  const riskThresholdRange = getRiskThresholdRange(
+    formData.severityLevels,
+    formData.probabilityLevels
+  );
+
   return (
     <div className="project-form">
       <div className="form-header">
@@ -1426,29 +1542,6 @@ const ProjectForm = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label>Project role</label>
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="form-select"
-            >
-              <option value="doctor">Clinical Evaluation / Doctor - risk management</option>
-              <option value="manager">Top Manager - project and users management</option>
-              <option value="quality_management_representative">Quality Management Representative</option>
-              <option value="product_manager">Product Manager / Quality Manager</option>
-              <option value="risk_assessment_team_leader">Risk Assessment Team Leader</option>
-              <option value="risk_assessment_team_member">Member of the Risk Assessment Team</option>
-            </select>
-            <small className="role-description">
-              {selectedRole === 'doctor' && 'Can view risks and edit risk evaluation table'}
-              {selectedRole === 'manager' && 'Can edit project, manage members and risks'}
-              {selectedRole === 'quality_management_representative' && 'Can view all blocks, create RMF, chat/comment'}
-              {selectedRole === 'product_manager' && 'Can view all blocks, edit source data'}
-              {selectedRole === 'risk_assessment_team_leader' && 'Can view all, edit source/risk data, verify reports, chat'}
-              {selectedRole === 'risk_assessment_team_member' && 'Can view all blocks, edit risk values'}
-            </small>
-          </div>
           <div className="form-group">
             <label htmlFor="description">Описание проекта</label>
             <textarea
@@ -1597,23 +1690,6 @@ const ProjectForm = () => {
           <h2>Назначение команды</h2>
 
           <div className="form-group">
-            <label htmlFor="projectLead">Руководитель проекта</label>
-            <select
-              id="projectLead"
-              name="projectLead"
-              value={formData.projectLead}
-              onChange={handleInputChange}
-            >
-              <option value="">Выберите руководителя проекта</option>
-              {availableUsers.map(user => (
-                <option key={user.id} value={user.id.toString()}>
-                  {user.name} ({user.email})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
             <label>Члены команды</label>
             <div className="team-selection">
                 {availableUsers.map(user => (
@@ -1635,6 +1711,8 @@ const ProjectForm = () => {
           <SeverityLevelsConfig
             severityLevels={formData.severityLevels}
             riskThreshold={formData.riskThreshold}
+            minRiskValue={riskThresholdRange.min}
+            maxRiskValue={riskThresholdRange.max}
             onChange={(data) => {
               setFormData({
                 ...formData,

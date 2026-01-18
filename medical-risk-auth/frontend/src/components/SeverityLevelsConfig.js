@@ -11,6 +11,8 @@ import './SeverityLevelsConfig.css';
 const SeverityLevelsConfig = ({ 
   severityLevels = [], 
   riskThreshold = 10,
+  minRiskValue,
+  maxRiskValue,
   onChange 
 }) => {
   const [levels, setLevels] = useState([]);
@@ -38,12 +40,11 @@ const SeverityLevelsConfig = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Запускается только при первом рендере
 
-  // Вычисление максимального значения риска (макс_уровень²)
-  const getMaxRiskValue = () => {
-    if (levels.length === 0) return 1;
-    const maxLevel = Math.max(...levels.map(l => l.level));
-    return maxLevel * maxLevel;
-  };
+  useEffect(() => {
+    if (riskThreshold || riskThreshold === 0) {
+      setThreshold(riskThreshold);
+    }
+  }, [riskThreshold]);
 
   // Добавление нового уровня
   const addLevel = () => {
@@ -51,8 +52,11 @@ const SeverityLevelsConfig = ({
       ? Math.max(...levels.map(l => l.level)) + 1
       : 1;
 
-    // Ensure score is within 0-100 range
-    const newScore = Math.min(100, Math.max(0, newLevel));
+    const lastScore = levels.length > 0 ? parseInt(levels[levels.length - 1]?.score) : 0;
+    const fallbackScore = Number.isFinite(lastScore)
+      ? lastScore
+      : parseInt(levels[levels.length - 1]?.level) || 0;
+    const newScore = fallbackScore + 1;
 
     const newLevels = [
       ...levels,
@@ -121,13 +125,19 @@ const SeverityLevelsConfig = ({
   const handleThresholdChange = (value) => {
     const numValue = parseInt(value);
 
+    const minValue = Number.isFinite(minRiskValue) ? minRiskValue : 1;
+    const maxValue = Number.isFinite(maxRiskValue) ? maxRiskValue : minValue;
+
     let newThreshold;
     if (isNaN(numValue)) {
       newThreshold = '';
       setThreshold('');
-    } else if (numValue < 1) {
-      newThreshold = 1;
-      setThreshold(1);
+    } else if (numValue < minValue) {
+      newThreshold = minValue;
+      setThreshold(minValue);
+    } else if (numValue > maxValue) {
+      newThreshold = maxValue;
+      setThreshold(maxValue);
     } else {
       newThreshold = numValue;
       setThreshold(numValue);
@@ -142,7 +152,8 @@ const SeverityLevelsConfig = ({
     }
   };
 
-  const maxRiskValue = getMaxRiskValue();
+  const minValue = Number.isFinite(minRiskValue) ? minRiskValue : 1;
+  const maxValue = Number.isFinite(maxRiskValue) ? maxRiskValue : minValue;
 
   return (
     <div className="severity-levels-config">
@@ -173,12 +184,11 @@ const SeverityLevelsConfig = ({
               <div className="col-score">
                 <input
                   type="number"
-                  min="0"
-                  max="100"
+                  min="1"
                   value={level.score !== undefined ? level.score : level.level}
                   onChange={(e) => {
                     const value = e.target.value;
-                    if (value === '' || (/^\d+$/.test(value) && parseInt(value) >= 0 && parseInt(value) <= 100)) {
+                    if (value === '' || (/^\d+$/.test(value) && parseInt(value) >= 1)) {
                       updateLevel(index, 'score', value === '' ? '' : parseInt(value));
                     }
                   }}
@@ -255,12 +265,16 @@ const SeverityLevelsConfig = ({
             <input
               id="risk-threshold"
               type="number"
-              min="1"
+              min={minValue}
+              max={maxValue}
               value={threshold}
               onChange={(e) => handleThresholdChange(e.target.value)}
               className="threshold-input"
             />
             <span className="threshold-range">
+              {Number.isFinite(minValue) && Number.isFinite(maxValue)
+                ? `от ${minValue} до ${maxValue}`
+                : ''}
             </span>
           </div>
         </div>

@@ -21,10 +21,10 @@ const ProbabilityLevelsConfig = ({
     } else {
       // Дефолтные уровни вероятности
       setLevels([
-        { level: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
-        { level: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
-        { level: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
-        { level: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
+        { level: 1, score: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
+        { level: 2, score: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
+        { level: 3, score: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
+        { level: 4, score: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
       ]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -36,10 +36,17 @@ const ProbabilityLevelsConfig = ({
       ? Math.max(...levels.map(l => l.level)) + 1
       : 1;
 
+    const lastScore = levels.length > 0 ? parseInt(levels[levels.length - 1]?.score) : 0;
+    const fallbackScore = Number.isFinite(lastScore)
+      ? lastScore
+      : parseInt(levels[levels.length - 1]?.level) || 0;
+    const newScore = fallbackScore + 1;
+
     const newLevels = [
       ...levels,
       {
         level: newLevel,
+        score: newScore,
         name: "",
         description: ""
       }
@@ -110,6 +117,7 @@ const ProbabilityLevelsConfig = ({
         <div className="levels-table probability-levels-table">
           <div className="levels-header">
             <div className="col-level">Уровень</div>
+            <div className="col-score">Баллы</div>
             <div className="col-name">Название</div>
             <div className="col-description">Описание</div>
             <div className="col-actions">Действия</div>
@@ -119,6 +127,36 @@ const ProbabilityLevelsConfig = ({
             <div key={index} className="level-row">
               <div className="col-level">
                 <span className="level-badge">{level.level}</span>
+              </div>
+              <div className="col-score">
+                <input
+                  type="number"
+                  min="1"
+                  value={level.score !== undefined ? level.score : level.level}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || (/^\d+$/.test(value) && parseInt(value) >= 1)) {
+                      updateLevel(index, 'score', value === '' ? '' : parseInt(value));
+                    }
+                  }}
+                  onKeyPress={(e) => {
+                    if (!/[0-9]/.test(e.key) &&
+                        e.key !== 'Tab' &&
+                        e.key !== 'Escape' &&
+                        e.key !== 'Enter' &&
+                        !e.key.includes('Arrow')) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const paste = e.clipboardData.getData('text');
+                    if (!/^\d*$/.test(paste)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="Баллы"
+                  className="level-input"
+                />
               </div>
               <div className="col-name">
                 <input
