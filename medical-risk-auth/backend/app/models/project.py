@@ -116,6 +116,7 @@ class Project(Base):
 
     # Risk severity levels configuration
     severity_levels = Column(Text, nullable=True)  # JSON array of severity levels: [{level: 1, score: 1, name: "...", description: "..."}]
+    probability_levels = Column(Text, nullable=True)  # JSON array of probability levels: [{level: 1, name: "...", description: "..."}]
     risk_threshold = Column(Integer, default=10)  # Threshold value for acceptable/unacceptable risk
 
     # Timestamps

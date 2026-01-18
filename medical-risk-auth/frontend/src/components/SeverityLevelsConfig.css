@@ -262,6 +262,13 @@
   color: #dc3545;
 }
 
+/* Специфические стили для таблицы уровней вероятностей */
+.probability-levels-table .levels-header,
+.probability-levels-table .level-row {
+  grid-template-columns: 80px 2fr 3fr 80px;
+  gap: 10px;
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
   .levels-header,
@@ -272,6 +279,12 @@
 
   .col-description {
     display: none;
+  }
+
+  .probability-levels-table .levels-header,
+  .probability-levels-table .level-row {
+    grid-template-columns: 60px 2fr 60px;
+    gap: 8px;
   }
 
   .threshold-controls {

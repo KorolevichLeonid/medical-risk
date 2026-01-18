@@ -4,6 +4,7 @@ import './ProjectForm.css';
 import API_BASE_URL from '../config';
 import RiskMatrixTable from '../components/RiskMatrixTable';
 import SeverityLevelsConfig from '../components/SeverityLevelsConfig';
+import ProbabilityLevelsConfig from '../components/ProbabilityLevelsConfig';
 
 // Detailed hazard checklist data
 const hazardDetails = {
@@ -392,8 +393,7 @@ const hazardDetails = {
     category: 'Клиническое применение',
     questions: [
       'Используется ли изделие в диагностике, лечении, реабилитации или мониторинге состояния пациента?',
-      'Может ли ошибка применения привести к клиническим последствиям?',
-      'Требуется ли клиническая валидация эффективности или безопасности?'
+      'Может ли ошибка применения привести к клиническим последствиям?'
     ],
     controls: 'Клинические испытания, обучение, мониторинг, протоколы безопасности'
   },
@@ -401,17 +401,7 @@ const hazardDetails = {
     category: 'Клиническое применение',
     questions: [
       'Используется ли изделие в диагностике, лечении, реабилитации или мониторинге состояния пациента?',
-      'Может ли ошибка применения привести к клиническим последствиям?',
-      'Требуется ли клиническая валидация эффективности или безопасности?'
-    ],
-    controls: 'Клинические испытания, обучение, мониторинг, протоколы безопасности'
-  },
-  clinicalValidation: {
-    category: 'Клиническое применение',
-    questions: [
-      'Используется ли изделие в диагностике, лечении, реабилитации или мониторинге состояния пациента?',
-      'Может ли ошибка применения привести к клиническим последствиям?',
-      'Требуется ли клиническая валидация эффективности или безопасности?'
+      'Может ли ошибка применения привести к клиническим последствиям?'
     ],
     controls: 'Клинические испытания, обучение, мониторинг, протоколы безопасности'
   }
@@ -520,7 +510,7 @@ const HAZARD_CATEGORY_MAPPING = {
   // Клиническое применение (всегда активна)
   'clinical': {
     category: 'Опасности клинического применения',
-    questions: ['clinicalUse', 'clinicalError', 'clinicalValidation']
+    questions: ['clinicalUse', 'clinicalError']
   }
 };
 
@@ -608,6 +598,13 @@ const ProjectForm = () => {
       { level: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
       { level: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
     ],
+    // Уровни вероятностей последствий
+    probabilityLevels: [
+      { level: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
+      { level: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
+      { level: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
+      { level: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
+    ],
     riskThreshold: 10,
 
     // Этапы жизненного цикла
@@ -676,8 +673,7 @@ const ProjectForm = () => {
       reliability: true,
       // Клиническое применение
       clinicalUse: false,
-      clinicalError: false,
-      clinicalValidation: false
+      clinicalError: false
     },
 
     // Подробные ответы на чеклисты
@@ -701,12 +697,24 @@ const ProjectForm = () => {
     if (isEditMode) {
       loadProjectData();
     }
+  }, [isEditMode]);
 
-    // Логирование данных пользователя в консоль
+  // Separate useEffect for logging user data only when we have a valid project ID
+  useEffect(() => {
     const logUserData = async () => {
+      // Only log for existing projects with valid IDs (not 'new' or undefined)
+      if (!id || id === 'new' || id === 'undefined' || !isEditMode || isEditMode === false) {
+        return;
+      }
+
       try {
         const token = localStorage.getItem('token');
-        const projectId = id; // id доступен в компоненте
+        const projectId = id;
+        // Double-check that projectId is a valid number
+        if (!projectId || isNaN(parseInt(projectId))) {
+          return;
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/users/me/permissions?project_id=${projectId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -845,6 +853,12 @@ const ProjectForm = () => {
             { level: 3, name: "Серьезный/Значительный", description: "Приводит к повреждению или нарушению, требующему медицинского или хирургического вмешательства" },
             { level: 4, name: "Критический", description: "Приводит к постоянному нарушению или необратимому повреждению" },
             { level: 5, name: "Катастрофический/Фатальный", description: "Приводит к смерти" }
+          ],
+          probabilityLevels: projectData.probability_levels || [
+            { level: 1, name: "Маловероятный", description: "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)" },
+            { level: 2, name: "Отдаленный", description: "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)" },
+            { level: 3, name: "Эпизодический", description: "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)" },
+            { level: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
           ],
           riskThreshold: projectData.risk_threshold || 10,
           lifecycleStages: projectData.lifecycle_stages || [],
@@ -1146,9 +1160,8 @@ const ProjectForm = () => {
       surfaceContact: 'Опасности, связанные с термическими воздействиями',
       
       // Клиническое применение
-      clinicalUse: 'Опасности клинического применения',
-      clinicalError: 'Опасности клинического применения',
-      clinicalValidation: 'Опасности клинического применения'
+    clinicalUse: 'Опасности клинического применения',
+    clinicalError: 'Опасности клинического применения'
     };
     
     // Обходим все вопросы и добавляем соответствующие категории
@@ -1185,9 +1198,20 @@ const ProjectForm = () => {
     setError('');
 
     try {
-      // Проверка обязательных полей
-      if (!formData.name || !formData.deviceName || !formData.devicePurpose) {
-        throw new Error('Пожалуйста, заполните все обязательные поля');
+      // Проверка обязательных полей с дополнительной валидацией
+      const errors = [];
+      if (!formData.name || formData.name.trim() === '') {
+        errors.push('Название проекта');
+      }
+      if (!formData.deviceName || formData.deviceName.trim() === '') {
+        errors.push('Название устройства');
+      }
+      if (!formData.devicePurpose || formData.devicePurpose.trim() === '') {
+        errors.push('Назначение устройства');
+      }
+
+      if (errors.length > 0) {
+        throw new Error(`Пожалуйста, заполните обязательные поля: ${errors.join(', ')}`);
       }
 
       const token = localStorage.getItem('token');
@@ -1229,6 +1253,7 @@ const ProjectForm = () => {
           active_hazard_categories: formData.activeHazardCategories,
           custom_hazard: formData.customHazards.join('\n'),
           severity_levels: formData.severityLevels,
+          probability_levels: formData.probabilityLevels,
           risk_threshold: parseInt(formData.riskThreshold) || 10
         })
       });
@@ -1268,27 +1293,37 @@ const ProjectForm = () => {
           }
         }
 
-        // Добавляем новых членов команды
-        for (const userId of formData.teamMembers) {
-          try {
-            const memberResponse = await fetch(`${API_BASE_URL}/api/projects/${projectData.id}/members`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                user_id: userId,
-                role: selectedRole
-              })
-            });
+        // Добавляем новых членов команды (только если есть выбранные пользователи)
+        console.log('Team members to add:', formData.teamMembers);
+        if (formData.teamMembers && formData.teamMembers.length > 0) {
+          for (const userId of formData.teamMembers) {
+            try {
+              console.log(`Adding team member ${userId} with role ${selectedRole}`);
+              const memberResponse = await fetch(`${API_BASE_URL}/api/projects/${projectData.id}/members`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  user_id: parseInt(userId),
+                  role: selectedRole
+                })
+              });
 
-            if (!memberResponse.ok) {
-              console.warn(`Не удалось добавить пользователя ${userId} в проект`);
+              if (!memberResponse.ok) {
+                const errorText = await memberResponse.text();
+                console.error(`Failed to add user ${userId}: ${memberResponse.status} ${errorText}`);
+                console.warn(`Не удалось добавить пользователя ${userId} в проект`);
+              } else {
+                console.log(`Successfully added user ${userId} to project`);
+              }
+            } catch (error) {
+              console.error(`Ошибка при добавлении пользователя ${userId} в проект:`, error);
             }
-          } catch (error) {
-            console.error(`Ошибка при добавлении пользователя ${userId} в проект:`, error);
           }
+        } else {
+          console.log('No team members to add');
         }
         
         navigate(`/project/${projectData.id}`);
@@ -1363,8 +1398,7 @@ const ProjectForm = () => {
     heating: 'Опасности, связанные с термическими воздействиями',
     surfaceContact: 'Опасности, связанные с термическими воздействиями',
     clinicalUse: 'Опасности клинического применения',
-    clinicalError: 'Опасности клинического применения',
-    clinicalValidation: 'Опасности клинического применения'
+    clinicalError: 'Опасности клинического применения'
   };
 
   return (
@@ -1379,45 +1413,42 @@ const ProjectForm = () => {
         <div className="form-section">
           <h2>Основная информация</h2>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="name">Название проекта</label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Введите название проекта"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Project role</label>
-              <select
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-                className="form-select"
-              >
-                <option value="doctor">Clinical Evaluation / Doctor - risk management</option>
-                <option value="manager">Top Manager - project and users management</option>
-                <option value="quality_management_representative">Quality Management Representative</option>
-                <option value="product_manager">Product Manager / Quality Manager</option>
-                <option value="risk_assessment_team_leader">Risk Assessment Team Leader</option>
-                <option value="risk_assessment_team_member">Member of the Risk Assessment Team</option>
-              </select>
-              <small className="role-description">
-                {selectedRole === 'doctor' && 'Can view risks and edit risk evaluation table'}
-                {selectedRole === 'manager' && 'Can edit project, manage members and risks'}
-                {selectedRole === 'quality_management_representative' && 'Can view all blocks, create RMF, chat/comment'}
-                {selectedRole === 'product_manager' && 'Can view all blocks, edit source data'}
-                {selectedRole === 'risk_assessment_team_leader' && 'Can view all, edit source/risk data, verify reports, chat'}
-                {selectedRole === 'risk_assessment_team_member' && 'Can view all blocks, edit risk values'}
-              </small>
-            </div>
+          <div className="form-group">
+            <label htmlFor="name">Название проекта</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="Введите название проекта"
+              required
+            />
           </div>
 
+          <div className="form-group">
+            <label>Project role</label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="form-select"
+            >
+              <option value="doctor">Clinical Evaluation / Doctor - risk management</option>
+              <option value="manager">Top Manager - project and users management</option>
+              <option value="quality_management_representative">Quality Management Representative</option>
+              <option value="product_manager">Product Manager / Quality Manager</option>
+              <option value="risk_assessment_team_leader">Risk Assessment Team Leader</option>
+              <option value="risk_assessment_team_member">Member of the Risk Assessment Team</option>
+            </select>
+            <small className="role-description">
+              {selectedRole === 'doctor' && 'Can view risks and edit risk evaluation table'}
+              {selectedRole === 'manager' && 'Can edit project, manage members and risks'}
+              {selectedRole === 'quality_management_representative' && 'Can view all blocks, create RMF, chat/comment'}
+              {selectedRole === 'product_manager' && 'Can view all blocks, edit source data'}
+              {selectedRole === 'risk_assessment_team_leader' && 'Can view all, edit source/risk data, verify reports, chat'}
+              {selectedRole === 'risk_assessment_team_member' && 'Can view all blocks, edit risk values'}
+            </small>
+          </div>
           <div className="form-group">
             <label htmlFor="description">Описание проекта</label>
             <textarea
@@ -1505,18 +1536,16 @@ const ProjectForm = () => {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="operatingEnvironment">Условия эксплуатации</label>
-              <input
-                type="text"
-                id="operatingEnvironment"
-                name="operatingEnvironment"
-                value={formData.operatingEnvironment}
-                onChange={handleInputChange}
-                placeholder="Условия окружающей среды"
-              />
-            </div>
+          <div className="form-group">
+            <label htmlFor="operatingEnvironment">Условия эксплуатации</label>
+            <textarea
+              id="operatingEnvironment"
+              name="operatingEnvironment"
+              value={formData.operatingEnvironment}
+              onChange={handleInputChange}
+              placeholder="Условия окружающей среды"
+              rows="3"
+            />
           </div>
         </div>
 
@@ -1601,7 +1630,7 @@ const ProjectForm = () => {
             </div>
         </div>
 
-        {/* Уровни тяжести и пороговое значение риска */}
+        {/* Уровни тяжести последствий */}
         <div className="form-section">
           <SeverityLevelsConfig
             severityLevels={formData.severityLevels}
@@ -1611,6 +1640,19 @@ const ProjectForm = () => {
                 ...formData,
                 severityLevels: data.severity_levels,
                 riskThreshold: data.risk_threshold
+              });
+            }}
+          />
+        </div>
+
+        {/* Уровни вероятностей последствий */}
+        <div className="form-section">
+          <ProbabilityLevelsConfig
+            probabilityLevels={formData.probabilityLevels}
+            onChange={(data) => {
+              setFormData({
+                ...formData,
+                probabilityLevels: data.probability_levels
               });
             }}
           />
@@ -2341,16 +2383,6 @@ const ProjectForm = () => {
                 />
                 Может ли ошибка применения привести к клиническим последствиям?
                 <span className={`hazard-indicator ${formData.hazardQuestions.clinicalError ? 'active' : ''}`}>• {hazardIndicators.clinicalError}</span>
-              </label>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="clinicalValidation"
-                  checked={formData.hazardQuestions.clinicalValidation}
-                  onChange={handleHazardChange}
-                />
-                Требуется ли клиническая валидация эффективности или безопасности?
-                <span className={`hazard-indicator ${formData.hazardQuestions.clinicalValidation ? 'active' : ''}`}>• {hazardIndicators.clinicalValidation}</span>
               </label>
             </div>
           </div>
