@@ -17,6 +17,9 @@ const ProjectView = () => {
   const [addingMember, setAddingMember] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showRiskTable, setShowRiskTable] = useState(false);
+  const [showEditMemberRole, setShowEditMemberRole] = useState(false);
+  const [memberToEdit, setMemberToEdit] = useState(null);
+  const [roleToEdit, setRoleToEdit] = useState('doctor');
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -34,18 +37,34 @@ const ProjectView = () => {
           const projectData = await response.json();
           
           // Transform API data to frontend format
+          const parseJsonArray = (value) => {
+            if (!value) return [];
+            if (Array.isArray(value)) return value;
+            if (typeof value === 'string') {
+              try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch (error) {
+                console.warn('Failed to parse array field:', error);
+                return [];
+              }
+            }
+            return [];
+          };
+
           const transformedProject = {
             id: projectData.id,
             name: projectData.name,
             description: projectData.description,
             status: projectData.status,
-            progress: projectData.progress_percentage || 0,
+            progress: 0,
             createdDate: projectData.created_at,
             lastUpdated: projectData.updated_at || projectData.created_at,
+            ownerId: projectData.owner_id,
             
             // Device Information
             deviceInfo: {
-              name: projectData.device_name,
+              name: projectData.device_name || 'N/A',
               model: projectData.device_model || 'N/A',
               purpose: projectData.device_purpose || 'N/A',
               description: projectData.device_description || 'N/A',
@@ -54,6 +73,17 @@ const ProjectView = () => {
               userProfile: projectData.user_profile || 'N/A',
               operatingEnvironment: projectData.operating_environment || 'N/A'
             },
+
+            technicalSpecs: projectData.technical_specs || 'N/A',
+            regulatoryRequirements: projectData.regulatory_requirements || 'N/A',
+            standards: projectData.standards || 'N/A',
+
+            lifecycleStages: projectData.lifecycle_stages || [],
+            customLifecycleStages: projectData.custom_lifecycle_stages || [],
+            activeHazardCategories: parseJsonArray(projectData.active_hazard_categories),
+            customHazards: projectData.custom_hazard
+              ? projectData.custom_hazard.split('\n').map(line => line.trim()).filter(line => line)
+              : [],
             
             // Team Members - will be loaded separately
             team: [],
@@ -97,32 +127,7 @@ const ProjectView = () => {
             }));
           }
           
-          // Load risk statistics
-          const risksResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/project/${id}/factors`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (risksResponse.ok) {
-            const risksData = await risksResponse.json();
-            const totalRisks = risksData.length;
-            const highRisks = risksData.filter(risk => risk.risk_score >= 15).length;
-            const mediumRisks = risksData.filter(risk => risk.risk_score >= 10 && risk.risk_score < 15).length;
-            const lowRisks = risksData.filter(risk => risk.risk_score < 10).length;
-            
-            setProject(prev => ({
-              ...prev,
-              statistics: {
-                totalRisks: totalRisks,
-                highRisks: highRisks,
-                mediumRisks: mediumRisks,
-                lowRisks: lowRisks,
-                mitigatedRisks: 0, // TODO: implement mitigation tracking
-                pendingActions: 0 // TODO: implement action tracking
-              }
-            }));
-          }
+          // Risk coverage progress comes from API (progress_percentage)
         } else if (response.status === 403) {
           setProject(null);
           alert('You do not have access to this project');
@@ -191,6 +196,16 @@ const ProjectView = () => {
     if (project.team.some(member => member.id === currentUser.id && member.role === 'manager')) return true;
     // Doctors can only view risks, not manage them
     return false;
+  };
+
+  const formatList = (items) => {
+    if (!items || items.length === 0) return 'N/A';
+    return items.join(', ');
+  };
+
+  const isProjectOwner = () => {
+    if (!currentUser || !project) return false;
+    return currentUser.id === project.ownerId;
   };
 
   const loadAvailableUsers = async () => {
@@ -314,6 +329,34 @@ const ProjectView = () => {
     }
   };
 
+  const handleUpdateMemberRole = async () => {
+    if (!memberToEdit) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members/${memberToEdit.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ role: roleToEdit })
+      });
+
+      if (response.ok) {
+        window.location.reload();
+        setShowEditMemberRole(false);
+        setMemberToEdit(null);
+      } else {
+        console.error('Failed to update member role:', response.status);
+        alert('Failed to update member role');
+      }
+    } catch (error) {
+      console.error('Failed to update member role:', error);
+      alert('Failed to update member role');
+    }
+  };
+
   if (loading) {
     return (
       <div className="project-view">
@@ -336,6 +379,20 @@ const ProjectView = () => {
       </div>
     );
   }
+
+  const lifecycleStages = formatList([
+    ...new Set([
+      ...(project.lifecycleStages || []),
+      ...(project.customLifecycleStages || [])
+    ])
+  ]);
+
+  const hazardCategories = formatList([
+    ...new Set([
+      ...(project.activeHazardCategories || []),
+      ...(project.customHazards || [])
+    ])
+  ]);
 
   return (
     <div className="project-view">
@@ -391,67 +448,75 @@ const ProjectView = () => {
 
       {/* Main Content Grid */}
       <div className="content-grid">
-        {/* Device Information */}
+        {/* Project Information */}
         <div className="info-section">
-          <h3>Device Information</h3>
+          <h3>Информация о проекте</h3>
           <div className="info-grid">
             <div className="info-item">
-              <label>Device Name:</label>
+              <label>Название проекта:</label>
+              <span>{project.name || 'N/A'}</span>
+            </div>
+            <div className="info-item">
+              <label>Описание проекта:</label>
+              <span>{project.description || 'N/A'}</span>
+            </div>
+            <div className="info-item">
+              <label>Название устройства:</label>
               <span>{project.deviceInfo.name}</span>
             </div>
             <div className="info-item">
-              <label>Model:</label>
+              <label>Модель устройства:</label>
               <span>{project.deviceInfo.model}</span>
             </div>
             <div className="info-item">
-              <label>Classification:</label>
+              <label>Назначение устройства:</label>
+              <span>{project.deviceInfo.purpose}</span>
+            </div>
+            <div className="info-item">
+              <label>Описание устройства:</label>
+              <span>{project.deviceInfo.description}</span>
+            </div>
+            <div className="info-item">
+              <label>Классификация устройства:</label>
               <span>{project.deviceInfo.classification}</span>
             </div>
             <div className="info-item">
-              <label>Intended Use:</label>
-              <span>{project.deviceInfo.intendedUse}</span>
+              <label>Условия эксплуатации:</label>
+              <span>{project.deviceInfo.operatingEnvironment}</span>
             </div>
-            <div className="info-item full-width">
-              <label>Purpose:</label>
-              <span>{project.deviceInfo.purpose}</span>
+            <div className="info-item">
+              <label>Технические характеристики:</label>
+              <span>{project.technicalSpecs}</span>
             </div>
-            <div className="info-item full-width">
-              <label>Description:</label>
-              <span>{project.deviceInfo.description}</span>
+            <div className="info-item">
+              <label>Нормативные требования:</label>
+              <span>{project.regulatoryRequirements}</span>
+            </div>
+            <div className="info-item">
+              <label>Применимые стандарты:</label>
+              <span>{project.standards}</span>
             </div>
           </div>
         </div>
 
-        {/* Risk Statistics */}
-        <div className="stats-section">
-          <h3>Risk Assessment Overview</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-number">{project.statistics.totalRisks}</div>
-              <div className="stat-label">Total Risks</div>
-            </div>
-            <div className="stat-card high-risk">
-              <div className="stat-number">{project.statistics.highRisks}</div>
-              <div className="stat-label">High Risk</div>
-            </div>
-            <div className="stat-card medium-risk">
-              <div className="stat-number">{project.statistics.mediumRisks}</div>
-              <div className="stat-label">Medium Risk</div>
-            </div>
-            <div className="stat-card low-risk">
-              <div className="stat-number">{project.statistics.lowRisks}</div>
-              <div className="stat-label">Low Risk</div>
+        {/* Lifecycle Stages */}
+        <div className="info-section">
+          <h3>Этапы жизненного цикла</h3>
+          <div className="info-grid">
+            <div className="info-item full-width">
+              <label>Используемые этапы:</label>
+              <span>{lifecycleStages}</span>
             </div>
           </div>
-          
-          <div className="mitigation-stats">
-            <div className="mitigation-item">
-              <span className="mitigation-label">Mitigated Risks:</span>
-              <span className="mitigation-value">{project.statistics.mitigatedRisks}</span>
-            </div>
-            <div className="mitigation-item">
-              <span className="mitigation-label">Pending Actions:</span>
-              <span className="mitigation-value pending">{project.statistics.pendingActions}</span>
+        </div>
+
+        {/* Hazards */}
+        <div className="info-section">
+          <h3>Опасности проекта</h3>
+          <div className="info-grid">
+            <div className="info-item full-width">
+              <label>Используемые опасности:</label>
+              <span>{hazardCategories}</span>
             </div>
           </div>
         </div>
@@ -470,15 +535,30 @@ const ProjectView = () => {
                   <div className="member-role">{getProjectRoleBadge(member.role)}</div>
                   <div className="member-email">{member.email}</div>
                 </div>
-                {canAddMembers() && member.role !== 'admin' && (
-                  <button 
-                    className="remove-member-btn"
-                    onClick={() => handleRemoveMember(member.id)}
-                    title="Remove from project"
-                  >
-                    ×
-                  </button>
-                )}
+                <div className="member-actions">
+                  {isProjectOwner() && member.id !== project.ownerId && (
+                    <button
+                      className="edit-member-btn"
+                      onClick={() => {
+                        setMemberToEdit(member);
+                        setRoleToEdit(member.role);
+                        setShowEditMemberRole(true);
+                      }}
+                      title="Edit member role"
+                    >
+                      ✎
+                    </button>
+                  )}
+                  {canAddMembers() && member.role !== 'admin' && (
+                    <button 
+                      className="remove-member-btn"
+                      onClick={() => handleRemoveMember(member.id)}
+                      title="Remove from project"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -582,6 +662,63 @@ const ProjectView = () => {
                 disabled={!selectedUser || addingMember}
               >
                 {addingMember ? 'Adding...' : 'Add member'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Member Role Modal */}
+      {showEditMemberRole && memberToEdit && (
+        <div className="modal-overlay" onClick={() => setShowEditMemberRole(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit member role</h2>
+              <button
+                className="close-btn"
+                onClick={() => setShowEditMemberRole(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-group">
+                <label>User</label>
+                <div className="member-name">{memberToEdit.name}</div>
+              </div>
+              <div className="form-group">
+                <label>Project role</label>
+                <select
+                  value={roleToEdit}
+                  onChange={(e) => setRoleToEdit(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="doctor">Clinical Evaluation / Doctor - risk management</option>
+                  <option value="manager">Top Manager - project and users management</option>
+                  <option value="quality_management_representative">Quality Management Representative</option>
+                  <option value="product_manager">Product Manager / Quality Manager</option>
+                  <option value="risk_assessment_team_leader">Risk Assessment Team Leader</option>
+                  <option value="risk_assessment_team_member">Member of the Risk Assessment Team</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowEditMemberRole(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleUpdateMemberRole}
+                disabled={!roleToEdit}
+              >
+                Update role
               </button>
             </div>
           </div>

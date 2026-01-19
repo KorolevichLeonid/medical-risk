@@ -330,6 +330,9 @@ const RiskAnalysis = () => {
 
     // Заполняем матрицу на основе существующих рисков
     risks.forEach(risk => {
+      if (risk.risk_status !== 'closed' && risk.risk_status !== 'fully_closed') {
+        return;
+      }
       if (matrix[risk.lifecycleStage] && matrix[risk.lifecycleStage][risk.hazardCategory]) {
         const cell = matrix[risk.lifecycleStage][risk.hazardCategory];
         cell.total++;
@@ -646,12 +649,6 @@ const RiskAnalysis = () => {
           </div>
           <div className="summary-label">High Risk</div>
         </div>
-        <div className="summary-card medium-risk">
-          <div className="summary-number">
-            {risks.filter(r => r.riskScore && getRiskLevel(r.riskScore).level === 'medium').length}
-          </div>
-          <div className="summary-label">Medium Risk</div>
-        </div>
         <div className="summary-card low-risk">
           <div className="summary-number">
             {risks.filter(r => r.riskScore && getRiskLevel(r.riskScore).level === 'low').length}
@@ -894,35 +891,44 @@ const RiskAnalysis = () => {
                       </span>
                     )}
                   </td>
-                                     <td className="actions-cell">
-                     {canEditRisks() && (
-                       <button 
-                         className="action-btn edit"
-                         onClick={() => {
-                           setSelectedRisk(risk);
-                           setShowEditRisk(true);
-                         }}
-                         title="Edit risk"
-                       >
-                         ✏️
-                       </button>
-                     )}
-                     <button
-                       className="action-btn view"
-                       onClick={() => {
-                         // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
-                         const sheetId = risk.lifecycleStage;
+                  <td className="actions-cell">
+                    {canEditRisks() && (
+                      <button 
+                        className="action-btn edit"
+                        onClick={() => {
+                          setSelectedRisk(risk);
+                          setShowEditRisk(true);
+                        }}
+                        title="Edit risk"
+                      >
+                        ✏️
+                      </button>
+                    )}
+                    {canDeleteRisks() && (
+                      <button
+                        className="action-btn delete"
+                        onClick={() => handleDeleteRisk(risk.id)}
+                        title="Delete risk"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                    <button
+                      className="action-btn view"
+                      onClick={() => {
+                        // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
+                        const sheetId = risk.lifecycleStage;
 
-                         sessionStorage.setItem('highlightRiskId', risk.id);
-                         sessionStorage.setItem('openSheet', sheetId);
+                        sessionStorage.setItem('highlightRiskId', risk.id);
+                        sessionStorage.setItem('openSheet', sheetId);
 
-                         navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${risk.id}`);
-                       }}
-                       title="Open in Risk Table"
-                     >
-                       📊
-                     </button>
-                   </td>
+                        navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${risk.id}`);
+                      }}
+                      title="Open in Risk Table"
+                    >
+                      📊
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -1159,18 +1165,6 @@ const RiskAnalysis = () => {
                 <button type="submit" className="btn btn-primary">
                   Update Risk
                 </button>
-                {canDeleteRisks() && (
-                  <button 
-                    type="button" 
-                    className="btn btn-danger"
-                    onClick={() => {
-                      setShowEditRisk(false);
-                      handleDeleteRisk(selectedRisk.id);
-                    }}
-                  >
-                    🗑️ Delete Risk
-                  </button>
-                )}
               </div>
             </form>
           </div>

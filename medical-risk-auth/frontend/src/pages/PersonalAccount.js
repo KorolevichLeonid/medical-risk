@@ -229,7 +229,7 @@ const PersonalAccount = () => {
       {/* Profile Header */}
       <div className="profile-header">
         <div className="profile-left">
-          <h2 className="greeting-title">Hi, {user.firstName || user.lastName ? `${user.firstName}` : 'User'}</h2>
+          <h2 className="greeting-title">Personal account</h2>
           <div className="profile-info">
           <div className={`profile-avatar ${(!user.avatar || String(user.avatar).includes('/api/placeholder')) ? 'default-avatar' : ''}`}>
             {(!user.avatar || String(user.avatar).includes('/api/placeholder')) ? (

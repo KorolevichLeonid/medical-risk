@@ -655,8 +655,6 @@ const ProjectForm = () => {
     regulatoryRequirements: '',
     standards: '',
 
-    // Назначение команды
-    teamMembers: [],
 
     // Уровень риска (доп./не доп.)
     acceptableRiskLevel: 10,
@@ -760,21 +758,13 @@ const ProjectForm = () => {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [selectedRole, setSelectedRole] = useState('doctor');
   const [riskMatrix, setRiskMatrix] = useState(null);
 
   useEffect(() => {
-    loadCurrentUser();
-  }, []);
-
-  useEffect(() => {
-    loadAvailableUsers();
     if (isEditMode) {
       loadProjectData();
     }
-  }, [isEditMode, currentUser]);
+  }, [isEditMode]);
 
   // Separate useEffect for logging user data only when we have a valid project ID
   useEffect(() => {
@@ -825,45 +815,6 @@ const ProjectForm = () => {
     }
   }, [formData.hazardQuestions, formData.customHazards]);
 
-  const loadCurrentUser = () => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setCurrentUser(JSON.parse(userData));
-    }
-  };
-
-  const loadAvailableUsers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/users/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const usersData = await response.json();
-        // Преобразуем в формат для селекта
-        const formattedUsers = usersData
-          .filter(user => user.is_active) // Только активные пользователи
-          .filter(user => !currentUser || user.id !== currentUser.id)
-          .map(user => ({
-            id: user.id,
-            name: `${user.first_name} ${user.last_name}`.trim() || user.email,
-            email: user.email,
-            role: user.role
-          }));
-        setAvailableUsers(formattedUsers);
-      } else {
-        console.error('Failed to load users:', response.status);
-        setAvailableUsers([]);
-      }
-    } catch (error) {
-      console.error('Failed to load users:', error);
-      setAvailableUsers([]);
-    }
-  };
-
   const loadProjectData = async () => {
     setLoading(true);
     try {
@@ -884,23 +835,6 @@ const ProjectForm = () => {
         const projectData = await response.json();
         console.log('Project data loaded:', projectData);
 
-        // Загружаем членов проекта
-        const membersResponse = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        let teamMembers = [];
-
-        if (membersResponse.ok) {
-          const membersData = await membersResponse.json();
-          teamMembers = membersData
-            .filter(member => member.role !== 'owner')
-            .map(member => member.user_id.toString());
-
-        }
-
         const loadedData = {
           name: projectData.name || '',
           description: projectData.description || '',
@@ -915,9 +849,6 @@ const ProjectForm = () => {
           technicalSpecs: projectData.technical_specs || '',
           regulatoryRequirements: projectData.regulatory_requirements || '',
           standards: projectData.standards || '',
-          teamMembers: currentUser
-            ? teamMembers.filter(userId => userId !== currentUser.id.toString())
-            : teamMembers,
           acceptableRiskLevel: projectData.acceptable_risk_level || 10,
           riskMatrix: projectData.risk_matrix || null,
           severityLevels: normalizeLevelsWithScores(projectData.severity_levels || [
@@ -1087,27 +1018,6 @@ const ProjectForm = () => {
       }
     }));
   };
-
-  const handleTeamMemberChange = (userId, isSelected) => {
-    setFormData(prev => ({
-      ...prev,
-      teamMembers: isSelected
-        ? [...prev.teamMembers, userId]
-        : prev.teamMembers.filter(id => id !== userId)
-    }));
-  };
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const currentUserId = currentUser.id?.toString();
-    if (!currentUserId) return;
-    if (formData.teamMembers.includes(currentUserId)) {
-      setFormData(prev => ({
-        ...prev,
-        teamMembers: prev.teamMembers.filter(id => id !== currentUserId)
-      }));
-    }
-  }, [currentUser, formData.teamMembers]);
 
   // Handlers for dynamic custom fields
   const addCustomLifecycleStage = () => {
@@ -1304,6 +1214,9 @@ const ProjectForm = () => {
       if (!formData.devicePurpose || formData.devicePurpose.trim() === '') {
         errors.push('Назначение устройства');
       }
+      if (!formData.lifecycleStages || formData.lifecycleStages.length === 0) {
+        errors.push('Этапы жизненного цикла');
+      }
 
       const severityScoreError = validateLevelScores(formData.severityLevels, 'уровни тяжести');
       if (severityScoreError) {
@@ -1371,72 +1284,6 @@ const ProjectForm = () => {
 
       if (response.ok) {
         const projectData = await response.json();
-        
-        if (isEditMode) {
-          // Для режима редактирования сначала получаем текущих членов и удаляем тех, кто не выбран
-          const currentMembersResponse = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          if (currentMembersResponse.ok) {
-            const currentMembers = await currentMembersResponse.json();
-            const currentMemberIds = currentMembers
-              .filter(member => member.role !== 'owner')
-              .map(member => member.user_id.toString());
-
-            // Удаляем членов, которые больше не выбраны
-            for (const memberId of currentMemberIds) {
-              if (!formData.teamMembers.includes(memberId)) {
-                try {
-                  await fetch(`${API_BASE_URL}/api/projects/${id}/members/${memberId}`, {
-                    method: 'DELETE',
-                    headers: {
-                      'Authorization': `Bearer ${token}`
-                    }
-                  });
-                } catch (error) {
-                  console.error(`Ошибка при удалении пользователя ${memberId} из проекта:`, error);
-                }
-              }
-            }
-          }
-        }
-
-        // Добавляем новых членов команды (только если есть выбранные пользователи)
-        console.log('Team members to add:', formData.teamMembers);
-        if (formData.teamMembers && formData.teamMembers.length > 0) {
-          for (const userId of formData.teamMembers) {
-            try {
-              console.log(`Adding team member ${userId} with role ${selectedRole}`);
-              const memberResponse = await fetch(`${API_BASE_URL}/api/projects/${projectData.id}/members`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  user_id: parseInt(userId),
-                  role: selectedRole
-                })
-              });
-
-              if (!memberResponse.ok) {
-                const errorText = await memberResponse.text();
-                console.error(`Failed to add user ${userId}: ${memberResponse.status} ${errorText}`);
-                console.warn(`Не удалось добавить пользователя ${userId} в проект`);
-              } else {
-                console.log(`Successfully added user ${userId} to project`);
-              }
-            } catch (error) {
-              console.error(`Ошибка при добавлении пользователя ${userId} в проект:`, error);
-            }
-          }
-        } else {
-          console.log('No team members to add');
-        }
-        
         navigate(`/project/${projectData.id}`);
       } else {
         const errorData = await response.json();
@@ -1685,27 +1532,6 @@ const ProjectForm = () => {
 
 
 
-        {/* Назначение команды */}
-        <div className="form-section">
-          <h2>Назначение команды</h2>
-
-          <div className="form-group">
-            <label>Члены команды</label>
-            <div className="team-selection">
-                {availableUsers.map(user => (
-                  <label key={user.id} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.teamMembers.includes(user.id.toString())}
-                      onChange={(e) => handleTeamMemberChange(user.id.toString(), e.target.checked)}
-                    />
-                    <span>{user.name} ({user.email})</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-        </div>
-
         {/* Уровни тяжести последствий */}
         <div className="form-section">
           <SeverityLevelsConfig
@@ -1917,8 +1743,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.active}
                   onChange={handleHazardChange}
                 />
-                Активное
-                <span className={`hazard-indicator ${formData.hazardQuestions.active ? 'active' : ''}`}>• {hazardIndicators.active}</span>
+                <div className="checkbox-text">
+                  <strong>Активное</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.active ? 'active' : ''}`}>• {hazardIndicators.active}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -1928,8 +1756,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.sterile}
                   onChange={handleHazardChange}
                 />
-                Стерильное
-                <span className={`hazard-indicator ${formData.hazardQuestions.sterile ? 'active' : ''}`}>• {hazardIndicators.sterile}</span>
+                <div className="checkbox-text">
+                  <strong>Стерильное</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.sterile ? 'active' : ''}`}>• {hazardIndicators.sterile}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -1939,8 +1769,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.disposable}
                   onChange={handleHazardChange}
                 />
-                Одноразовое
-                <span className={`hazard-indicator ${formData.hazardQuestions.disposable ? 'active' : ''}`}>• {hazardIndicators.disposable}</span>
+                <div className="checkbox-text">
+                  <strong>Одноразовое</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.disposable ? 'active' : ''}`}>• {hazardIndicators.disposable}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -1950,8 +1782,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.software}
                   onChange={handleHazardChange}
                 />
-                Программное обеспечение входит в состав?
-                <span className={`hazard-indicator ${formData.hazardQuestions.software ? 'active' : ''}`}>• {hazardIndicators.software}</span>
+                <div className="checkbox-text">
+                  <strong>Программное обеспечение входит в состав?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.software ? 'active' : ''}`}>• {hazardIndicators.software}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -1961,8 +1795,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.implantable}
                   onChange={handleHazardChange}
                 />
-                Предназначено для имплантации?
-                <span className={`hazard-indicator ${formData.hazardQuestions.implantable ? 'active' : ''}`}>• {hazardIndicators.implantable}</span>
+                <div className="checkbox-text">
+                  <strong>Предназначено для имплантации?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.implantable ? 'active' : ''}`}>• {hazardIndicators.implantable}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -1978,8 +1814,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.bodyContact}
                   onChange={handleHazardChange}
                 />
-                Имеет ли изделие контакт с телом человека или его жидкостями?
-                <span className={`hazard-indicator ${formData.hazardQuestions.bodyContact ? 'active' : ''}`}>• {hazardIndicators.bodyContact}</span>
+                <div className="checkbox-text">
+                  <strong>Имеет ли изделие контакт с телом человека или его жидкостями?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.bodyContact ? 'active' : ''}`}>• {hazardIndicators.bodyContact}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -1989,8 +1827,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.materialContact}
                   onChange={handleHazardChange}
                 />
-                Используются ли материалы с прямым контактом с тканями или жидкостями?
-                <span className={`hazard-indicator ${formData.hazardQuestions.materialContact ? 'active' : ''}`}>• {hazardIndicators.materialContact}</span>
+                <div className="checkbox-text">
+                  <strong>Используются ли материалы с прямым контактом с тканями или жидкостями?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.materialContact ? 'active' : ''}`}>• {hazardIndicators.materialContact}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -2000,8 +1840,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.implantableDevice}
                   onChange={handleHazardChange}
                 />
-                Предназначено ли изделие для имплантации?
-                <span className={`hazard-indicator ${formData.hazardQuestions.implantableDevice ? 'active' : ''}`}>• {hazardIndicators.implantableDevice}</span>
+                <div className="checkbox-text">
+                  <strong>Предназначено ли изделие для имплантации?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.implantableDevice ? 'active' : ''}`}>• {hazardIndicators.implantableDevice}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -2011,8 +1853,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.substanceRelease}
                   onChange={handleHazardChange}
                 />
-                Есть ли риск выделения веществ из материалов в организм?
-                <span className={`hazard-indicator ${formData.hazardQuestions.substanceRelease ? 'active' : ''}`}>• {hazardIndicators.substanceRelease}</span>
+                <div className="checkbox-text">
+                  <strong>Есть ли риск выделения веществ из материалов в организм?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.substanceRelease ? 'active' : ''}`}>• {hazardIndicators.substanceRelease}</span>
+                </div>
               </label>
 
               <label className="checkbox-label">
@@ -2022,8 +1866,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.sensitization}
                   onChange={handleHazardChange}
                 />
-                Есть ли риск сенсибилизации, раздражения или цитотоксичности?
-                <span className={`hazard-indicator ${formData.hazardQuestions.sensitization ? 'active' : ''}`}>• {hazardIndicators.sensitization}</span>
+                <div className="checkbox-text">
+                  <strong>Есть ли риск сенсибилизации, раздражения или цитотоксичности?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.sensitization ? 'active' : ''}`}>• {hazardIndicators.sensitization}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2039,8 +1885,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.containsSoftware}
                     onChange={handleHazardChange}
                   />
-                  Содержит ли изделие программное обеспечение?
+                <div className="checkbox-text">
+                  <strong>Содержит ли изделие программное обеспечение?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.containsSoftware ? 'active' : ''}`}>• {hazardIndicators.containsSoftware}</span>
+                </div>
                 </label>
 
 
@@ -2051,8 +1899,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.dataExchange}
                     onChange={handleHazardChange}
                   />
-                  Обменивается ли изделие данными с другими устройствами или сетями?
+                <div className="checkbox-text">
+                  <strong>Обменивается ли изделие данными с другими устройствами или сетями?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.dataExchange ? 'active' : ''}`}>• {hazardIndicators.dataExchange}</span>
+                </div>
                 </label>
 
                 <label className="checkbox-label">
@@ -2062,8 +1912,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.wireless}
                     onChange={handleHazardChange}
                   />
-                  Передаёт ли изделие информацию по беспроводной связи (Wi-Fi, Bluetooth)?
+                <div className="checkbox-text">
+                  <strong>Передаёт ли изделие информацию по беспроводной связи (Wi-Fi, Bluetooth)?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.wireless ? 'active' : ''}`}>• {hazardIndicators.wireless}</span>
+                </div>
                 </label>
 
                 <label className="checkbox-label">
@@ -2073,8 +1925,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.personalData}
                     onChange={handleHazardChange}
                   />
-                  Хранит ли изделие персональные или медицинские данные?
+                <div className="checkbox-text">
+                  <strong>Хранит ли изделие персональные или медицинские данные?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.personalData ? 'active' : ''}`}>• {hazardIndicators.personalData}</span>
+                </div>
                 </label>
 
                 <label className="checkbox-label">
@@ -2084,8 +1938,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.userInterface}
                     onChange={handleHazardChange}
                   />
-                  Управляется ли изделие через интерфейс пользователя или сеть?
+                <div className="checkbox-text">
+                  <strong>Управляется ли изделие через интерфейс пользователя или сеть?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.userInterface ? 'active' : ''}`}>• {hazardIndicators.userInterface}</span>
+                </div>
                 </label>
               </div>
           </div>
@@ -2101,8 +1957,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.activeDevice}
                     onChange={handleHazardChange}
                   />
-                  Является ли изделие активным (использует источник энергии)?
+                <div className="checkbox-text">
+                  <strong>Является ли изделие активным (использует источник энергии)?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.activeDevice ? 'active' : ''}`}>• {hazardIndicators.activeDevice}</span>
+                </div>
                 </label>
 
                 <label className="checkbox-label">
@@ -2112,8 +1970,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.powerConnection}
                     onChange={handleHazardChange}
                   />
-                  Подключается ли изделие к электросети или батарее?
+                <div className="checkbox-text">
+                  <strong>Подключается ли изделие к электросети или батарее?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.powerConnection ? 'active' : ''}`}>• {hazardIndicators.powerConnection}</span>
+                </div>
                 </label>
 
                 <label className="checkbox-label">
@@ -2123,8 +1983,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.electricalContacts}
                     onChange={handleHazardChange}
                   />
-                  Есть ли электрические контакты, которые могут соприкасаться с пользователем или пациентом?
+                <div className="checkbox-text">
+                  <strong>Есть ли электрические контакты, которые могут соприкасаться с пользователем или пациентом?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.electricalContacts ? 'active' : ''}`}>• {hazardIndicators.electricalContacts}</span>
+                </div>
                 </label>
               </div>
           </div>
@@ -2140,8 +2002,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.movingElements}
                   onChange={handleHazardChange}
                 />
-                Содержит ли изделие движущиеся механические элементы?
-                <span className={`hazard-indicator ${formData.hazardQuestions.movingElements ? 'active' : ''}`}>• {hazardIndicators.movingElements}</span>
+                <div className="checkbox-text">
+                  <strong>Содержит ли изделие движущиеся механические элементы?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.movingElements ? 'active' : ''}`}>• {hazardIndicators.movingElements}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2150,8 +2014,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.movingRisk}
                   onChange={handleHazardChange}
                 />
-                Есть ли подвижные узлы, создающие риск защемления, раздавливания или травмы?
-                <span className={`hazard-indicator ${formData.hazardQuestions.movingRisk ? 'active' : ''}`}>• {hazardIndicators.movingRisk}</span>
+                <div className="checkbox-text">
+                  <strong>Есть ли подвижные узлы, создающие риск защемления, раздавливания или травмы?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.movingRisk ? 'active' : ''}`}>• {hazardIndicators.movingRisk}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2167,8 +2033,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.emitsEnergy}
                   onChange={handleHazardChange}
                 />
-                Излучает ли изделие энергию (ультразвук, инфракрасное, УФ, радиацию, лазер)?
-                <span className={`hazard-indicator ${formData.hazardQuestions.emitsEnergy ? 'active' : ''}`}>• {hazardIndicators.emitsEnergy}</span>
+                <div className="checkbox-text">
+                  <strong>Излучает ли изделие энергию (ультразвук, инфракрасное, УФ, радиацию, лазер)?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.emitsEnergy ? 'active' : ''}`}>• {hazardIndicators.emitsEnergy}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2177,8 +2045,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.opticalSystems}
                   onChange={handleHazardChange}
                 />
-                Использует ли изделие световые или оптические системы высокой интенсивности?
-                <span className={`hazard-indicator ${formData.hazardQuestions.opticalSystems ? 'active' : ''}`}>• {hazardIndicators.opticalSystems}</span>
+                <div className="checkbox-text">
+                  <strong>Использует ли изделие световые или оптические системы высокой интенсивности?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.opticalSystems ? 'active' : ''}`}>• {hazardIndicators.opticalSystems}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2194,8 +2064,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.specialTraining}
                   onChange={handleHazardChange}
                 />
-                Требуется ли специальное обучение для безопасного применения?
-                <span className={`hazard-indicator ${formData.hazardQuestions.specialTraining ? 'active' : ''}`}>• {hazardIndicators.specialTraining}</span>
+                <div className="checkbox-text">
+                  <strong>Требуется ли специальное обучение для безопасного применения?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.specialTraining ? 'active' : ''}`}>• {hazardIndicators.specialTraining}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2204,8 +2076,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.specialNeeds}
                   onChange={handleHazardChange}
                 />
-                Предусмотрено ли применение лицами с особыми потребностями?
-                <span className={`hazard-indicator ${formData.hazardQuestions.specialNeeds ? 'active' : ''}`}>• {hazardIndicators.specialNeeds}</span>
+                <div className="checkbox-text">
+                  <strong>Предусмотрено ли применение лицами с особыми потребностями?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.specialNeeds ? 'active' : ''}`}>• {hazardIndicators.specialNeeds}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2214,8 +2088,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.interfaceError}
                   onChange={handleHazardChange}
                 />
-                Есть ли риск неправильного выбора режима или ошибки интерфейса?
-                <span className={`hazard-indicator ${formData.hazardQuestions.interfaceError ? 'active' : ''}`}>• {hazardIndicators.interfaceError}</span>
+                <div className="checkbox-text">
+                  <strong>Есть ли риск неправильного выбора режима или ошибки интерфейса?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.interfaceError ? 'active' : ''}`}>• {hazardIndicators.interfaceError}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2224,8 +2100,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.alarms}
                   onChange={handleHazardChange}
                 />
-                Отображает ли изделие сигналы тревоги или предупреждения?
-                <span className={`hazard-indicator ${formData.hazardQuestions.alarms ? 'active' : ''}`}>• {hazardIndicators.alarms}</span>
+                <div className="checkbox-text">
+                  <strong>Отображает ли изделие сигналы тревоги или предупреждения?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.alarms ? 'active' : ''}`}>• {hazardIndicators.alarms}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2242,8 +2120,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.isSterile}
                     onChange={handleHazardChange}
                   />
-                  Изделие является стерильным?
+                <div className="checkbox-text">
+                  <strong>Изделие является стерильным?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.isSterile ? 'active' : ''}`}>• {hazardIndicators.isSterile}</span>
+                </div>
                 </label>
                 <label className="checkbox-label">
                   <input
@@ -2252,8 +2132,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.reusable}
                     onChange={handleHazardChange}
                   />
-                  Изделие многоразовое (повторная очистка и дезинфекция)?
+                <div className="checkbox-text">
+                  <strong>Изделие многоразовое (повторная очистка и дезинфекция)?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.reusable ? 'active' : ''}`}>• {hazardIndicators.reusable}</span>
+                </div>
                 </label>
                 <label className="checkbox-label">
                   <input
@@ -2262,8 +2144,10 @@ const ProjectForm = () => {
                     checked={formData.hazardQuestions.biologicalContact}
                     onChange={handleHazardChange}
                   />
-                  Имеет ли изделие контакт с биологическими жидкостями?
+                <div className="checkbox-text">
+                  <strong>Имеет ли изделие контакт с биологическими жидкостями?</strong>
                   <span className={`hazard-indicator ${formData.hazardQuestions.biologicalContact ? 'active' : ''}`}>• {hazardIndicators.biologicalContact}</span>
+                </div>
                 </label>
               </div>
             </div>
@@ -2280,8 +2164,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.chemicalSubstances}
                   onChange={handleHazardChange}
                 />
-                Содержит ли изделие химически активные вещества или реагенты?
-                <span className={`hazard-indicator ${formData.hazardQuestions.chemicalSubstances ? 'active' : ''}`}>• {hazardIndicators.chemicalSubstances}</span>
+                <div className="checkbox-text">
+                  <strong>Содержит ли изделие химически активные вещества или реагенты?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.chemicalSubstances ? 'active' : ''}`}>• {hazardIndicators.chemicalSubstances}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2290,8 +2176,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.chemicalRelease}
                   onChange={handleHazardChange}
                 />
-                Возможен ли выброс, испарение или утечка химических веществ при эксплуатации?
-                <span className={`hazard-indicator ${formData.hazardQuestions.chemicalRelease ? 'active' : ''}`}>• {hazardIndicators.chemicalRelease}</span>
+                <div className="checkbox-text">
+                  <strong>Возможен ли выброс, испарение или утечка химических веществ при эксплуатации?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.chemicalRelease ? 'active' : ''}`}>• {hazardIndicators.chemicalRelease}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2300,8 +2188,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.chemicalSterilization}
                   onChange={handleHazardChange}
                 />
-                Требует ли изделие стерилизации химическими агентами?
-                <span className={`hazard-indicator ${formData.hazardQuestions.chemicalSterilization ? 'active' : ''}`}>• {hazardIndicators.chemicalSterilization}</span>
+                <div className="checkbox-text">
+                  <strong>Требует ли изделие стерилизации химическими агентами?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.chemicalSterilization ? 'active' : ''}`}>• {hazardIndicators.chemicalSterilization}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2317,8 +2207,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.animalMaterials}
                   onChange={handleHazardChange}
                 />
-                Используются ли материалы или компоненты животного происхождения (коллаген, желатин и т.п.)?
-                <span className={`hazard-indicator ${formData.hazardQuestions.animalMaterials ? 'active' : ''}`}>• {hazardIndicators.animalMaterials}</span>
+                <div className="checkbox-text">
+                  <strong>Используются ли материалы или компоненты животного происхождения (коллаген, желатин и т.п.)?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.animalMaterials ? 'active' : ''}`}>• {hazardIndicators.animalMaterials}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2334,8 +2226,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.nanomaterials}
                   onChange={handleHazardChange}
                 />
-                Содержит ли изделие наночастицы, нанопокрытия или наноструктуры?
-                <span className={`hazard-indicator ${formData.hazardQuestions.nanomaterials ? 'active' : ''}`}>• {hazardIndicators.nanomaterials}</span>
+                <div className="checkbox-text">
+                  <strong>Содержит ли изделие наночастицы, нанопокрытия или наноструктуры?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.nanomaterials ? 'active' : ''}`}>• {hazardIndicators.nanomaterials}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2351,8 +2245,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.pharmaceutical}
                   onChange={handleHazardChange}
                 />
-                Содержит ли изделие лекарственные вещества или покрытия с высвобождением субстанции?
-                <span className={`hazard-indicator ${formData.hazardQuestions.pharmaceutical ? 'active' : ''}`}>• {hazardIndicators.pharmaceutical}</span>
+                <div className="checkbox-text">
+                  <strong>Содержит ли изделие лекарственные вещества или покрытия с высвобождением субстанции?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.pharmaceutical ? 'active' : ''}`}>• {hazardIndicators.pharmaceutical}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2368,8 +2264,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.environmentalSensitivity}
                   onChange={handleHazardChange}
                 />
-                Чувствительно ли изделие к температуре, влажности, пыли, вибрации или ЭМИ?
-                <span className={`hazard-indicator ${formData.hazardQuestions.environmentalSensitivity ? 'active' : ''}`}>• {hazardIndicators.environmentalSensitivity}</span>
+                <div className="checkbox-text">
+                  <strong>Чувствительно ли изделие к температуре, влажности, пыли, вибрации или ЭМИ?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.environmentalSensitivity ? 'active' : ''}`}>• {hazardIndicators.environmentalSensitivity}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2378,8 +2276,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.environmentalImpact}
                   onChange={handleHazardChange}
                 />
-                Может ли изделие оказывать влияние на окружающую среду при утилизации?
-                <span className={`hazard-indicator ${formData.hazardQuestions.environmentalImpact ? 'active' : ''}`}>• {hazardIndicators.environmentalImpact}</span>
+                <div className="checkbox-text">
+                  <strong>Может ли изделие оказывать влияние на окружающую среду при утилизации?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.environmentalImpact ? 'active' : ''}`}>• {hazardIndicators.environmentalImpact}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2395,8 +2295,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.mechanicalLoad}
                   onChange={handleHazardChange}
                 />
-                Подвержено ли изделие механическим нагрузкам, вибрации, ударам?
-                <span className={`hazard-indicator ${formData.hazardQuestions.mechanicalLoad ? 'active' : ''}`}>• {hazardIndicators.mechanicalLoad}</span>
+                <div className="checkbox-text">
+                  <strong>Подвержено ли изделие механическим нагрузкам, вибрации, ударам?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.mechanicalLoad ? 'active' : ''}`}>• {hazardIndicators.mechanicalLoad}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2405,8 +2307,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.destructionRisk}
                   onChange={handleHazardChange}
                 />
-                Есть ли риск разрушения, деформации, разгерметизации?
-                <span className={`hazard-indicator ${formData.hazardQuestions.destructionRisk ? 'active' : ''}`}>• {hazardIndicators.destructionRisk}</span>
+                <div className="checkbox-text">
+                  <strong>Есть ли риск разрушения, деформации, разгерметизации?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.destructionRisk ? 'active' : ''}`}>• {hazardIndicators.destructionRisk}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2422,8 +2326,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.heating}
                   onChange={handleHazardChange}
                 />
-                Может ли изделие нагреваться или охлаждаться при использовании?
-                <span className={`hazard-indicator ${formData.hazardQuestions.heating ? 'active' : ''}`}>• {hazardIndicators.heating}</span>
+                <div className="checkbox-text">
+                  <strong>Может ли изделие нагреваться или охлаждаться при использовании?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.heating ? 'active' : ''}`}>• {hazardIndicators.heating}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2432,8 +2338,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.surfaceContact}
                   onChange={handleHazardChange}
                 />
-                Контактирует ли пользователь или пациент с горячими или холодными поверхностями?
-                <span className={`hazard-indicator ${formData.hazardQuestions.surfaceContact ? 'active' : ''}`}>• {hazardIndicators.surfaceContact}</span>
+                <div className="checkbox-text">
+                  <strong>Контактирует ли пользователь или пациент с горячими или холодными поверхностями?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.surfaceContact ? 'active' : ''}`}>• {hazardIndicators.surfaceContact}</span>
+                </div>
               </label>
             </div>
           </div>
@@ -2449,8 +2357,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.clinicalUse}
                   onChange={handleHazardChange}
                 />
-                Используется ли изделие в диагностике, лечении, реабилитации или мониторинге состояния пациента?
-                <span className={`hazard-indicator ${formData.hazardQuestions.clinicalUse ? 'active' : ''}`}>• {hazardIndicators.clinicalUse}</span>
+                <div className="checkbox-text">
+                  <strong>Используется ли изделие в диагностике, лечении, реабилитации или мониторинге состояния пациента?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.clinicalUse ? 'active' : ''}`}>• {hazardIndicators.clinicalUse}</span>
+                </div>
               </label>
               <label className="checkbox-label">
                 <input
@@ -2459,8 +2369,10 @@ const ProjectForm = () => {
                   checked={formData.hazardQuestions.clinicalError}
                   onChange={handleHazardChange}
                 />
-                Может ли ошибка применения привести к клиническим последствиям?
-                <span className={`hazard-indicator ${formData.hazardQuestions.clinicalError ? 'active' : ''}`}>• {hazardIndicators.clinicalError}</span>
+                <div className="checkbox-text">
+                  <strong>Может ли ошибка применения привести к клиническим последствиям?</strong>
+                  <span className={`hazard-indicator ${formData.hazardQuestions.clinicalError ? 'active' : ''}`}>• {hazardIndicators.clinicalError}</span>
+                </div>
               </label>
             </div>
           </div>

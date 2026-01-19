@@ -91,6 +91,11 @@ class ProjectMemberCreate(ProjectMemberBase):
     pass
 
 
+class ProjectMemberRoleUpdate(BaseModel):
+    """Schema for updating a project member role"""
+    role: ProjectRole
+
+
 class ProjectMemberResponse(BaseModel):
     """Schema for project member response"""
     id: int

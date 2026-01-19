@@ -112,17 +112,17 @@
 /* Risk Summary */
 .risk-summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
   margin-bottom: 30px;
 }
 
 .summary-card {
   background: white;
-  border-radius: 15px;
-  padding: 25px;
+  border-radius: 12px;
+  padding: 16px;
   text-align: center;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   border: 2px solid #000000; /* black outline for default (Total Risks) */
   transition: all 0.3s ease;
 }
@@ -148,14 +148,14 @@
 }
 
 .summary-number {
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 700;
   color: #131313;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .summary-label {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   color: #4A4A4A;
 }
@@ -514,6 +514,11 @@
   text-overflow: ellipsis;
 }
 
+.risk-table td.actions-cell {
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .risk-row:hover {
   background-color: #F8F9FA;
 }
@@ -645,14 +650,16 @@
   width: 12%;
   text-align: center;
   white-space: nowrap;
+  overflow: visible;
+  min-width: 110px;
 }
 
 .action-btn {
   background-color: #D9D9D9;
   border: none;
   border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 16px;
+  padding: 6px 8px;
+  font-size: 15px;
   font-weight: 600;
   color: #131313;
   cursor: pointer;
@@ -662,7 +669,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
+  min-width: 30px;
   height: auto;
   line-height: 1;
 }
@@ -865,7 +872,7 @@
 /* Responsive Design */
 @media (max-width: 1024px) {
   .risk-summary {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   
   .analysis-controls {
@@ -891,7 +898,7 @@
   }
   
   .risk-summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   
   .filter-section {

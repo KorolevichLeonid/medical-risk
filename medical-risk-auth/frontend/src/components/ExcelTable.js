@@ -213,11 +213,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       return row.risk_status !== 'closed' && row.risk_status !== 'fully_closed';
     }
 
-    // Если в столбце "Новые риски" выбрано "нет" - блокируем редактирование
-    if (columnKey === 'new_risks' && row.new_risks && row.new_risks.startsWith('нет')) {
-      return true;
-    }
-
     if (columnKey === 'comment_1') {
       return !row.first_evaluation_done;
     }
@@ -1895,71 +1890,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         onClick={handleCellClick}
       >
         {isEditing && canEdit && !isLocked ? (
-          column.key === 'new_risks' ? (
-            // Special handling for new_risks: show choice selector + optional text input
-            <div style={{
-              position: 'relative',
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
-              <select
-                className="excel-cell-input"
-                value={value.startsWith('да:') ? 'да' : value.startsWith('нет') ? 'нет' : ''}
-                onChange={(e) => {
-                  const choice = e.target.value;
-                  if (choice === 'да') {
-                    // If switching to "да", preserve any existing comment
-                    const existingComment = value.startsWith('да:') ? value.substring(3) : '';
-                    handleCellChange(rowIndex, column.key, `да:${existingComment}`);
-                  } else if (choice === 'нет') {
-                    handleCellChange(rowIndex, column.key, 'нет');
-                  } else {
-                    handleCellChange(rowIndex, column.key, '');
-                  }
-                }}
-                style={{
-                  backgroundColor: 'transparent',
-                  width: '100%',
-                  flex: value.startsWith('да:') ? '0 0 40%' : '1',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  padding: '12px 8px',
-                  border: 'none',
-                  boxSizing: 'border-box',
-                  zIndex: 3
-                }}
-              >
-                <option value="">—</option>
-                <option value="да">да</option>
-                <option value="нет">нет</option>
-              </select>
-              {value.startsWith('да:') && (
-                <textarea
-                  className="excel-cell-input"
-                  value={value.substring(3)} // Remove "да:" prefix
-                  onChange={(e) => {
-                    const comment = e.target.value;
-                    handleCellChange(rowIndex, column.key, `да:${comment}`);
-                  }}
-                  onBlur={handleCellBlur}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Комментарий..."
-                  style={{
-                    backgroundColor: 'transparent',
-                    width: '100%',
-                    flex: '1',
-                    padding: '8px',
-                    border: 'none',
-                    resize: 'none',
-                    fontSize: '12px',
-                    zIndex: 2
-                  }}
-                />
-              )}
-            </div>
-          ) : column.key === 'risk_benefit_analysis' ? (
+          column.key === 'risk_benefit_analysis' ? (
             <select
               className="excel-cell-input"
               value={value}
@@ -2010,32 +1941,9 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
               position: 'relative',
               zIndex: 2
             }}
-            title={isLocked ? (row.new_risks && row.new_risks.startsWith('нет') && column.key === 'new_risks' ? 'Выбрано "нет" - редактирование заблокировано' : 'Эта ячейка управляется из Risk Analysis') : ''}
+            title={isLocked ? 'Эта ячейка управляется из Risk Analysis' : ''}
           >
-            {column.key === 'new_risks' && value.startsWith('да:') ? (
-              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                <span style={{
-                  position: 'absolute',
-                  top: '2px',
-                  left: '2px',
-                  fontSize: '11px',
-                  color: '#666',
-                  fontWeight: 'bold'
-                }}>
-                  да
-                </span>
-                <div style={{
-                  padding: '18px 4px 4px 4px',
-                  whiteSpace: 'normal',
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word'
-                }}>
-                  {value.substring(3) || ''}
-                </div>
-              </div>
-            ) : (
-              value || ''
-            )}
+            {value || ''}
           </div>
         )}
       </div>

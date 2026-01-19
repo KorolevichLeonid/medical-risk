@@ -24,7 +24,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 10px 16px;
   background: linear-gradient(to right, #8b9dc3, #9fa8b4);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -45,7 +45,7 @@
 
 .excel-toolbar-left h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 16px;
   color: white;
   font-weight: 600;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -138,16 +138,16 @@
 
 /* Buttons */
 .excel-btn {
-  padding: 10px 20px;
+  padding: 6px 14px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 6px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
 }
 
 .excel-btn-save {
@@ -182,10 +182,10 @@
 /* Tabs */
 .excel-tabs {
   display: flex;
-  gap: 8px;
-  padding: 12px 24px;
+  gap: 6px;
+  padding: 8px 16px;
   background: white;
-  border-bottom: 3px solid #e0e0e0;
+  border-bottom: 2px solid #e0e0e0;
   overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: #8b9dc3 #f1f1f1;
@@ -213,11 +213,11 @@
 .excel-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
+  gap: 6px;
+  padding: 6px 12px;
   background: #f5f5f5;
   border: none;
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px 6px 0 0;
   cursor: pointer;
   transition: all 0.3s ease;
   white-space: nowrap;
@@ -239,11 +239,11 @@
 }
 
 .tab-icon {
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .tab-name {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* Sheet name input */

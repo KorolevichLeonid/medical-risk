@@ -10,14 +10,17 @@ import json
 from ..database import get_db
 from ..models.user import User, UserRole
 from ..models.project import Project, ProjectMember, ProjectVersion, ProjectStatus, ProjectRole
+from ..models.risk_analysis import RiskAnalysis, RiskFactor, RiskManagementTable
 from ..schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse,
-    ProjectMemberCreate, ProjectMemberResponse, ProjectVersionCreate, ProjectVersionResponse
+    ProjectMemberCreate, ProjectMemberResponse, ProjectMemberRoleUpdate,
+    ProjectVersionCreate, ProjectVersionResponse
 )
 from ..routers.auth import get_current_active_user
 from ..core.logging import (
     log_project_created, log_project_updated, log_project_deleted,
-    log_project_status_changed, log_project_member_added, log_project_member_removed
+    log_project_status_changed, log_project_member_added, log_project_member_removed,
+    log_project_member_role_changed
 )
 
 # Default probability levels (4 levels)
@@ -43,6 +46,103 @@ DEFAULT_PROBABILITY_LEVELS = [
         "description": "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)"
     }
 ]
+
+def _safe_json_list(value):
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    try:
+        parsed = json.loads(value)
+        return parsed if isinstance(parsed, list) else []
+    except (TypeError, json.JSONDecodeError):
+        return []
+
+
+def _extract_hazard_category_text(risk: RiskFactor) -> str:
+    hazard_name = risk.hazard_name or ""
+    if hazard_name.startswith("[") and "]" in hazard_name:
+        return hazard_name.split("]", 1)[0].lstrip("[")
+    if risk.hazard_category is None:
+        return ""
+    return risk.hazard_category.value if hasattr(risk.hazard_category, "value") else str(risk.hazard_category)
+
+
+def _calculate_coverage_progress(db: Session, project: Project) -> float:
+    lifecycle_stages = _safe_json_list(project.lifecycle_stages) + _safe_json_list(project.custom_lifecycle_stages)
+    hazard_categories = _safe_json_list(project.active_hazard_categories)
+
+    if not lifecycle_stages or not hazard_categories:
+        return 0.0
+
+    total_required = len(lifecycle_stages) * len(hazard_categories)
+    if total_required == 0:
+        return 0.0
+
+    analysis = db.query(RiskAnalysis).filter(
+        RiskAnalysis.project_id == project.id
+    ).order_by(RiskAnalysis.created_at.desc()).first()
+
+    if not analysis:
+        return 0.0
+
+    covered = set()
+    lifecycle_set = set(lifecycle_stages)
+    hazard_set = set(hazard_categories)
+
+    for risk in analysis.risk_factors:
+        risk_status = "new"
+
+        if risk.lifecycle_stage:
+            table = db.query(RiskManagementTable).filter(
+                RiskManagementTable.project_id == project.id,
+                RiskManagementTable.sheet_id == risk.lifecycle_stage
+            ).first()
+
+            if table and table.rows:
+                factor_id_str = str(risk.id)
+                matched_row = None
+
+                for row in table.rows:
+                    row_data = row.data or {}
+                    row_risk_id = row_data.get("risk_id", "")
+
+                    if row_risk_id == factor_id_str:
+                        matched_row = row
+                        break
+
+                    if not matched_row:
+                        clean_factor_name = risk.hazard_name
+                        if risk.hazard_name and "[" in risk.hazard_name:
+                            parts = risk.hazard_name.split("]", 1)
+                            if len(parts) > 1:
+                                clean_factor_name = parts[1].strip()
+
+                        row_hazard_name = row_data.get("hazard_name", "")
+                        row_situation = row_data.get("hazardous_situation", "")
+                        row_harm = row_data.get("harm", "")
+
+                        if (
+                            row_situation == risk.hazardous_situation
+                            and row_harm == risk.harm
+                            and (row_hazard_name == clean_factor_name or row_hazard_name == risk.hazard_name)
+                        ):
+                            matched_row = row
+
+                if matched_row:
+                    matched_data = matched_row.data or {}
+                    risk_status = matched_data.get("risk_status", "new")
+
+        if risk_status not in ["closed", "fully_closed"]:
+            continue
+
+        stage = risk.lifecycle_stage
+        hazard = _extract_hazard_category_text(risk)
+        if stage in lifecycle_set and hazard in hazard_set:
+            covered.add(f"{stage}|||{hazard}")
+
+    coverage_percentage = round((len(covered) / total_required) * 100)
+    return float(coverage_percentage)
 
 router = APIRouter()
 
@@ -171,7 +271,7 @@ async def read_projects(
             id=project.id,
             name=project.name,
             status=project.status,
-            progress_percentage=project.progress_percentage,
+            progress_percentage=_calculate_coverage_progress(db, project),
             device_name=project.device_name,
             owner_id=project.owner_id,
             created_at=project.created_at,
@@ -192,6 +292,9 @@ async def create_project(
 ):
     """Create a new project (all users can create projects)"""
     # All users can create projects
+
+    if not project.lifecycle_stages or len(project.lifecycle_stages) == 0:
+        raise HTTPException(status_code=400, detail="Выберите хотя бы один этап жизненного цикла")
     
     db_project = Project(
         name=project.name,
@@ -331,7 +434,7 @@ async def create_project(
         name=db_project.name,
         description=db_project.description,
         status=db_project.status,
-        progress_percentage=db_project.progress_percentage,
+        progress_percentage=_calculate_coverage_progress(db, db_project),
         device_name=db_project.device_name,
         device_model=db_project.device_model,
         device_purpose=db_project.device_purpose,
@@ -451,7 +554,7 @@ async def read_project(
         name=db_project.name,
         description=db_project.description,
         status=db_project.status,
-        progress_percentage=db_project.progress_percentage,
+        progress_percentage=_calculate_coverage_progress(db, db_project),
         device_name=db_project.device_name,
         device_model=db_project.device_model,
         device_purpose=db_project.device_purpose,
@@ -518,6 +621,8 @@ async def update_project(
     
     # Update fields if provided
     update_data = project_update.dict(exclude_unset=True)
+    if 'lifecycle_stages' in update_data and not update_data['lifecycle_stages']:
+        raise HTTPException(status_code=400, detail="Выберите хотя бы один этап жизненного цикла")
     # Handle JSON serialization for specific fields
     if 'lifecycle_stages' in update_data:
         update_data['lifecycle_stages'] = json.dumps(update_data['lifecycle_stages']) if update_data['lifecycle_stages'] else None
@@ -653,7 +758,7 @@ async def update_project(
         name=db_project.name,
         description=db_project.description,
         status=db_project.status,
-        progress_percentage=db_project.progress_percentage,
+        progress_percentage=_calculate_coverage_progress(db, db_project),
         device_name=db_project.device_name,
         device_model=db_project.device_model,
         device_purpose=db_project.device_purpose,
@@ -844,6 +949,68 @@ async def add_project_member(
         user_email=user.email,
         user_first_name=user.first_name,
         user_last_name=user.last_name
+    )
+
+
+@router.put("/{project_id}/members/{user_id}", response_model=ProjectMemberResponse)
+async def update_project_member_role(
+    project_id: int,
+    user_id: int,
+    role_update: ProjectMemberRoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a project member role"""
+    db_project = get_project(db, project_id=project_id)
+    if db_project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not check_project_member_management_permission(db_project, current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to manage project members"
+        )
+
+    # Cannot change project owner role
+    if user_id == db_project.owner_id:
+        raise HTTPException(status_code=400, detail="Cannot change project owner role")
+
+    member = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user_id
+    ).first()
+
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    old_role = member.role.value
+    member.role = role_update.role
+    db.commit()
+    db.refresh(member)
+
+    member_user = db.query(User).filter(User.id == user_id).first()
+    member_name = f"{member_user.first_name} {member_user.last_name}" if member_user else f"User {user_id}"
+
+    await log_project_member_role_changed(
+        db=db,
+        user=current_user,
+        project_id=project_id,
+        project_name=db_project.name,
+        member_id=user_id,
+        member_name=member_name,
+        old_role=old_role,
+        new_role=member.role.value
+    )
+
+    return ProjectMemberResponse(
+        id=member.id,
+        project_id=member.project_id,
+        user_id=member.user_id,
+        role=member.role.value,
+        joined_at=member.joined_at,
+        user_email=member_user.email if member_user else "",
+        user_first_name=member_user.first_name if member_user else "",
+        user_last_name=member_user.last_name if member_user else ""
     )
 
 
