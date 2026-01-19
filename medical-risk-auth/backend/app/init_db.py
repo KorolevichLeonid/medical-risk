@@ -39,6 +39,30 @@ DEFAULT_SEVERITY_LEVELS = [
 ]
 
 DEFAULT_RISK_THRESHOLD = 10
+
+# Default probability levels (4 levels)
+DEFAULT_PROBABILITY_LEVELS = [
+    {
+        "level": 1,
+        "name": "Маловероятный",
+        "description": "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)"
+    },
+    {
+        "level": 2,
+        "name": "Отдаленный",
+        "description": "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)"
+    },
+    {
+        "level": 3,
+        "name": "Эпизодический",
+        "description": "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)"
+    },
+    {
+        "level": 4,
+        "name": "Частый",
+        "description": "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)"
+    }
+]
 def create_tables():
     """Create all database tables"""
     from .models import user, project, risk_analysis
@@ -87,6 +111,40 @@ def ensure_project_severity_columns():
         )
 
 
+def ensure_project_probability_columns():
+    """Ensure probability_levels exist and have defaults."""
+    inspector = inspect(engine)
+    if "projects" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("projects")}
+    needs_probability = "probability_levels" not in columns
+
+    if not needs_probability:
+        return
+
+    default_probability_json = json.dumps(DEFAULT_PROBABILITY_LEVELS, ensure_ascii=False)
+
+    with engine.begin() as conn:
+        if engine.url.drivername.startswith("sqlite"):
+            if needs_probability:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN probability_levels TEXT"))
+        else:
+            if needs_probability:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS probability_levels TEXT"))
+
+        conn.execute(
+            text(
+                """
+                UPDATE projects
+                SET probability_levels = :probability
+                WHERE probability_levels IS NULL OR probability_levels = ''
+                """
+            ),
+            {"probability": default_probability_json},
+        )
+
+
 def create_admin_user():
     """Check if any admin user exists for Azure auth system"""
     db = SessionLocal()
@@ -114,6 +172,10 @@ def init_database():
     # Ensure new columns exist for severity configuration
     ensure_project_severity_columns()
     print("[+] Project severity configuration ensured")
+
+    # Ensure probability levels column exists
+    ensure_project_probability_columns()
+    print("[+] Project probability levels configuration ensured")
 
     # Initialize permissions
     import sys

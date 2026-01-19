@@ -20,6 +20,30 @@ from ..core.logging import (
     log_project_status_changed, log_project_member_added, log_project_member_removed
 )
 
+# Default probability levels (4 levels)
+DEFAULT_PROBABILITY_LEVELS = [
+    {
+        "level": 1,
+        "name": "Маловероятный",
+        "description": "Маловероятно произойти (только в исключительном случае стечения нескольких редких ошибок и/или обстоятельств)"
+    },
+    {
+        "level": 2,
+        "name": "Отдаленный",
+        "description": "Может произойти, но не часто (возможно для немногих устройств, один или два раза за время эксплуатации)"
+    },
+    {
+        "level": 3,
+        "name": "Эпизодический",
+        "description": "Вероятно произойти (возможно для многих устройств один или два раза за время эксплуатации, или для отдельных устройств несколько раз за время эксплуатации)"
+    },
+    {
+        "level": 4,
+        "name": "Частый",
+        "description": "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)"
+    }
+]
+
 router = APIRouter()
 
 
@@ -196,7 +220,7 @@ async def create_project(
         hazard_checklist_answers=json.dumps(project.hazard_checklist_answers) if project.hazard_checklist_answers else None,
         active_hazard_categories=json.dumps(project.active_hazard_categories) if project.active_hazard_categories else None,
         severity_levels=json.dumps(project.severity_levels) if project.severity_levels else None,
-        probability_levels=json.dumps(project.probability_levels) if project.probability_levels else None,
+        probability_levels=json.dumps(project.probability_levels or DEFAULT_PROBABILITY_LEVELS),
         risk_threshold=project.risk_threshold if project.risk_threshold else 10
     )
     db.add(db_project)
