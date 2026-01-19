@@ -30,15 +30,28 @@ app = FastAPI(
 )
 
 # Configure CORS
+# Get allowed origins from environment or use defaults
+import os
+cors_origins = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else []
+# Remove empty strings from list
+cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+
+# Default origins (development + production)
+default_origins = [
+    "http://localhost:3000",      # React dev server
+    "http://localhost:3001",      # Alternative React dev server
+    "http://127.0.0.1:3000",      # Alternative localhost
+    "http://127.0.0.1:3001",      # Alternative localhost
+    "https://medical-risk-frontend.onrender.com",  # Production frontend
+    "https://medical-risk-backend.onrender.com",   # Production backend (for docs)
+]
+
+# Combine environment origins with defaults, remove duplicates
+all_origins = list(set(default_origins + cors_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",      # React dev server
-        "http://localhost:3001",      # Alternative React dev server
-        "http://127.0.0.1:3000",      # Alternative localhost
-        "http://127.0.0.1:3001",      # Alternative localhost
-        "*"  # Allow all origins for development (remove in production!)
-    ],
+    allow_origins=all_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
