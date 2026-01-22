@@ -164,12 +164,12 @@ class RiskManagementReportGenerator:
             ('2', 'СОДЕРЖАНИЕ', '2'),
             ('3', 'ИДЕНТИФИКАЦИЯ ИЗДЕЛИЯ И НАЗНАЧЕНИЕ', '3'),
             ('4', 'Identification of Hazards (Идентификация опасностей)', '4'),
-            ('5', 'Risk Analysis (Before Risk Control)', '5-8'),
-            ('6', 'Risk Control Measures (Меры управления рисками)', '9-10'),
-            ('7', 'Residual Risk Evaluation', '11-12'),
-            ('8', 'Overall Residual Risk Acceptability (Оценка совокупного остаточного риска)', '13-14'),
-            ('9', 'Conclusions and Approval', '15'),
-            ('10', 'References and Document Control', '16'),
+            ('5', 'Risk Analysis (Before Risk Control)', '5'),
+            ('6', 'Risk Control Measures (Меры управления рисками)', '6'),
+            ('7', 'Residual Risk Evaluation', '7'),
+            ('8', 'Overall Residual Risk Acceptability (Оценка совокупного остаточного риска)', '8'),
+            ('9', 'Conclusions and Approval', '9'),
+            ('10', 'References and Document Control', '10'),
         ]
 
         for section_num, section_name, page_num in sections_data:
@@ -991,21 +991,32 @@ class PDFRiskManagementReportGenerator:
         """Add table of contents - Section 2"""
         story.append(Paragraph('2. СОДЕРЖАНИЕ', self.styles['Heading1']))
 
-        sections = [
-            "1. ТИТУЛЬНЫЙ ЛИСТ",
-            "2. СОДЕРЖАНИЕ",
-            "3. ИДЕНТИФИКАЦИЯ ИЗДЕЛИЯ И НАЗНАЧЕНИЕ",
-            "4. Identification of Hazards (Идентификация опасностей)",
-            "5. Risk Analysis (Before Risk Control)",
-            "6. Risk Control Measures (Меры управления рисками)",
-            "7. Residual Risk Evaluation",
-            "8. Overall Residual Risk Acceptability (Оценка совокупного остаточного риска)",
-            "9. Conclusions and Approval",
-            "10. References and Document Control"
+        toc_data = [
+            ['1', 'ТИТУЛЬНЫЙ ЛИСТ', '1'],
+            ['2', 'СОДЕРЖАНИЕ', '2'],
+            ['3', 'ИДЕНТИФИКАЦИЯ ИЗДЕЛИЯ И НАЗНАЧЕНИЕ', '3'],
+            ['4', 'Identification of Hazards (Идентификация опасностей)', '4'],
+            ['5', 'Risk Analysis (Before Risk Control)', '5'],
+            ['6', 'Risk Control Measures (Меры управления рисками)', '6'],
+            ['7', 'Residual Risk Evaluation', '7'],
+            ['8', 'Overall Residual Risk Acceptability (Оценка совокупного остаточного риска)', '8'],
+            ['9', 'Conclusions and Approval', '9'],
+            ['10', 'References and Document Control', '10']
         ]
 
-        for section in sections:
-            story.append(Paragraph(f'• {section}', self.styles['Normal']))
+        table = Table(toc_data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 20))
 
         story.append(PageBreak())
 
