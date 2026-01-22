@@ -323,6 +323,11 @@ class RiskManagementReportGenerator:
     
     def _add_risk_analysis(self):
         """Add risk analysis section - Section 5"""
+        # Set landscape orientation for this section
+        current_section = self.doc.sections[-1]
+        current_section.orientation = 1  # 1 = landscape, 0 = portrait
+        current_section.page_width, current_section.page_height = current_section.page_height, current_section.page_width
+
         self.doc.add_heading('5. Risk Analysis (Before Risk Control)', level=1)
         
         self.doc.add_heading('5.1 Методология оценки', level=2)
@@ -472,6 +477,11 @@ class RiskManagementReportGenerator:
     
     def _add_risk_control_measures(self):
         """Add risk control measures section - Section 6"""
+        # Set landscape orientation for this section
+        current_section = self.doc.sections[-1]
+        current_section.orientation = 1  # 1 = landscape, 0 = portrait
+        current_section.page_width, current_section.page_height = current_section.page_height, current_section.page_width
+
         self.doc.add_heading('6. Risk Control Measures (Меры управления рисками)', level=1)
 
         self.doc.add_heading('6.1 Цель раздела', level=2)
@@ -577,6 +587,11 @@ class RiskManagementReportGenerator:
     
     def _add_residual_risk_evaluation(self):
         """Add residual risk evaluation section - Section 7"""
+        # Set landscape orientation for this section
+        current_section = self.doc.sections[-1]
+        current_section.orientation = 1  # 1 = landscape, 0 = portrait
+        current_section.page_width, current_section.page_height = current_section.page_height, current_section.page_width
+
         self.doc.add_heading('7. Residual Risk Evaluation', level=1)
 
         self.doc.add_heading('7.1 Цель раздела', level=2)
