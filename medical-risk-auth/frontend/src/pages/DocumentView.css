@@ -1,7 +1,7 @@
 .document-view {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 0;
+  max-width: none;
+  margin: 0;
 }
 
 /* Header */
@@ -92,8 +92,9 @@
 .document-info-card {
   background: white;
   border-radius: 12px;
-  padding: 2rem;
+  padding: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin: 0;
 }
 
 .document-badge-container {
@@ -132,8 +133,8 @@
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: 1fr;
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
