@@ -329,9 +329,9 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 120px);
   position: sticky;
-  top: 2rem;
+  top: 0;
 }
 
 .panel-header {
