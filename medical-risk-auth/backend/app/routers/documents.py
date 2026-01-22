@@ -688,11 +688,7 @@ def generate_html_preview(project, doc_version, risks, team_members):
             <p>Пример недопустимого риска:</p>
             <p>Тяжесть: 5 × Вероятность: 5 = Риск: 25 ✗ недопустимый (при пороге {getattr(project, 'risk_threshold', 10)})</p>
 
-            <table>
-                <tr><th>Диапазон</th><th>Категория риска</th><th>Интерпретация</th></tr>
-                <tr><td>1–{max(1, getattr(project, 'risk_threshold', 10) - 1)}</td><td>Низкий (Acceptable)</td><td>Допустимый без мер</td></tr>
-                <tr><td>{getattr(project, 'risk_threshold', 10)}–25</td><td>Высокий (Unacceptable)</td><td>Требует мер контроля</td></tr>
-            </table>
+
             
             
         
