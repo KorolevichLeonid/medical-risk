@@ -633,7 +633,18 @@ def generate_html_preview(project, doc_version, risks, team_members):
         <!-- 2. СОДЕРЖАНИЕ -->
         <div class="section">
             <h2>2. СОДЕРЖАНИЕ</h2>
-            <p>Все разделы ниже</p>
+            <table class="info-table">
+                <tr><td>1</td><td>ТИТУЛЬНЫЙ ЛИСТ</td><td>1</td></tr>
+                <tr><td>2</td><td>СОДЕРЖАНИЕ</td><td>2</td></tr>
+                <tr><td>3</td><td>ИДЕНТИФИКАЦИЯ ИЗДЕЛИЯ И НАЗНАЧЕНИЕ</td><td>3</td></tr>
+                <tr><td>4</td><td>Identification of Hazards (Идентификация опасностей)</td><td>4</td></tr>
+                <tr><td>5</td><td>Risk Analysis (Before Risk Control)</td><td>5</td></tr>
+                <tr><td>6</td><td>Risk Control Measures (Меры управления рисками)</td><td>6</td></tr>
+                <tr><td>7</td><td>Residual Risk Evaluation</td><td>7</td></tr>
+                <tr><td>8</td><td>Overall Residual Risk Acceptability (Оценка совокупного остаточного риска)</td><td>8</td></tr>
+                <tr><td>9</td><td>Conclusions and Approval</td><td>9</td></tr>
+                <tr><td>10</td><td>References and Document Control</td><td>10</td></tr>
+            </table>
         </div>
         
         <!-- 3. ИДЕНТИФИКАЦИЯ ИЗДЕЛИЯ -->

@@ -849,11 +849,15 @@ async def delete_project(
         # 4. Delete project versions
         db.query(ProjectVersion).filter(ProjectVersion.project_id == project_id).delete()
 
-        # 5. Delete changelog entries for this project
+        # 5. Delete document versions
+        from ..models import DocumentVersion
+        db.query(DocumentVersion).filter(DocumentVersion.project_id == project_id).delete()
+
+        # 6. Delete changelog entries for this project
         from ..models.changelog import ChangeLog
         db.query(ChangeLog).filter(ChangeLog.project_id == project_id).delete()
 
-        # 6. Delete project invitations (if the table exists)
+        # 7. Delete project invitations (if the table exists)
         try:
             # Try to delete from project_invitations table if it exists
             from sqlalchemy import text
@@ -862,7 +866,7 @@ async def delete_project(
             # Table might not exist, continue silently
             pass
 
-        # 7. Finally, delete the project itself
+        # 8. Finally, delete the project itself
         db.delete(db_project)
 
         db.commit()

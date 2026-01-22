@@ -85,6 +85,15 @@ class Project(Base):
     intended_use = Column(Text, nullable=True)
     user_profile = Column(Text, nullable=True)
     operating_environment = Column(Text, nullable=True)
+
+    # Manufacturer information
+    manufacturer = Column(String, nullable=True)
+    manufacturer_address = Column(Text, nullable=True)
+
+    # Additional device characteristics
+    patient_population = Column(Text, nullable=True)
+    key_performance_characteristics = Column(Text, nullable=True)
+    safety_characteristics = Column(Text, nullable=True)
     
     # Technical specifications
     technical_specs = Column(Text, nullable=True)

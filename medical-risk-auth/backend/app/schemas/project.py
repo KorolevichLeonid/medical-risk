@@ -19,6 +19,16 @@ class ProjectBase(BaseModel):
     intended_use: Optional[str] = None
     user_profile: Optional[str] = None
     operating_environment: Optional[str] = None
+
+    # Manufacturer information
+    manufacturer: Optional[str] = None
+    manufacturer_address: Optional[str] = None
+
+    # Additional device characteristics
+    patient_population: Optional[str] = None
+    key_performance_characteristics: Optional[str] = None
+    safety_characteristics: Optional[str] = None
+
     technical_specs: Optional[str] = None
     regulatory_requirements: Optional[str] = None
     standards: Optional[str] = None
@@ -62,6 +72,16 @@ class ProjectUpdate(BaseModel):
     intended_use: Optional[str] = None
     user_profile: Optional[str] = None
     operating_environment: Optional[str] = None
+
+    # Manufacturer information
+    manufacturer: Optional[str] = None
+    manufacturer_address: Optional[str] = None
+
+    # Additional device characteristics
+    patient_population: Optional[str] = None
+    key_performance_characteristics: Optional[str] = None
+    safety_characteristics: Optional[str] = None
+
     technical_specs: Optional[str] = None
     regulatory_requirements: Optional[str] = None
     standards: Optional[str] = None
