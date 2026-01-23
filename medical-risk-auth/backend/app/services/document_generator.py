@@ -83,11 +83,26 @@ class RiskManagementReportGenerator:
         """Generate HTML content identical to the preview"""
         # Import the HTML generation function from documents.py
         from ..routers.documents import generate_html_preview
-        return generate_html_preview(self.project, type('obj', (object,), {
-            'created_at': None,
-            'report_number': self.project.get('report_number', 'RMR-2025-01'),
-            'version': self.project.get('version', '1.0')
-        })(), self.risks, self.team)
+
+        # Create a mock project object that behaves like a SQLAlchemy model
+        class MockProject:
+            def __init__(self, data):
+                for key, value in data.items():
+                    setattr(self, key, value)
+
+        # Create a mock doc_version object
+        class MockDocVersion:
+            def __init__(self, project_data):
+                self.created_at = None
+                self.report_number = project_data.get('report_number', 'RMR-2025-01')
+                self.version = project_data.get('version', '1.0')
+                # Store reference to project data for attribute access
+                self._project_data = project_data
+
+        mock_project = MockProject(self.project)
+        mock_doc_version = MockDocVersion(self.project)
+
+        return generate_html_preview(mock_project, mock_doc_version, self.risks, self.team)
     
     def _get_field_value(self, value, default_placeholder='[PLACEHOLDER]'):
         """Get field value or return 'не заполнено' if empty"""
