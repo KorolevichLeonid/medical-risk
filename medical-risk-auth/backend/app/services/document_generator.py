@@ -78,8 +78,6 @@ class RiskManagementReportGenerator:
             self._add_conclusions()
             print("DEBUG: Adding references")
             self._add_references()
-            print("DEBUG: Adding appendix")
-            self._add_appendix()
 
             print("DEBUG: Saving document to BytesIO")
             # Save to BytesIO
