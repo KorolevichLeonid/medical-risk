@@ -1,5 +1,5 @@
 """
-Service for generating Risk Management Report documents
+Service for generating Risk Management Report DOCX documents
 """
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
@@ -15,7 +15,6 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
-from html2docx import html2docx
 
 
 def format_role_display_name(role: str) -> str:
@@ -63,15 +62,10 @@ class RiskManagementReportGenerator:
 
             print("DEBUG: Converting HTML to DOCX")
             # Convert HTML to DOCX using html2docx
-            self.doc = html2docx(html_content, title="Risk Management Report")
+            doc_buffer = html2docx(html_content, title="Risk Management Report")
 
-            print("DEBUG: Saving document to BytesIO")
-            # Save to BytesIO
-            file_stream = BytesIO()
-            self.doc.save(file_stream)
-            file_stream.seek(0)
             print("DEBUG: Document generation completed successfully")
-            return file_stream
+            return doc_buffer
         except Exception as e:
             print(f"DEBUG: Error in document generation: {e}")
             print(f"DEBUG: Error type: {type(e)}")
