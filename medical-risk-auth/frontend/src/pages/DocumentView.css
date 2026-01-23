@@ -330,8 +330,10 @@
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 120px);
-  position: sticky;
-  top: 0;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
 }
 
 .panel-header {
