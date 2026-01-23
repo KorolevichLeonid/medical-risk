@@ -72,8 +72,6 @@ class RiskManagementReportGenerator:
             self._add_device_identification()
             print("DEBUG: Adding hazard identification")
             self._add_hazard_identification()
-            print("DEBUG: Adding risk analysis")
-            self._add_risk_analysis()
             print("DEBUG: Adding risk control measures")
             self._add_risk_control_measures()
             print("DEBUG: Adding residual risk evaluation")
