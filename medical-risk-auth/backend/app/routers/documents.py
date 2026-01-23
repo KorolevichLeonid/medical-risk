@@ -602,20 +602,94 @@ def generate_html_preview(project, doc_version, risks, team_members):
         <meta charset="UTF-8">
         <title>Risk Management Report - {escape_html(project.device_name or 'N/A')}</title>
         <style>
-            body {{ font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; background: #fff; }}
-            h1 {{ color: #1f2937; border-bottom: 2px solid #6366f1; padding-bottom: 10px; text-align: center; }}
-            h2 {{ color: #374151; margin-top: 40px; margin-bottom: 20px; font-size: 1.5em; }}
-            h3 {{ color: #4b5563; margin-top: 25px; margin-bottom: 15px; font-size: 1.2em; }}
-            p {{ margin: 10px 0; }}
-            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; page-break-inside: avoid; }}
-            th, td {{ border: 1px solid #d1d5db; padding: 10px; text-align: left; vertical-align: top; }}
-            th {{ background-color: #f3f4f6; font-weight: bold; }}
-            .empty-field {{ color: #9ca3af; font-style: italic; }}
-            .section {{ margin-bottom: 50px; page-break-inside: avoid; }}
-            .info-table {{ width: 100%; }}
-            .info-table td:first-child {{ font-weight: bold; width: 200px; }}
-            ul {{ margin: 10px 0; padding-left: 30px; }}
-            li {{ margin: 5px 0; }}
+            body {{
+                font-family: 'Times New Roman', serif;
+                margin: 20px;
+                line-height: 1.3;
+                background: #fff;
+                font-size: 10px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }}
+            h1 {{
+                color: #1f2937;
+                border-bottom: 1px solid #6366f1;
+                padding-bottom: 5px;
+                text-align: center;
+                font-size: 14px;
+                margin: 10px 0;
+            }}
+            h2 {{
+                color: #374151;
+                margin-top: 15px;
+                margin-bottom: 8px;
+                font-size: 12px;
+                page-break-after: avoid;
+            }}
+            h3 {{
+                color: #4b5563;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                font-size: 11px;
+                page-break-after: avoid;
+            }}
+            p {{
+                margin: 3px 0;
+                text-align: justify;
+                word-wrap: break-word;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 5px 0;
+                page-break-inside: avoid;
+                font-size: 8px;
+            }}
+            th, td {{
+                border: 1px solid #d1d5db;
+                padding: 2px 4px;
+                text-align: left;
+                vertical-align: top;
+                word-wrap: break-word;
+            }}
+            th {{
+                background-color: #f3f4f6;
+                font-weight: bold;
+                font-size: 8px;
+            }}
+            .empty-field {{
+                color: #9ca3af;
+                font-style: italic;
+                font-size: 8px;
+            }}
+            .section {{
+                margin-bottom: 15px;
+                page-break-inside: avoid;
+            }}
+            .info-table {{
+                width: 100%;
+                font-size: 9px;
+            }}
+            .info-table td:first-child {{
+                font-weight: bold;
+                width: 150px;
+            }}
+            ul {{
+                margin: 3px 0;
+                padding-left: 15px;
+            }}
+            li {{
+                margin: 2px 0;
+                word-wrap: break-word;
+            }}
+            .toc-table {{
+                font-size: 9px;
+                margin: 5px 0;
+            }}
+            .toc-table th, .toc-table td {{
+                padding: 2px;
+                font-size: 8px;
+            }}
         </style>
     </head>
     <body>

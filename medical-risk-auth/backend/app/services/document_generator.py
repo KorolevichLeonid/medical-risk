@@ -15,6 +15,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+from html2docx import html2docx
 
 
 def format_role_display_name(role: str) -> str:
@@ -48,24 +49,49 @@ class RiskManagementReportGenerator:
             team_members: Project team members list
         """
         self.project = project_data
-        self.risks = risk_data
+        # Flatten risk data to match HTML preview format
+        self.risks = []
+        for risk in risk_data:
+            flattened_risk = risk.get('data', {}).copy()
+            flattened_risk['table_name'] = risk.get('table_name', '')
+            self.risks.append(flattened_risk)
         self.table_data = table_data
         self.team = team_members
         self.doc = Document()
         
     def generate(self) -> BytesIO:
-        """Generate the complete document from HTML and return as BytesIO"""
+        """Generate the complete document and return as BytesIO"""
         try:
-            print("DEBUG: Generating HTML content")
-            # Generate HTML content using the same logic as preview
-            html_content = self._generate_html_content()
+            print("DEBUG: Setting up document styles")
+            self._setup_document_styles()
+            print("DEBUG: Adding title page")
+            self._add_title_page()
+            print("DEBUG: Adding table of contents")
+            self._add_table_of_contents()
+            print("DEBUG: Adding device identification")
+            self._add_device_identification()
+            print("DEBUG: Adding hazard identification")
+            self._add_hazard_identification()
+            print("DEBUG: Adding risk analysis")
+            self._add_risk_analysis()
+            print("DEBUG: Adding risk control measures")
+            self._add_risk_control_measures()
+            print("DEBUG: Adding residual risk evaluation")
+            self._add_residual_risk_evaluation()
+            print("DEBUG: Adding overall risk acceptability")
+            self._add_overall_risk_acceptability()
+            print("DEBUG: Adding conclusions")
+            self._add_conclusions()
+            print("DEBUG: Adding references")
+            self._add_references()
 
-            print("DEBUG: Converting HTML to DOCX")
-            # Convert HTML to DOCX using html2docx
-            doc_buffer = html2docx(html_content, title="Risk Management Report")
-
+            print("DEBUG: Saving document to BytesIO")
+            # Save to BytesIO
+            file_stream = BytesIO()
+            self.doc.save(file_stream)
+            file_stream.seek(0)
             print("DEBUG: Document generation completed successfully")
-            return doc_buffer
+            return file_stream
         except Exception as e:
             print(f"DEBUG: Error in document generation: {e}")
             print(f"DEBUG: Error type: {type(e)}")
@@ -301,23 +327,22 @@ class RiskManagementReportGenerator:
 
             # Data rows from risk_table_rows
             for idx, risk in enumerate(self.risks, 1):
-                data = risk.get('data', {})
                 row = table.add_row().cells
                 row[0].text = str(idx)
                 # Show sheet name where risk is located (without "Управление рисками -" prefix)
-                table_name = risk.get('table_name', data.get('lifecycle_stage', ''))
+                table_name = risk.get('table_name', '')
                 # Remove "Управление рисками -" prefix if present
                 if table_name.startswith('Управление рисками - '):
                     table_name = table_name.replace('Управление рисками - ', '', 1)
                 row[1].text = table_name
                 # Category of hazard
-                row[2].text = data.get('hazard_category', '')
+                row[2].text = risk.get('hazard_category', '')
                 # Name of hazard
-                row[3].text = data.get('hazard_name', '')
+                row[3].text = risk.get('hazard_name', '')
                 # Sequence of events
-                row[4].text = data.get('event_sequence', '')
+                row[4].text = risk.get('event_sequence', '')
                 # Harm
-                row[5].text = data.get('harm', '')
+                row[5].text = risk.get('harm', '')
         else:
             self.doc.add_paragraph('[PLACEHOLDER: No hazards identified yet]')
         
@@ -456,17 +481,16 @@ class RiskManagementReportGenerator:
             unacceptable_count = 0
             
             for idx, risk in enumerate(self.risks, 1):
-                data = risk.get('data', {})
                 row = table.add_row().cells
                 row[0].text = str(idx)
-                row[1].text = data.get('hazard', '')
-                
-                severity = data.get('severity_initial', '[PLACEHOLDER]')
-                probability = data.get('probability_initial', '[PLACEHOLDER]')
-                
+                row[1].text = risk.get('hazard', '')
+
+                severity = risk.get('severity_initial', '[PLACEHOLDER]')
+                probability = risk.get('probability_initial', '[PLACEHOLDER]')
+
                 row[2].text = str(severity)
                 row[3].text = str(probability)
-                
+
                 # Calculate risk score
                 try:
                     risk_score = int(severity) * int(probability)
