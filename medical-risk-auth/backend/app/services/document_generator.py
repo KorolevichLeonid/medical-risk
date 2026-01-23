@@ -15,6 +15,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+from html2docx import html2docx
 
 
 def format_role_display_name(role: str) -> str:
@@ -54,30 +55,15 @@ class RiskManagementReportGenerator:
         self.doc = Document()
         
     def generate(self) -> BytesIO:
-        """Generate the complete document and return as BytesIO"""
+        """Generate the complete document from HTML and return as BytesIO"""
         try:
-            print("DEBUG: Setting up document styles")
-            self._setup_document_styles()
-            print("DEBUG: Adding title page")
-            self._add_title_page()
-            print("DEBUG: Adding table of contents")
-            self._add_table_of_contents()
-            print("DEBUG: Adding device identification")
-            self._add_device_identification()
-            print("DEBUG: Adding hazard identification")
-            self._add_hazard_identification()
-            print("DEBUG: Adding risk analysis")
-            self._add_risk_analysis()
-            print("DEBUG: Adding risk control measures")
-            self._add_risk_control_measures()
-            print("DEBUG: Adding residual risk evaluation")
-            self._add_residual_risk_evaluation()
-            print("DEBUG: Adding overall risk acceptability")
-            self._add_overall_risk_acceptability()
-            print("DEBUG: Adding conclusions")
-            self._add_conclusions()
-            print("DEBUG: Adding references")
-            self._add_references()
+            print("DEBUG: Generating HTML content")
+            # Generate HTML content using the same logic as preview
+            html_content = self._generate_html_content()
+
+            print("DEBUG: Converting HTML to DOCX")
+            # Convert HTML to DOCX using html2docx
+            self.doc = html2docx(html_content, title="Risk Management Report")
 
             print("DEBUG: Saving document to BytesIO")
             # Save to BytesIO
@@ -92,6 +78,16 @@ class RiskManagementReportGenerator:
             import traceback
             print(f"DEBUG: Traceback: {traceback.format_exc()}")
             raise
+
+    def _generate_html_content(self) -> str:
+        """Generate HTML content identical to the preview"""
+        # Import the HTML generation function from documents.py
+        from ..routers.documents import generate_html_preview
+        return generate_html_preview(self.project, type('obj', (object,), {
+            'created_at': None,
+            'report_number': self.project.get('report_number', 'RMR-2025-01'),
+            'version': self.project.get('version', '1.0')
+        })(), self.risks, self.team)
     
     def _get_field_value(self, value, default_placeholder='[PLACEHOLDER]'):
         """Get field value or return 'не заполнено' if empty"""
