@@ -106,20 +106,28 @@ class RiskManagementReportGenerator:
     
     def _setup_document_styles(self):
         """Setup document styles"""
-        # Set default font
+        # Set default font - smaller for compact layout
         style = self.doc.styles['Normal']
         font = style.font
         font.name = 'Calibri'
-        font.size = Pt(11)
+        font.size = Pt(8)
+
+        # Set compact margins
+        sections = self.doc.sections
+        for section in sections:
+            section.top_margin = Inches(0.5)
+            section.bottom_margin = Inches(0.5)
+            section.left_margin = Inches(0.5)
+            section.right_margin = Inches(0.5)
     
     def _add_title_page(self):
         """Add title page - Section 1"""
-        # Title
+        # Title - smaller for compact layout
         title = self.doc.add_paragraph()
         title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         run = title.add_run("RISK MANAGEMENT REPORT")
         run.bold = True
-        run.font.size = Pt(18)
+        run.font.size = Pt(12)
         self.doc.add_paragraph()
 
         # Device information
@@ -890,44 +898,45 @@ class PDFRiskManagementReportGenerator:
         self.team = team_members
         self.styles = getSampleStyleSheet()
 
-        # Create custom styles
+        # Create custom styles - compact for landscape printing
         self.styles.add(ParagraphStyle(
             name='CustomTitle',
             parent=self.styles['Title'],
-            fontSize=18,
+            fontSize=12,
             alignment=TA_CENTER,
-            spaceAfter=30
+            spaceAfter=15
         ))
 
         self.styles.add(ParagraphStyle(
             name='Heading1',
             parent=self.styles['Heading1'],
-            fontSize=14,
-            spaceAfter=20,
+            fontSize=11,
+            spaceAfter=8,
             alignment=TA_LEFT
         ))
 
         self.styles.add(ParagraphStyle(
             name='Heading2',
             parent=self.styles['Heading2'],
-            fontSize=12,
-            spaceAfter=15,
+            fontSize=10,
+            spaceAfter=5,
             alignment=TA_LEFT
         ))
 
         self.styles.add(ParagraphStyle(
             name='Heading3',
             parent=self.styles['Heading3'],
-            fontSize=11,
-            spaceAfter=10,
+            fontSize=9,
+            spaceAfter=3,
             alignment=TA_LEFT
         ))
 
         self.styles.add(ParagraphStyle(
             name='Normal',
             parent=self.styles['Normal'],
-            fontSize=10,
-            alignment=TA_JUSTIFY
+            fontSize=8,
+            alignment=TA_JUSTIFY,
+            wordWrap='CJK'
         ))
 
     def generate(self) -> BytesIO:
