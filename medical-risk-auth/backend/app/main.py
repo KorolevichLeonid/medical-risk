@@ -49,6 +49,9 @@ default_origins = [
 # Combine environment origins with defaults, remove duplicates
 all_origins = list(set(default_origins + cors_origins))
 
+# Debug output for CORS configuration
+print(f"🔥 DEBUG: CORS Origins configured: {all_origins}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=all_origins,
