@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from .database import engine, get_db
-from .init_db import ensure_project_severity_columns
+from .init_db import ensure_project_severity_columns, run_postgresql_migration
 from .models import user, project, risk_analysis
 from .models import changelog as changelog_model
 from .models import document as document_model
@@ -76,6 +76,7 @@ app.include_router(documents.router, tags=["documents"])
 def startup_migrations():
     """Ensure new columns exist when running under uvicorn."""
     ensure_project_severity_columns()
+    run_postgresql_migration()
 
 @app.get("/")
 async def root():
