@@ -325,9 +325,11 @@ async def get_user_statistics(
         # Import required models
         from ..models.risk_analysis import RiskAnalysis
         from ..models.project import ProjectMember
-        
+        from sqlalchemy import func
+
         # Count projects where user is owner or member
-        owned_projects_count = db.query(Project).filter(Project.owner_id == current_user.id).count()
+        # Use explicit column selection to avoid loading all fields
+        owned_projects_count = db.query(func.count(Project.id)).filter(Project.owner_id == current_user.id).scalar()
         member_projects_count = db.query(ProjectMember).filter(ProjectMember.user_id == current_user.id).count()
         user_projects = owned_projects_count + member_projects_count
         

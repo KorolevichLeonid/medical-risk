@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from .database import engine, get_db
-from .init_db import ensure_project_severity_columns
+from .init_db import ensure_project_severity_columns, run_postgresql_migration
 from .models import user, project, risk_analysis
 from .models import changelog as changelog_model
 from .models import document as document_model
@@ -13,12 +13,6 @@ from .routers import auth, users, projects, risk_analyses, risk_tables, changelo
 from . import admin_auth
 from .core.config import settings
 
-# Create database tables
-user.Base.metadata.create_all(bind=engine)
-project.Base.metadata.create_all(bind=engine)
-risk_analysis.Base.metadata.create_all(bind=engine)
-changelog_model.Base.metadata.create_all(bind=engine)
-document_model.Base.metadata.create_all(bind=engine)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -49,6 +43,9 @@ default_origins = [
 # Combine environment origins with defaults, remove duplicates
 all_origins = list(set(default_origins + cors_origins))
 
+# Debug output for CORS configuration
+print(f"🔥 DEBUG: CORS Origins configured: {all_origins}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=all_origins,
@@ -73,6 +70,7 @@ app.include_router(documents.router, tags=["documents"])
 def startup_migrations():
     """Ensure new columns exist when running under uvicorn."""
     ensure_project_severity_columns()
+    run_postgresql_migration()
 
 @app.get("/")
 async def root():

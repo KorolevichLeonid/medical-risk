@@ -63,12 +63,18 @@ DEFAULT_PROBABILITY_LEVELS = [
         "description": "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)"
     }
 ]
+
 def create_tables():
     """Create all database tables"""
     from .models import user, project, risk_analysis
+    from .models import changelog as changelog_model
+    from .models import document as document_model
+    
     user.Base.metadata.create_all(bind=engine)
     project.Base.metadata.create_all(bind=engine)
     risk_analysis.Base.metadata.create_all(bind=engine)
+    changelog_model.Base.metadata.create_all(bind=engine)
+    document_model.Base.metadata.create_all(bind=engine)
 
 
 def ensure_project_severity_columns():
@@ -175,6 +181,21 @@ def ensure_project_probability_columns():
         raise
 
 
+def run_postgresql_migration():
+    """Run PostgreSQL migration to add missing project fields"""
+    try:
+        # Import the migration function
+        from ..migrate_add_project_fields_postgresql import migrate_database
+        print("🔥 DEBUG: Running PostgreSQL migration...")
+        migrate_database()
+        print("✓ PostgreSQL migration completed successfully")
+    except ImportError:
+        print("⚠ PostgreSQL migration script not found (expected for SQLite)")
+    except Exception as e:
+        print(f"✗ Error during PostgreSQL migration: {e}")
+        # Don't raise - this is not critical for app startup
+
+
 def create_admin_user():
     """Check if any admin user exists for Azure auth system"""
     db = SessionLocal()
@@ -195,32 +216,40 @@ def init_database():
     """Initialize the database with tables and sample data"""
     print("[*] Initializing database...")
 
-    # Create tables
-    create_tables()
-    print("[+] Database tables created")
+    try:
+        # Create tables
+        create_tables()
+        print("[+] Database tables created")
 
-    # Ensure new columns exist for severity configuration
-    ensure_project_severity_columns()
-    print("[+] Project severity configuration ensured")
+        # Ensure new columns exist for severity configuration
+        ensure_project_severity_columns()
+        print("[+] Project severity configuration ensured")
 
-    # Ensure probability levels column exists
-    ensure_project_probability_columns()
-    print("[+] Project probability levels configuration ensured")
+        # Ensure probability levels column exists
+        ensure_project_probability_columns()
+        print("[+] Project probability levels configuration ensured")
 
-    # Initialize permissions
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from init_permissions import init_permissions
-    init_permissions()
+        # Run PostgreSQL migration if needed
+        run_postgresql_migration()
 
-    # Check admin user status (Azure auth system)
-    create_admin_user()
+        # Initialize permissions
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from init_permissions import init_permissions
+        init_permissions()
 
-    # Users are created automatically through Azure authentication
-    print("[i] Users will be created automatically through Azure authentication")
+        # Check admin user status (Azure auth system)
+        create_admin_user()
 
-    print("[+] Database initialization completed!")
+        # Users are created automatically through Azure authentication
+        print("[i] Users will be created automatically through Azure authentication")
+
+        print("[+] Database initialization completed!")
+        
+    except Exception as e:
+        print(f"✗ Error during database initialization: {e}")
+        raise
 
 
 if __name__ == "__main__":

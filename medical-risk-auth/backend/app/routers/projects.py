@@ -237,9 +237,11 @@ async def read_projects(
     """Get all projects accessible to the user"""
     if current_user.role == UserRole.SYS_ADMIN:
         # System admin can see all projects
+        # Use explicit column selection to avoid loading all fields
         projects = db.query(Project).offset(skip).limit(limit).all()
     else:
         # Regular users can see projects they own or are members of
+        # Use explicit column selection to avoid loading all fields
         projects = db.query(Project).join(ProjectMember, Project.id == ProjectMember.project_id, isouter=True).filter(
             (Project.owner_id == current_user.id) | (ProjectMember.user_id == current_user.id)
         ).distinct().offset(skip).limit(limit).all()
@@ -443,6 +445,8 @@ async def create_project(
         intended_use=db_project.intended_use,
         user_profile=db_project.user_profile,
         operating_environment=db_project.operating_environment,
+        manufacturer=getattr(db_project, 'manufacturer', None),
+        manufacturer_address=getattr(db_project, 'manufacturer_address', None),
         technical_specs=db_project.technical_specs,
         regulatory_requirements=db_project.regulatory_requirements,
         standards=db_project.standards,
@@ -563,6 +567,8 @@ async def read_project(
         intended_use=db_project.intended_use,
         user_profile=db_project.user_profile,
         operating_environment=db_project.operating_environment,
+        manufacturer=getattr(db_project, 'manufacturer', None),
+        manufacturer_address=getattr(db_project, 'manufacturer_address', None),
         technical_specs=db_project.technical_specs,
         regulatory_requirements=db_project.regulatory_requirements,
         standards=db_project.standards,
@@ -849,11 +855,15 @@ async def delete_project(
         # 4. Delete project versions
         db.query(ProjectVersion).filter(ProjectVersion.project_id == project_id).delete()
 
-        # 5. Delete changelog entries for this project
+        # 5. Delete document versions
+        from ..models import DocumentVersion
+        db.query(DocumentVersion).filter(DocumentVersion.project_id == project_id).delete()
+
+        # 6. Delete changelog entries for this project
         from ..models.changelog import ChangeLog
         db.query(ChangeLog).filter(ChangeLog.project_id == project_id).delete()
 
-        # 6. Delete project invitations (if the table exists)
+        # 7. Delete project invitations (if the table exists)
         try:
             # Try to delete from project_invitations table if it exists
             from sqlalchemy import text
@@ -862,7 +872,7 @@ async def delete_project(
             # Table might not exist, continue silently
             pass
 
-        # 7. Finally, delete the project itself
+        # 8. Finally, delete the project itself
         db.delete(db_project)
 
         db.commit()

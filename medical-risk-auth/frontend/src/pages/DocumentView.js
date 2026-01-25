@@ -94,111 +94,8 @@ const DocumentView = () => {
   };
 
   const checkReportGenerationConditions = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Загружаем проект для получения lifecycle stages и hazard categories
-      const projectResponse = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!projectResponse.ok) {
-        return { canGenerate: false, message: 'Не удалось загрузить данные проекта' };
-      }
-      
-      const projectData = await projectResponse.json();
-      
-      // Получаем lifecycle stages
-      const lifecycleStages = [];
-      if (projectData.lifecycle_stages) {
-        if (Array.isArray(projectData.lifecycle_stages)) {
-          lifecycleStages.push(...projectData.lifecycle_stages);
-        } else if (typeof projectData.lifecycle_stages === 'string') {
-          lifecycleStages.push(...JSON.parse(projectData.lifecycle_stages));
-        }
-      }
-      if (projectData.custom_lifecycle_stages) {
-        if (Array.isArray(projectData.custom_lifecycle_stages)) {
-          lifecycleStages.push(...projectData.custom_lifecycle_stages);
-        } else if (typeof projectData.custom_lifecycle_stages === 'string') {
-          lifecycleStages.push(...JSON.parse(projectData.custom_lifecycle_stages));
-        }
-      }
-      
-      // Получаем hazard categories
-      const hazardCategories = [];
-      if (projectData.active_hazard_categories) {
-        if (Array.isArray(projectData.active_hazard_categories)) {
-          hazardCategories.push(...projectData.active_hazard_categories);
-        } else if (typeof projectData.active_hazard_categories === 'string') {
-          hazardCategories.push(...JSON.parse(projectData.active_hazard_categories));
-        }
-      }
-      
-      if (lifecycleStages.length === 0 || hazardCategories.length === 0) {
-        return { canGenerate: false, message: 'Не настроены этапы жизненного цикла или категории опасностей' };
-      }
-      
-      // Загружаем все риски
-      const risksResponse = await fetch(`${API_BASE_URL}/api/risk-analyses/project/${id}/factors`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!risksResponse.ok) {
-        return { canGenerate: false, message: 'Не удалось загрузить риски' };
-      }
-      
-      const risks = await risksResponse.json();
-      
-      // Проверка 1: Матрица полностью заполнена (хотя бы по одному риску в каждой ячейке)
-      const totalRequired = lifecycleStages.length * hazardCategories.length;
-      const coveredCombinations = new Set();
-      
-      risks.forEach(risk => {
-        // Извлекаем текстовую категорию из hazard_name (формат: "[Категория] Название")
-        let textualHazardCategory = risk.hazard_category; // fallback
-        
-        const categoryMatch = risk.hazard_name?.match(/^\[(.+?)\]\s*(.*)$/);
-        if (categoryMatch) {
-          textualHazardCategory = categoryMatch[1]; // Текстовое название категории
-        }
-        
-        if (risk.lifecycle_stage && textualHazardCategory) {
-          const key = `${risk.lifecycle_stage}|||${textualHazardCategory}`;
-          coveredCombinations.add(key);
-        }
-      });
-      
-      if (coveredCombinations.size < totalRequired) {
-        const missing = totalRequired - coveredCombinations.size;
-        return { 
-          canGenerate: false, 
-          message: `Матрица рисков не полностью заполнена. Отсутствует ${missing} комбинация(й) этап × опасность.` 
-        };
-      }
-      
-      // Проверка 2: Все риски закрыты (closed / fully_closed)
-      const notClosedRisks = risks.filter(risk => {
-        const status = risk.risk_status || 'new';
-        return status !== 'fully_closed' && status !== 'closed';
-      });
-      
-      if (notClosedRisks.length > 0) {
-        return { 
-          canGenerate: false, 
-          message: `Не все риски закрыты. Осталось ${notClosedRisks.length} риск(ов) в работе или на проверке.` 
-        };
-      }
-      
-      return { canGenerate: true, message: '' };
-    } catch (error) {
-      console.error('Error checking conditions:', error);
-      return { canGenerate: false, message: 'Ошибка при проверке условий генерации отчета' };
-    }
+    // Document generation is now allowed regardless of matrix completeness or risk closure status
+    return { canGenerate: true, message: '' };
   };
 
   const handleGenerateDocument = async () => {
@@ -251,23 +148,27 @@ const DocumentView = () => {
     }
   };
 
-  const handleDownloadDocument = async (versionId) => {
+  const handleDownloadDocument = async (versionId, format = 'docx') => {
     try {
-      console.log('Starting download for version:', versionId);
+      console.log(`Starting ${format.toUpperCase()} download for version:`, versionId);
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         alert('Ошибка: Требуется авторизация');
         return;
       }
 
+      const acceptHeader = format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
       const response = await fetch(
-        `${API_BASE_URL}/api/documents/projects/${id}/versions/${versionId}/download`,
+        `${API_BASE_URL}/api/documents/projects/${id}/versions/${versionId}/download?format=${format}`,
         {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            'Accept': acceptHeader
           }
         }
       );
@@ -284,16 +185,17 @@ const DocumentView = () => {
       // Get blob from response
       const blob = await response.blob();
       console.log('Blob received, size:', blob.size, 'bytes');
-      
+
       if (blob.size === 0) {
         alert('Ошибка: Получен пустой файл');
         return;
       }
-      
+
       // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `Risk_Management_Report_P${id}_V${selectedVersion?.version || '1.0'}.docx`;
-      
+      const extension = format === 'pdf' ? 'pdf' : 'docx';
+      let filename = `Risk_Management_Report_P${id}_V${selectedVersion?.version || '1.0'}.${extension}`;
+
       if (contentDisposition) {
         console.log('Content-Disposition:', contentDisposition);
         // Try multiple patterns to extract filename
@@ -304,7 +206,7 @@ const DocumentView = () => {
         if (!filenameMatch) {
           filenameMatch = contentDisposition.match(/filename=(.+)/);
         }
-        
+
         if (filenameMatch && filenameMatch[1]) {
           filename = filenameMatch[1].replace(/['"]/g, '');
           // Decode URI if needed
@@ -315,27 +217,27 @@ const DocumentView = () => {
           }
         }
       }
-      
-      console.log('Downloading file as:', filename);
-      
+
+      console.log(`Downloading ${format.toUpperCase()} file as:`, filename);
+
       // Create object URL from blob
       const blobUrl = window.URL.createObjectURL(blob);
-      
+
       // Create temporary anchor element
       const downloadLink = document.createElement('a');
       downloadLink.href = blobUrl;
       downloadLink.download = filename;
       downloadLink.style.display = 'none';
       downloadLink.setAttribute('download', filename); // Ensure download attribute is set
-      
+
       // Append to body
       document.body.appendChild(downloadLink);
-      
+
       // Trigger download immediately
       downloadLink.click();
-      
-      console.log('Download triggered');
-      
+
+      console.log(`${format.toUpperCase()} download triggered`);
+
       // Cleanup after a delay to ensure download starts
       setTimeout(() => {
         if (document.body.contains(downloadLink)) {
@@ -344,11 +246,15 @@ const DocumentView = () => {
         window.URL.revokeObjectURL(blobUrl);
         console.log('Cleanup completed');
       }, 1000);
-      
+
     } catch (error) {
-      console.error('Error downloading document:', error);
+      console.error(`Error downloading ${format} document:`, error);
       alert(`Ошибка при скачивании документа: ${error.message}`);
     }
+  };
+
+  const handleDownloadPDF = async (versionId) => {
+    await handleDownloadDocument(versionId, 'pdf');
   };
 
   const loadDocumentPreview = async (versionId) => {
@@ -573,13 +479,20 @@ const DocumentView = () => {
                       <p>Пожалуйста, попробуйте скачать документ для просмотра.</p>
                     )}
                     {selectedVersion && (
-                      <button 
-                        className="btn btn-primary"
-                        onClick={() => handleDownloadDocument(selectedVersion.id)}
-                        style={{ marginTop: '1rem' }}
-                      >
-                        ⬇️ Скачать документ (DOCX)
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleDownloadDocument(selectedVersion.id)}
+                        >
+                          ⬇️ Download (DOCX)
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleDownloadPDF(selectedVersion.id)}
+                        >
+                          ⬇️ Download (PDF)
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
@@ -655,16 +568,25 @@ const DocumentView = () => {
         )}
       </div>
 
-      {/* Floating Download Button - only show if document exists */}
+      {/* Floating Download Buttons - only show if document exists */}
       {selectedVersion && (
         <div className="floating-download-btn">
-          <button 
-            className="btn btn-primary btn-floating"
-            onClick={() => handleDownloadDocument(selectedVersion.id)}
-            title="Download Document"
-          >
-            ⬇️ Download (DOCX)
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              className="btn btn-primary btn-floating"
+              onClick={() => handleDownloadDocument(selectedVersion.id)}
+              title="Download DOCX Document"
+            >
+              ⬇️ Download (DOCX)
+            </button>
+            <button
+              className="btn btn-secondary btn-floating"
+              onClick={() => handleDownloadPDF(selectedVersion.id)}
+              title="Download PDF Document"
+            >
+              ⬇️ Download (PDF)
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 """
 Document generation and management router
 """
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List
@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 async def generate_document(
     project_id: int,
     request: GenerateDocumentRequest,
+    format: str = "docx",  # Add format parameter
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -90,6 +91,19 @@ async def generate_document(
         'active_hazard_categories': project.active_hazard_categories,
         'version': version_number,
         'report_number': report_number,
+        # Manufacturer information
+        'manufacturer': project.manufacturer,
+        'manufacturer_address': project.manufacturer_address,
+        # Additional device characteristics
+        'patient_population': project.patient_population,
+        'key_performance_characteristics': project.key_performance_characteristics,
+        'safety_characteristics': project.safety_characteristics,
+        # Risk configuration
+        'severity_levels': project.severity_levels,
+        'probability_levels': project.probability_levels,
+        'risk_threshold': project.risk_threshold,
+        # Checklist answers
+        'hazard_checklist_answers': project.hazard_checklist_answers,
     }
     
     # Gather risk data from all tables
@@ -104,34 +118,41 @@ async def generate_document(
         ).order_by(RiskTableRow.row_index).all()
         
         for row in rows:
+            # Ensure row.data is a dict, fallback to empty dict if None
+            row_data = row.data if isinstance(row.data, dict) else {}
             all_risks.append({
                 'id': row.id,
                 'row_number': row.row_number,
-                'data': row.data,
+                'data': row_data,
                 'table_name': table.name or table.sheet_id
             })
     
     # Gather team members
     team_members = []
-    members = db.query(ProjectMember, User).join(
-        User, ProjectMember.user_id == User.id
-    ).filter(ProjectMember.project_id == project_id).all()
-    
-    for member, user in members:
-        team_members.append({
-            'name': f"{user.first_name} {user.last_name}",
-            'email': user.email,
-            'role': member.role.value
-        })
-    
-    # Add project owner if not in members
-    owner = db.query(User).filter(User.id == project.owner_id).first()
-    if owner and not any(m['email'] == owner.email for m in team_members):
-        team_members.append({
-            'name': f"{owner.first_name} {owner.last_name}",
-            'email': owner.email,
-            'role': 'admin'
-        })
+    try:
+        members = db.query(ProjectMember, User).join(
+            User, ProjectMember.user_id == User.id
+        ).filter(ProjectMember.project_id == project_id).all()
+
+        for member, user in members:
+            if user:  # Ensure user exists
+                team_members.append({
+                    'name': f"{user.first_name or ''} {user.last_name or ''}".strip(),
+                    'email': user.email or '',
+                    'role': getattr(member.role, 'value', str(member.role)) if member.role else ''
+                })
+
+        # Add project owner if not in members
+        owner = db.query(User).filter(User.id == project.owner_id).first()
+        if owner and not any(m.get('email') == owner.email for m in team_members):
+            team_members.append({
+                'name': f"{owner.first_name or ''} {owner.last_name or ''}".strip(),
+                'email': owner.email or '',
+                'role': 'admin'
+            })
+    except Exception as e:
+        print(f"DEBUG: Error gathering team members: {e}")
+        team_members = []  # Fallback to empty list
     
     # Create table data structure
     table_data = {
@@ -145,15 +166,37 @@ async def generate_document(
     
     # Generate document
     try:
-        generator = RiskManagementReportGenerator(
-            project_data=project_data,
-            risk_data=all_risks,
-            table_data=table_data,
-            team_members=team_members
-        )
-        
+        # Log data for debugging
+        print(f"DEBUG: Generating document for project {project_id}")
+        print(f"DEBUG: Project data keys: {list(project_data.keys()) if project_data else 'None'}")
+        print(f"DEBUG: Risk count: {len(all_risks) if all_risks else 0}")
+        print(f"DEBUG: Team members count: {len(team_members) if team_members else 0}")
+        print(f"DEBUG: Format: {format}")
+
+        if format.lower() == "pdf":
+            print("DEBUG: Using PDF generator")
+            from ..services.document_generator import PDFRiskManagementReportGenerator
+            generator = PDFRiskManagementReportGenerator(
+                project_data=project_data,
+                risk_data=all_risks,
+                table_data=table_data,
+                team_members=team_members
+            )
+        else:
+            print("DEBUG: Using DOCX generator")
+            # Default to DOCX
+            generator = RiskManagementReportGenerator(
+                project_data=project_data,
+                risk_data=all_risks,
+                table_data=table_data,
+                team_members=team_members
+            )
+
+        print("DEBUG: Calling generator.generate()")
         file_stream = generator.generate()
+        print("DEBUG: Generator completed, reading file data")
         file_data = file_stream.read()
+        print(f"DEBUG: File data size: {len(file_data)} bytes")
         
         # Create snapshot of data
         snapshot = {
@@ -170,7 +213,8 @@ async def generate_document(
         ).update({'is_current': False})
         
         # Create new document version record
-        file_name = f"Risk_Management_Report_{project.device_name}_{version_number}.docx".replace(' ', '_')
+        extension = "pdf" if format.lower() == "pdf" else "docx"
+        file_name = f"Risk_Management_Report_{project.device_name}_{version_number}.{extension}".replace(' ', '_')
         
         new_version = DocumentVersion(
             project_id=project_id,
@@ -356,21 +400,35 @@ async def download_document(
     if not doc_version.file_data:
         raise HTTPException(status_code=404, detail="Document file not found")
     
-    # Ensure filename is safe
-    import urllib.parse
-    safe_filename = urllib.parse.quote(doc_version.file_name.encode('utf-8'))
-    
-    # Return file with proper headers for download (including CORS)
+    # Create a safe ASCII filename for headers
+    try:
+        import unicodedata
+        import re
+
+        # Convert to ASCII-safe filename by transliterating non-ASCII chars
+        safe_filename = unicodedata.normalize('NFKD', doc_version.file_name)
+        safe_filename = ''.join(c for c in safe_filename if ord(c) < 128)  # Keep only ASCII chars
+        safe_filename = re.sub(r'[^\w\-_\. ]', '_', safe_filename)  # Replace remaining non-alphanumeric chars with underscores
+        safe_filename = re.sub(r'_+', '_', safe_filename)  # Replace multiple underscores with single
+
+        if not safe_filename or len(safe_filename) < 5:
+            safe_filename = f"document_{doc_version.id}.docx"
+    except Exception as e:
+        # Fallback to simple ASCII filename if encoding fails
+        print(f"DEBUG: Filename encoding failed: {e}, using fallback")
+        safe_filename = f"document_{doc_version.id}.docx"
+
+    # Return file directly with proper headers
     return Response(
         content=doc_version.file_data,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
-            "Content-Disposition": f'attachment; filename="{doc_version.file_name}"; filename*=UTF-8\'\'{safe_filename}',
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
             "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "Cache-Control": "no-cache",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Expose-Headers": "Content-Disposition, Content-Type"
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type"
         }
     )
 
@@ -419,14 +477,18 @@ async def preview_document(
     risk_tables = db.query(RiskManagementTable).filter(
         RiskManagementTable.project_id == project_id
     ).all()
-    
+
     all_risks = []
     for table in risk_tables:
         rows = db.query(RiskTableRow).filter(
             RiskTableRow.table_id == table.id
         ).order_by(RiskTableRow.row_index).all()
         for row in rows:
-            all_risks.append(row.data if isinstance(row.data, dict) else json.loads(row.data))
+            # Ensure row.data is a dict, fallback to empty dict if None
+            row_data = row.data if isinstance(row.data, dict) else {}
+            # Add table_name for HTML preview consistency
+            row_data['table_name'] = table.name or table.sheet_id
+            all_risks.append(row_data)
     
     # Get team members
     members = db.query(ProjectMember).filter(
@@ -540,20 +602,94 @@ def generate_html_preview(project, doc_version, risks, team_members):
         <meta charset="UTF-8">
         <title>Risk Management Report - {escape_html(project.device_name or 'N/A')}</title>
         <style>
-            body {{ font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; background: #fff; }}
-            h1 {{ color: #1f2937; border-bottom: 2px solid #6366f1; padding-bottom: 10px; text-align: center; }}
-            h2 {{ color: #374151; margin-top: 40px; margin-bottom: 20px; font-size: 1.5em; }}
-            h3 {{ color: #4b5563; margin-top: 25px; margin-bottom: 15px; font-size: 1.2em; }}
-            p {{ margin: 10px 0; }}
-            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; page-break-inside: avoid; }}
-            th, td {{ border: 1px solid #d1d5db; padding: 10px; text-align: left; vertical-align: top; }}
-            th {{ background-color: #f3f4f6; font-weight: bold; }}
-            .empty-field {{ color: #9ca3af; font-style: italic; }}
-            .section {{ margin-bottom: 50px; page-break-inside: avoid; }}
-            .info-table {{ width: 100%; }}
-            .info-table td:first-child {{ font-weight: bold; width: 200px; }}
-            ul {{ margin: 10px 0; padding-left: 30px; }}
-            li {{ margin: 5px 0; }}
+            body {{
+                font-family: 'Times New Roman', serif;
+                margin: 20px;
+                line-height: 1.3;
+                background: #fff;
+                font-size: 10px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }}
+            h1 {{
+                color: #1f2937;
+                border-bottom: 1px solid #6366f1;
+                padding-bottom: 5px;
+                text-align: center;
+                font-size: 14px;
+                margin: 10px 0;
+            }}
+            h2 {{
+                color: #374151;
+                margin-top: 15px;
+                margin-bottom: 8px;
+                font-size: 12px;
+                page-break-after: avoid;
+            }}
+            h3 {{
+                color: #4b5563;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                font-size: 11px;
+                page-break-after: avoid;
+            }}
+            p {{
+                margin: 3px 0;
+                text-align: justify;
+                word-wrap: break-word;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 5px 0;
+                page-break-inside: avoid;
+                font-size: 8px;
+            }}
+            th, td {{
+                border: 1px solid #d1d5db;
+                padding: 2px 4px;
+                text-align: left;
+                vertical-align: top;
+                word-wrap: break-word;
+            }}
+            th {{
+                background-color: #f3f4f6;
+                font-weight: bold;
+                font-size: 8px;
+            }}
+            .empty-field {{
+                color: #9ca3af;
+                font-style: italic;
+                font-size: 8px;
+            }}
+            .section {{
+                margin-bottom: 15px;
+                page-break-inside: avoid;
+            }}
+            .info-table {{
+                width: 100%;
+                font-size: 9px;
+            }}
+            .info-table td:first-child {{
+                font-weight: bold;
+                width: 150px;
+            }}
+            ul {{
+                margin: 3px 0;
+                padding-left: 15px;
+            }}
+            li {{
+                margin: 2px 0;
+                word-wrap: break-word;
+            }}
+            .toc-table {{
+                font-size: 9px;
+                margin: 5px 0;
+            }}
+            .toc-table th, .toc-table td {{
+                padding: 2px;
+                font-size: 8px;
+            }}
         </style>
     </head>
     <body>
@@ -563,21 +699,26 @@ def generate_html_preview(project, doc_version, risks, team_members):
         <div class="section">
             <h2>1. ТИТУЛЬНЫЙ ЛИСТ</h2>
             <p><strong>Medical device:</strong> {get_field(project.device_name)}</p>
-            <p><strong>Model:</strong> {get_field(project.device_model)}</p>
-            <p><strong>Manufacturer:</strong> {get_field(project.manufacturer if hasattr(project, 'manufacturer') else None)}</p>
-            <p><strong>Address:</strong> {get_field(project.manufacturer_address if hasattr(project, 'manufacturer_address') else None)}</p>
             <p><strong>Report No.:</strong> {get_field(doc_version.report_number)}</p>
             <p><strong>Revision:</strong> {get_field(doc_version.version)}</p>
             <p><strong>Date:</strong> {date_str}</p>
-            <p><strong>Prepared by:</strong> {get_field(project.prepared_by if hasattr(project, 'prepared_by') else None)}</p>
-            <p><strong>Reviewed by:</strong> {get_field(project.reviewed_by if hasattr(project, 'reviewed_by') else None)}</p>
-            <p><strong>Approved by:</strong> {get_field(project.approved_by if hasattr(project, 'approved_by') else None)}</p>
         </div>
         
         <!-- 2. СОДЕРЖАНИЕ -->
         <div class="section">
             <h2>2. СОДЕРЖАНИЕ</h2>
-            <p>Все разделы ниже</p>
+            <table class="info-table">
+                <tr><td>1</td><td>ТИТУЛЬНЫЙ ЛИСТ</td><td>1</td></tr>
+                <tr><td>2</td><td>СОДЕРЖАНИЕ</td><td>2</td></tr>
+                <tr><td>3</td><td>ИДЕНТИФИКАЦИЯ ИЗДЕЛИЯ И НАЗНАЧЕНИЕ</td><td>3</td></tr>
+                <tr><td>4</td><td>Identification of Hazards (Идентификация опасностей)</td><td>4</td></tr>
+                <tr><td>5</td><td>Risk Analysis (Before Risk Control)</td><td>5</td></tr>
+                <tr><td>6</td><td>Risk Control Measures (Меры управления рисками)</td><td>6</td></tr>
+                <tr><td>7</td><td>Residual Risk Evaluation</td><td>7</td></tr>
+                <tr><td>8</td><td>Overall Residual Risk Acceptability (Оценка совокупного остаточного риска)</td><td>8</td></tr>
+                <tr><td>9</td><td>Conclusions and Approval</td><td>9</td></tr>
+                <tr><td>10</td><td>References and Document Control</td><td>10</td></tr>
+            </table>
         </div>
         
         <!-- 3. ИДЕНТИФИКАЦИЯ ИЗДЕЛИЯ -->
@@ -587,12 +728,7 @@ def generate_html_preview(project, doc_version, risks, team_members):
                 <tr><td>Device name</td><td>{get_field(project.device_name)}</td></tr>
                 <tr><td>Model / Type</td><td>{get_field(project.device_model)}</td></tr>
                 <tr><td>Category risk</td><td>{get_field(project.device_classification)}</td></tr>
-                <tr><td>Intended purpose</td><td>{get_field(project.intended_use)}</td></tr>
-                <tr><td>Intended users</td><td>{get_field(project.user_profile)}</td></tr>
-                <tr><td>Patient population</td><td>{get_field(project.patient_population if hasattr(project, 'patient_population') else None)}</td></tr>
                 <tr><td>Operating environment</td><td>{get_field(project.operating_environment)}</td></tr>
-                <tr><td>Key performance characteristics</td><td>{get_field(project.key_performance if hasattr(project, 'key_performance') else None)}</td></tr>
-                <tr><td>Safety-related characteristics</td><td>{get_field(project.safety_characteristics if hasattr(project, 'safety_characteristics') else None)}</td></tr>
                 <tr><td>Standards and regulations applied</td><td>{get_field(project.standards)}</td></tr>
                 <tr><td>Этапы жизненного цикла</td><td>{', '.join([escape_html(s) for s in lifecycle_stages]) if lifecycle_stages else '<span class="empty-field">не заполнено</span>'}</td></tr>
                 <tr><td>Идентифицированные категории опасностей</td><td>{', '.join([escape_html(c) for c in hazard_categories]) if hazard_categories else '<span class="empty-field">не заполнено</span>'}</td></tr>
@@ -605,11 +741,10 @@ def generate_html_preview(project, doc_version, risks, team_members):
             <h3>4.1 Цель раздела</h3>
             <p>Определить все разумно предсказуемые опасности, возникающие на этапах жизненного цикла изделия - от проектирования и производства до эксплуатации, очистки, транспортировки, утилизации.</p>
             
-            <h3>4.1 Идентификация предполагаемого назначение, неправильного предполагаемого применения, характеристики связанных с безопасностью</h3>
-            <p>{get_field(project.hazard_checklist_answers, 'НАШ ЧЕК ЛИСТ С ОТВЕТАМИ - не заполнено')}</p>
+            
             
             <h3>4.2 Таблица идентифицированных опасностей</h3>
-            {generate_risks_table(risks, ['lifecycle_stage', 'hazard', 'hazardous_situation', 'sequence_of_events', 'harm']) if risks else '<p class="empty-field">Таблица опасностей не заполнена</p>'}
+            {generate_risks_table(risks, ['table_name', 'hazard_category', 'hazard_name', 'event_sequence', 'harm']) if risks else '<p class="empty-field">Таблица опасностей не заполнена</p>'}
             
             <h3>4.3 Резюме раздела</h3>
             <p>Идентифицированы основные опасности, связанные с {', '.join([escape_html(c) for c in hazard_categories]) if hazard_categories else '<span class="empty-field">не заполнено</span>'}</p>
@@ -620,39 +755,27 @@ def generate_html_preview(project, doc_version, risks, team_members):
         <div class="section">
             <h2>5. Risk Analysis (Before Risk Control)</h2>
             <h3>5.1 Методология оценки</h3>
-            <p>Для анализа рисков используется качественно-количественная методика с матрицей 5×5, где:</p>
+            <p>Для анализа рисков используется качественно-количественная методика </p>
             <p><strong>Риск = вероятность × тяжесть</strong></p>
             
             <p><strong>Severity (S) — Тяжесть вреда:</strong></p>
-            <table>
-                <tr><th>Уровень</th><th>Описание</th><th>Пример</th></tr>
-                <tr><td>1</td><td>Незначительный</td><td>Лёгкое раздражение кожи</td></tr>
-                <tr><td>2</td><td>Малый</td><td>Обратимая травма, лёгкий порез</td></tr>
-                <tr><td>3</td><td>Средний</td><td>Временная потеря трудоспособности</td></tr>
-                <tr><td>4</td><td>Серьёзный</td><td>Значительная травма, госпитализация</td></tr>
-                <tr><td>5</td><td>Критический</td><td>Смерть или необратимое повреждение органа</td></tr>
-            </table>
-            
+            {generate_severity_table(project)}
             <p><strong>Probability (P) — Вероятность возникновения:</strong></p>
-            <table>
-                <tr><th>Уровень</th><th>Описание</th><th>Пример</th></tr>
-                <tr><td>1</td><td>Очень редкое</td><td>Почти невозможно (&lt;1/10000)</td></tr>
-                <tr><td>2</td><td>Редкое</td><td>Возможное при особых обстоятельствах</td></tr>
-                <tr><td>3</td><td>Иногда</td><td>Может произойти время от времени</td></tr>
-                <tr><td>4</td><td>Вероятное</td><td>Может происходить регулярно</td></tr>
-                <tr><td>5</td><td>Частое</td><td>Происходит регулярно</td></tr>
-            </table>
+            {generate_probability_table(project)}
+
+            <h4>Уровень риска (доп./не доп.):</h4>
+            <p>Укажите пороговое значение уровня риска. Если произведение "Тяжесть вреда" × "Вероятность" будет больше или равно этому значению, риск будет считаться недопустимым. Если меньше - допустимым.</p>
+            <p><strong>Пороговое значение уровня риска: {getattr(project, 'risk_threshold', 10) if hasattr(project, 'risk_threshold') else 10}</strong></p>
+            <p>от 1 до 20</p>
+            <p>ℹ️ Пояснение: Вы можете установить любое пороговое значение риска по вашему усмотрению. Значение по умолчанию - 10. Риск считается недопустимым, если его уровень превышает или равен указанному порогу.</p>
+            <p>Пример допустимого риска:</p>
+            <p>Тяжесть: 2 × Вероятность: 1 = Риск: 2 ✓ допустимый</p>
+            <p>Пример недопустимого риска:</p>
+            <p>Тяжесть: 5 × Вероятность: 5 = Риск: 25 ✗ недопустимый (при пороге {getattr(project, 'risk_threshold', 10)})</p>
+
+
             
-            <table>
-                <tr><th>Диапазон</th><th>Категория риска</th><th>Интерпретация</th></tr>
-                <tr><td>1–9</td><td>Низкий (Acceptable)</td><td>Допустимый без мер</td></tr>
-                <tr><td>10–25</td><td>Высокий (Unacceptable)</td><td>Требует мер контроля</td></tr>
-            </table>
             
-            <h3>5.3 Резюме раздела</h3>
-            <p>Кол-во неприемлемых рисков – {unacceptable_risks if unacceptable_risks > 0 else '<span class="empty-field">не заполнено</span>'}</p>
-            <p>Кол-во приемлемых – {acceptable_risks if acceptable_risks > 0 else '<span class="empty-field">не заполнено</span>'}</p>
-        </div>
         
         <!-- 6. Risk Control Measures -->
         <div class="section">
@@ -660,8 +783,8 @@ def generate_html_preview(project, doc_version, risks, team_members):
             <h3>6.1 Цель раздела</h3>
             <p>Определить и задокументировать меры, применённые для снижения или устранения рисков, связанных с выявленными опасными ситуациями.</p>
             
-            <h3>6.2 Таблица мер управления рисками и верификация</h3>
-            {generate_risks_table(risks, ['lifecycle_stage', 'hazard', 'control_measures', 'verification']) if risks else '<p class="empty-field">Таблица мер управления рисками не заполнена</p>'}
+            <h3>6.2 Таблица мер управления рисками</h3>
+            {generate_risks_table(risks, ['lifecycle_stage', 'hazard', 'control_measures']) if risks else '<p class="empty-field">Таблица мер управления рисками не заполнена</p>'}
         </div>
         
         <!-- 7. Residual Risk Evaluation -->
@@ -673,10 +796,7 @@ def generate_html_preview(project, doc_version, risks, team_members):
             <h3>7.2 Таблица оценки остаточных рисков</h3>
             {generate_residual_risks_table(risks) if risks else '<p class="empty-field">Таблица остаточных рисков не заполнена</p>'}
             
-            <h3>7.3 Обоснование приемлемости</h3>
-            <p>Кол-во рисков приемлемых - {acceptable_risks if acceptable_risks > 0 else '<span class="empty-field">не заполнено</span>'}</p>
-            <p>Кол-во рисков не приемлемых – {unacceptable_risks if unacceptable_risks > 0 else '<span class="empty-field">не заполнено</span>'}</p>
-        </div>
+            
         
         <!-- 8. Overall Residual Risk Acceptability -->
         <div class="section">
@@ -684,12 +804,7 @@ def generate_html_preview(project, doc_version, risks, team_members):
             <h3>8.1 Цель раздела</h3>
             <p>Определить, является ли совокупный остаточный риск медицинского изделия приемлемым, учитывая все идентифицированные индивидуальные риски, их взаимное влияние и соотношение польза/риск (Benefit-Risk balance), как требует ISO 14971:2019, п. 8.3.</p>
             
-            <h3>8.2</h3>
-            <p>Совокупный остаточный риск = <span class="empty-field">не заполнено</span></p>
-            <p>Совокупный остаточный риск - приемлемый или неприемлемый <span class="empty-field">не заполнено</span></p>
             
-            <h3>8.3 Оценка соотношения польза/риск – заполняется только если остались неприемлемые риски</h3>
-            <p>Используется формула <span class="empty-field">не заполнено</span></p>
         </div>
         
         <!-- 9. Conclusions -->
@@ -737,19 +852,11 @@ def generate_html_preview(project, doc_version, risks, team_members):
                 <tr><td>Revision</td><td>{get_field(doc_version.version)}</td></tr>
                 <tr><td>Status</td><td>Approved</td></tr>
                 <tr><td>Effective date</td><td>{date_str.replace(' ', '.') if isinstance(date_str, str) and 'не заполнено' not in date_str else date_str}</td></tr>
-                <tr><td>Prepared by</td><td>{get_field(project.prepared_by if hasattr(project, 'prepared_by') else None)}</td></tr>
-                <tr><td>Reviewed by</td><td>{get_field(project.reviewed_by if hasattr(project, 'reviewed_by') else None)}</td></tr>
-                <tr><td>Approved by</td><td>{get_field(project.approved_by if hasattr(project, 'approved_by') else None)}</td></tr>
-                <tr><td>Next review date</td><td>{get_field(None)}</td></tr>
-                <tr><td>Controlled copy location</td><td>QMS Repository / Folder: "Risk Management / Containers"</td></tr>
+                <tr><td>Controlled copy location</td><td>QMS Repository / Folder: "Risk Management"</td></tr>
             </table>
         </div>
         
-        <!-- Приложение А -->
-        <div class="section">
-            <h2>Приложение А</h2>
-            {generate_full_risks_table(risks) if risks else '<p class="empty-field">Полная таблица управления рисками не заполнена</p>'}
-        </div>
+
     </body>
     </html>
     """
@@ -757,70 +864,184 @@ def generate_html_preview(project, doc_version, risks, team_members):
 
 
 def generate_risks_table(risks, columns):
-    """Generate HTML table for risks"""
+    """Generate HTML table for risks with exact Excel structure"""
     import html as html_module
-    
+
     if not risks:
         return '<p class="empty-field">Нет данных</p>'
-    
-    # Column name mapping
-    col_names = {
-        'lifecycle_stage': 'Этап жизненного цикла',
-        'hazard': 'Опасность',
-        'hazardous_situation': 'Опасная ситуация',
-        'sequence_of_events': 'Последовательность событий',
-        'harm': 'Вред',
-        'control_measures': 'Меры контроля',
-        'verification': 'Верификация'
-    }
-    
+
+    # For summary tables (4.2, 6.2, 7.2) - show exact Excel structure
+    if len(columns) <= 5:
+        if columns == ['table_name', 'hazard_category', 'hazard_name', 'event_sequence', 'harm']:
+            # Table 4.2 - Show all Excel fields including Категория опасности and Последовательность событий
+            all_columns = ['table_name', 'hazard_category', 'hazard_name', 'event_sequence', 'harm']
+            col_names = {
+                'table_name': 'Этап жизненного цикла',
+                'hazard_category': 'Категория опасности',
+                'hazard_name': 'Наименование опасности',
+                'event_sequence': 'Последовательность событий',
+                'harm': 'Вред'
+            }
+        elif columns == ['table_name', 'hazard', 'hazardous_situation', 'harm']:
+            # Legacy Table 4.2 - fallback
+            all_columns = ['table_name', 'hazard_category', 'hazard_name', 'event_sequence', 'harm']
+            col_names = {
+                'table_name': 'Этап жизненного цикла',
+                'hazard_category': 'Категория опасности',
+                'hazard_name': 'Наименование опасности',
+                'event_sequence': 'Последовательность событий',
+                'harm': 'Вред'
+            }
+        elif columns == ['lifecycle_stage', 'hazard', 'control_measures']:
+            # Table 6.2 - Control measures with ALL fields (remove Категория опасности and Последовательность событий, remove prefix)
+            all_columns = [
+                'table_name', 'hazard_name', 'hazardous_situation', 'harm',
+                'severity_score', 'probability_score', 'risk_score', 'risk_level_1',
+                'control_measure_1', 'control_measure_2', 'control_measure_3',
+                'verification_1', 'verification_2', 'verification_3',
+                'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2',
+                'comment_1', 'comment_2', 'inherent_safety', 'protective_measure'
+            ]
+            col_names = {
+                'table_name': 'Этап жизненного цикла',
+                'hazard_name': 'Наименование опасности',  # Skip category
+                'hazardous_situation': 'Опасная ситуация',
+                'harm': 'Вред',
+                'severity_score': 'Тяжесть вреда, балл',
+                'probability_score': 'Вероятность причинения вреда, балл',
+                'risk_score': 'Риск, балл',
+                'risk_level_1': 'Уровень риска (доп./не доп.)',
+                'control_measure_1': 'Меры по управлению риском (1)',
+                'control_measure_2': 'Меры по управлению риском (2)',
+                'control_measure_3': 'Меры по управлению риском (3)',
+                'verification_1': 'Верификация мер по управлению риском (1)',
+                'verification_2': 'Верификация мер по управлению риском (2)',
+                'verification_3': 'Верификация мер по управлению риском (3)',
+                'residual_risk_level': 'Тяжесть вреда, балл (остат.)',
+                'residual_probability': 'Вероятность причинения вреда, балл (остат.)',
+                'residual_risk_score': 'Достигнутый риск и его уровень',
+                'risk_level_2': 'Уровень риска (доп./не доп.) (остат.)',
+                'comment_1': 'Комментарий',
+                'comment_2': 'Комментарий (остат.)',
+                'inherent_safety': 'Безопасность, заложенная в конструкции',
+                'protective_measure': 'Защитная мера/средство'
+            }
+        else:
+            # Default case
+            all_columns = columns
+            col_names = {
+                'table_name': 'Этап жизненного цикла',
+                'hazard': 'Категория опасности',
+                'hazardous_situation': 'Наименование опасности',
+                'sequence_of_events': 'Последовательность событий',
+                'harm': 'Вред'
+            }
+    else:
+        # Full detailed view
+        all_columns = columns
+        col_names = {
+            'table_name': 'Этап жизненного цикла',
+            'hazard': 'Категория опасности',
+            'hazardous_situation': 'Наименование опасности',
+            'sequence_of_events': 'Последовательность событий',
+            'harm': 'Вред',
+            'severity_initial': 'Тяжесть вреда, балл',
+            'probability_initial': 'Вероятность причинения вреда, балл',
+            'risk_score': 'Риск, балл',
+            'risk_level_1': 'Уровень риска (доп./не доп.)',
+            'control_measure_1': 'Меры по управлению риском (1)',
+            'control_measure_2': 'Меры по управлению риском (2)',
+            'control_measure_3': 'Меры по управлению риском (3)',
+            'verification_1': 'Верификация мер по управлению риском (1)',
+            'verification_2': 'Верификация мер по управлению риском (2)',
+            'verification_3': 'Верификация мер по управлению риском (3)',
+            'severity_residual': 'Тяжесть вреда, балл (остат.)',
+            'probability_residual': 'Вероятность причинения вреда, балл (остат.)',
+            'residual_risk_score': 'Достигнутый риск и его уровень',
+            'risk_level_2': 'Уровень риска (доп./не доп.) (остат.)',
+            'comment_1': 'Комментарий',
+            'comment_2': 'Комментарий (остат.)',
+            'risk_benefit_analysis': 'Анализ остаточный риск/польза',
+            'new_risks': 'Новые риски в результате принятия мер по управлению',
+            'inherent_safety': 'Безопасность, заложенная в конструкции',
+            'protective_measure': 'Защитная мера/средство',
+            'safety_information': 'Информация по безопасности/обучению'
+        }
+
     html = '<table><thead><tr>'
-    for col in columns:
+    for col in all_columns:
         col_name = col_names.get(col, col.replace('_', ' ').title())
         html += f'<th>{col_name}</th>'
     html += '</tr></thead><tbody>'
-    
+
     for risk in risks:
         html += '<tr>'
-        for col in columns:
+        for col in all_columns:
             value = risk.get(col, '')
             if not value or str(value).strip() == '':
                 value = '<span class="empty-field">не заполнено</span>'
             else:
+                # Remove "Управление рисками -" prefix if present
+                if col == 'table_name' and isinstance(value, str) and value.startswith('Управление рисками - '):
+                    value = value.replace('Управление рисками - ', '', 1)
                 value = html_module.escape(str(value))
             html += f'<td>{value}</td>'
         html += '</tr>'
-    
+
     html += '</tbody></table>'
     return html
 
 
 def generate_residual_risks_table(risks):
-    """Generate HTML table for residual risks"""
+    """Generate HTML table for residual risks with ALL Excel fields including Категория опасности and Последовательность событий"""
     import html as html_module
-    
+
     if not risks:
         return '<p class="empty-field">Нет данных</p>'
-    
-    html = '<table><thead><tr><th>Этап жизненного цикла</th><th>Опасность</th><th>Остаточная тяжесть (S)</th><th>Остаточная вероятность (P)</th><th>Остаточный риск (S×P)</th></tr></thead><tbody>'
-    
+
+    # Show comprehensive table with ALL Excel columns for residual risk evaluation
+    all_columns = [
+        'table_name', 'hazard_category', 'hazard_name', 'event_sequence', 'harm',
+        'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2',
+        'comment_2', 'risk_benefit_analysis', 'new_risks'
+    ]
+
+    # Column name mapping
+    col_names = {
+        'table_name': 'Этап жизненного цикла',
+        'hazard_category': 'Категория опасности',
+        'hazard_name': 'Наименование опасности',
+        'event_sequence': 'Последовательность событий',
+        'harm': 'Вред',
+        'residual_risk_level': 'Тяжесть вреда, балл (остат.)',
+        'residual_probability': 'Вероятность причинения вреда, балл (остат.)',
+        'residual_risk_score': 'Достигнутый риск и его уровень',
+        'risk_level_2': 'Уровень риска (доп./не доп.) (остат.)',
+        'comment_2': 'Комментарий (остат.)',
+        'risk_benefit_analysis': 'Анализ остаточный риск/польза',
+        'new_risks': 'Новые риски в результате принятия мер по управлению'
+    }
+
+    html = '<table><thead><tr>'
+    for col in all_columns:
+        col_name = col_names.get(col, col.replace('_', ' ').title())
+        html += f'<th>{col_name}</th>'
+    html += '</tr></thead><tbody>'
+
     for risk in risks:
-        s_res = risk.get('severity_residual', 0) or 0
-        p_res = risk.get('probability_residual', 0) or 0
-        risk_value = s_res * p_res
-        
-        lifecycle = html_module.escape(str(risk.get('lifecycle_stage', ''))) if risk.get('lifecycle_stage') else '<span class="empty-field">не заполнено</span>'
-        hazard = html_module.escape(str(risk.get('hazard', ''))) if risk.get('hazard') else '<span class="empty-field">не заполнено</span>'
-        
-        empty_field = '<span class="empty-field">не заполнено</span>'
-        html += f'<tr>'
-        html += f'<td>{lifecycle}</td>'
-        html += f'<td>{hazard}</td>'
-        html += f'<td>{s_res if s_res else empty_field}</td>'
-        html += f'<td>{p_res if p_res else empty_field}</td>'
-        html += f'<td>{risk_value if risk_value else empty_field}</td>'
+        html += '<tr>'
+        for col in all_columns:
+            value = risk.get(col, '')
+            if not value or str(value).strip() == '':
+                value = '<span class="empty-field">не заполнено</span>'
+            else:
+                # Remove "Управление рисками -" prefix if present
+                if col == 'table_name' and isinstance(value, str) and value.startswith('Управление рисками - '):
+                    value = value.replace('Управление рисками - ', '', 1)
+                value = html_module.escape(str(value))
+            html += f'<td>{value}</td>'
         html += '</tr>'
-    
+
     html += '</tbody></table>'
     return html
 
@@ -864,60 +1085,90 @@ def generate_team_table(team_members, date_str):
     return html
 
 
-def generate_full_risks_table(risks):
-    """Generate full risk management table for Appendix A"""
+
+
+
+def generate_severity_table(project):
+    """Generate severity levels table from project configuration"""
     import html as html_module
-    
-    if not risks:
-        return '<p class="empty-field">Нет данных</p>'
-    
-    html = '<table><thead><tr>'
-    html += '<th>Этап жизненного цикла</th>'
-    html += '<th>Опасность</th>'
-    html += '<th>Опасная ситуация</th>'
-    html += '<th>Последовательность событий</th>'
-    html += '<th>Вред</th>'
-    html += '<th>Начальная тяжесть (S)</th>'
-    html += '<th>Начальная вероятность (P)</th>'
-    html += '<th>Начальный риск (S×P)</th>'
-    html += '<th>Меры контроля</th>'
-    html += '<th>Метод верификации</th>'
-    html += '<th>Остаточная тяжесть (S)</th>'
-    html += '<th>Остаточная вероятность (P)</th>'
-    html += '<th>Остаточный риск (S×P)</th>'
-    html += '</tr></thead><tbody>'
-    
-    empty_field_html = '<span class="empty-field">не заполнено</span>'
-    
-    for risk in risks:
-        s_init = risk.get('severity_initial', 0) or 0
-        p_init = risk.get('probability_initial', 0) or 0
-        risk_init = s_init * p_init
-        s_res = risk.get('severity_residual', 0) or 0
-        p_res = risk.get('probability_residual', 0) or 0
-        risk_res = s_res * p_res
-        
-        def safe_escape(val):
-            if not val:
-                return empty_field_html
-            return html_module.escape(str(val))
-        
-        html += '<tr>'
-        html += f'<td>{safe_escape(risk.get("lifecycle_stage"))}</td>'
-        html += f'<td>{safe_escape(risk.get("hazard"))}</td>'
-        html += f'<td>{safe_escape(risk.get("hazardous_situation"))}</td>'
-        html += f'<td>{safe_escape(risk.get("sequence_of_events"))}</td>'
-        html += f'<td>{safe_escape(risk.get("harm"))}</td>'
-        html += f'<td>{s_init if s_init else empty_field_html}</td>'
-        html += f'<td>{p_init if p_init else empty_field_html}</td>'
-        html += f'<td>{risk_init if risk_init else empty_field_html}</td>'
-        html += f'<td>{safe_escape(risk.get("control_measures"))}</td>'
-        html += f'<td>{safe_escape(risk.get("verification"))}</td>'
-        html += f'<td>{s_res if s_res else empty_field_html}</td>'
-        html += f'<td>{p_res if p_res else empty_field_html}</td>'
-        html += f'<td>{risk_res if risk_res else empty_field_html}</td>'
-        html += '</tr>'
-    
+
+    # Parse severity levels from project
+    try:
+        if project.severity_levels:
+            if isinstance(project.severity_levels, str):
+                severity_levels = json.loads(project.severity_levels)
+            else:
+                severity_levels = project.severity_levels
+        else:
+            severity_levels = []
+    except (json.JSONDecodeError, TypeError, AttributeError) as e:
+        print(f"DEBUG: Error parsing severity_levels: {e}")
+        severity_levels = []
+
+    if not severity_levels:
+        # Fallback to default severity levels
+        return '''<table>
+            <tr><th>Уровень</th><th>Описание</th><th>Пример</th></tr>
+            <tr><td>1</td><td>Незначительный</td><td>Лёгкое раздражение кожи</td></tr>
+            <tr><td>2</td><td>Малый</td><td>Обратимая травма, лёгкий порез</td></tr>
+            <tr><td>3</td><td>Средний</td><td>Временная потеря трудоспособности</td></tr>
+            <tr><td>4</td><td>Серьёзный</td><td>Значительная травма, госпитализация</td></tr>
+            <tr><td>5</td><td>Критический</td><td>Смерть или необратимое повреждение органа</td></tr>
+        </table>'''
+
+    # Generate table from project configuration
+    html = '<table><thead><tr><th>Уровень</th><th>Название</th><th>Описание</th><th>Балл</th></tr></thead><tbody>'
+
+    for level_data in severity_levels:
+        level = level_data.get('level', '')
+        name = html_module.escape(str(level_data.get('name', '')))
+        description = html_module.escape(str(level_data.get('description', '')))
+        score = level_data.get('score', level_data.get('level', ''))
+
+        html += f'<tr><td>{level}</td><td>{name}</td><td>{description}</td><td>{score}</td></tr>'
+
+    html += '</tbody></table>'
+    return html
+
+
+def generate_probability_table(project):
+    """Generate probability levels table from project configuration"""
+    import html as html_module
+
+    # Parse probability levels from project
+    try:
+        if project.probability_levels:
+            if isinstance(project.probability_levels, str):
+                probability_levels = json.loads(project.probability_levels)
+            else:
+                probability_levels = project.probability_levels
+        else:
+            probability_levels = []
+    except (json.JSONDecodeError, TypeError, AttributeError) as e:
+        print(f"DEBUG: Error parsing probability_levels: {e}")
+        probability_levels = []
+
+    if not probability_levels:
+        # Fallback to default probability levels
+        return '''<table>
+            <tr><th>Уровень</th><th>Описание</th><th>Пример</th></tr>
+            <tr><td>1</td><td>Очень редкое</td><td>Почти невозможно (<1/10000)</td></tr>
+            <tr><td>2</td><td>Редкое</td><td>Возможное при особых обстоятельствах</td></tr>
+            <tr><td>3</td><td>Иногда</td><td>Может произойти время от времени</td></tr>
+            <tr><td>4</td><td>Вероятное</td><td>Может происходить регулярно</td></tr>
+            <tr><td>5</td><td>Частое</td><td>Происходит регулярно</td></tr>
+        </table>'''
+
+    # Generate table from project configuration
+    html = '<table><thead><tr><th>Уровень</th><th>Название</th><th>Описание</th></tr></thead><tbody>'
+
+    for level_data in probability_levels:
+        level = level_data.get('level', '')
+        name = html_module.escape(str(level_data.get('name', '')))
+        description = html_module.escape(str(level_data.get('description', '')))
+
+        html += f'<tr><td>{level}</td><td>{name}</td><td>{description}</td></tr>'
+
     html += '</tbody></table>'
     return html
 
