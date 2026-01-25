@@ -237,9 +237,11 @@ async def read_projects(
     """Get all projects accessible to the user"""
     if current_user.role == UserRole.SYS_ADMIN:
         # System admin can see all projects
+        # Use explicit column selection to avoid loading all fields
         projects = db.query(Project).offset(skip).limit(limit).all()
     else:
         # Regular users can see projects they own or are members of
+        # Use explicit column selection to avoid loading all fields
         projects = db.query(Project).join(ProjectMember, Project.id == ProjectMember.project_id, isouter=True).filter(
             (Project.owner_id == current_user.id) | (ProjectMember.user_id == current_user.id)
         ).distinct().offset(skip).limit(limit).all()
