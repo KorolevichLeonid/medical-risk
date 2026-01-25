@@ -73,76 +73,106 @@ def create_tables():
 
 def ensure_project_severity_columns():
     """Ensure severity_levels and risk_threshold exist and have defaults."""
-    inspector = inspect(engine)
-    if "projects" not in inspector.get_table_names():
-        return
+    try:
+        inspector = inspect(engine)
+        if "projects" not in inspector.get_table_names():
+            return
 
-    columns = {col["name"] for col in inspector.get_columns("projects")}
-    needs_severity = "severity_levels" not in columns
-    needs_threshold = "risk_threshold" not in columns
+        columns = {col["name"] for col in inspector.get_columns("projects")}
+        needs_severity = "severity_levels" not in columns
+        needs_threshold = "risk_threshold" not in columns
 
-    if not (needs_severity or needs_threshold):
-        return
+        if not (needs_severity or needs_threshold):
+            return
 
-    default_severity_json = json.dumps(DEFAULT_SEVERITY_LEVELS, ensure_ascii=False)
+        default_severity_json = json.dumps(DEFAULT_SEVERITY_LEVELS, ensure_ascii=False)
 
-    with engine.begin() as conn:
-        if engine.url.drivername.startswith("sqlite"):
+        with engine.begin() as conn:
+            is_sqlite = engine.url.drivername.startswith("sqlite")
+            
             if needs_severity:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN severity_levels TEXT"))
+                if is_sqlite:
+                    # SQLite doesn't support IF NOT EXISTS in ALTER TABLE
+                    try:
+                        conn.execute(text("ALTER TABLE projects ADD COLUMN severity_levels TEXT"))
+                    except Exception as e:
+                        # Column might already exist, ignore error
+                        if "duplicate column" not in str(e).lower():
+                            raise
+                else:
+                    # PostgreSQL supports IF NOT EXISTS
+                    conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS severity_levels TEXT"))
+            
             if needs_threshold:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN risk_threshold INTEGER DEFAULT 10"))
-        else:
-            if needs_severity:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS severity_levels TEXT"))
-            if needs_threshold:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS risk_threshold INTEGER DEFAULT 10"))
+                if is_sqlite:
+                    try:
+                        conn.execute(text("ALTER TABLE projects ADD COLUMN risk_threshold INTEGER DEFAULT 10"))
+                    except Exception as e:
+                        if "duplicate column" not in str(e).lower():
+                            raise
+                else:
+                    conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS risk_threshold INTEGER DEFAULT 10"))
 
-        conn.execute(
-            text(
-                """
-                UPDATE projects
-                SET severity_levels = :severity,
-                    risk_threshold = COALESCE(risk_threshold, :risk_threshold)
-                WHERE severity_levels IS NULL OR severity_levels = ''
-                """
-            ),
-            {"severity": default_severity_json, "risk_threshold": DEFAULT_RISK_THRESHOLD},
-        )
+            conn.execute(
+                text(
+                    """
+                    UPDATE projects
+                    SET severity_levels = :severity,
+                        risk_threshold = COALESCE(risk_threshold, :risk_threshold)
+                    WHERE severity_levels IS NULL OR severity_levels = ''
+                    """
+                ),
+                {"severity": default_severity_json, "risk_threshold": DEFAULT_RISK_THRESHOLD},
+            )
+    except Exception as e:
+        print(f"[!] Error ensuring project severity columns: {e}")
+        raise
 
 
 def ensure_project_probability_columns():
     """Ensure probability_levels exist and have defaults."""
-    inspector = inspect(engine)
-    if "projects" not in inspector.get_table_names():
-        return
+    try:
+        inspector = inspect(engine)
+        if "projects" not in inspector.get_table_names():
+            return
 
-    columns = {col["name"] for col in inspector.get_columns("projects")}
-    needs_probability = "probability_levels" not in columns
+        columns = {col["name"] for col in inspector.get_columns("projects")}
+        needs_probability = "probability_levels" not in columns
 
-    if not needs_probability:
-        return
+        if not needs_probability:
+            return
 
-    default_probability_json = json.dumps(DEFAULT_PROBABILITY_LEVELS, ensure_ascii=False)
+        default_probability_json = json.dumps(DEFAULT_PROBABILITY_LEVELS, ensure_ascii=False)
 
-    with engine.begin() as conn:
-        if engine.url.drivername.startswith("sqlite"):
+        with engine.begin() as conn:
+            is_sqlite = engine.url.drivername.startswith("sqlite")
+            
             if needs_probability:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN probability_levels TEXT"))
-        else:
-            if needs_probability:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS probability_levels TEXT"))
+                if is_sqlite:
+                    # SQLite doesn't support IF NOT EXISTS in ALTER TABLE
+                    try:
+                        conn.execute(text("ALTER TABLE projects ADD COLUMN probability_levels TEXT"))
+                    except Exception as e:
+                        # Column might already exist, ignore error
+                        if "duplicate column" not in str(e).lower():
+                            raise
+                else:
+                    # PostgreSQL supports IF NOT EXISTS
+                    conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS probability_levels TEXT"))
 
-        conn.execute(
-            text(
-                """
-                UPDATE projects
-                SET probability_levels = :probability
-                WHERE probability_levels IS NULL OR probability_levels = ''
-                """
-            ),
-            {"probability": default_probability_json},
-        )
+            conn.execute(
+                text(
+                    """
+                    UPDATE projects
+                    SET probability_levels = :probability
+                    WHERE probability_levels IS NULL OR probability_levels = ''
+                    """
+                ),
+                {"probability": default_probability_json},
+            )
+    except Exception as e:
+        print(f"[!] Error ensuring project probability columns: {e}")
+        raise
 
 
 def create_admin_user():
