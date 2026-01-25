@@ -13,12 +13,6 @@ from .routers import auth, users, projects, risk_analyses, risk_tables, changelo
 from . import admin_auth
 from .core.config import settings
 
-# Create database tables
-user.Base.metadata.create_all(bind=engine)
-project.Base.metadata.create_all(bind=engine)
-risk_analysis.Base.metadata.create_all(bind=engine)
-changelog_model.Base.metadata.create_all(bind=engine)
-document_model.Base.metadata.create_all(bind=engine)
 
 # Initialize FastAPI app
 app = FastAPI(

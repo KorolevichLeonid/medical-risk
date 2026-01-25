@@ -3,10 +3,35 @@ Database initialization and migration functions
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from ..database import engine
-from ..models.project import Project
+from .database import engine
+from .models.project import Project
 import json
 import logging
+
+def init_database():
+    """Initialize database - create tables and run migrations"""
+    try:
+        # Import models to ensure they're registered
+        from .models import user, project, risk_analysis
+        from .models import changelog as changelog_model
+        from .models import document as document_model
+
+        # Create database tables
+        user.Base.metadata.create_all(bind=engine)
+        project.Base.metadata.create_all(bind=engine)
+        risk_analysis.Base.metadata.create_all(bind=engine)
+        changelog_model.Base.metadata.create_all(bind=engine)
+        document_model.Base.metadata.create_all(bind=engine)
+
+        # Run migrations
+        ensure_project_severity_columns()
+        run_postgresql_migration()
+
+        print("✓ Database initialization completed successfully")
+
+    except Exception as e:
+        print(f"✗ Error during database initialization: {e}")
+        raise
 
 def ensure_project_severity_columns():
     """Ensure project severity columns exist in SQLite database"""
