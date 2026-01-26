@@ -135,6 +135,60 @@ def ensure_project_severity_columns():
         raise
 
 
+def ensure_project_extended_columns():
+    """Ensure newer project columns exist for both SQLite and PostgreSQL."""
+    try:
+        inspector = inspect(engine)
+        if "projects" not in inspector.get_table_names():
+            return
+
+        columns = {col["name"] for col in inspector.get_columns("projects")}
+        is_sqlite = engine.url.drivername.startswith("sqlite")
+
+        columns_to_add = {
+            "manufacturer": "VARCHAR(255)",
+            "manufacturer_address": "TEXT",
+            "patient_population": "TEXT",
+            "key_performance_characteristics": "TEXT",
+            "safety_characteristics": "TEXT",
+            "technical_specs": "TEXT",
+            "regulatory_requirements": "TEXT",
+            "standards": "TEXT",
+            "contact_type": "VARCHAR(50)",
+            "duration": "VARCHAR(50)",
+            "invasiveness": "VARCHAR(50)",
+            "energy_source": "VARCHAR(50)",
+            "lifecycle_stages": "TEXT",
+            "custom_lifecycle_stages": "TEXT",
+            "hazard_questions": "TEXT",
+            "custom_hazard": "TEXT",
+            "hazard_checklist_answers": "TEXT",
+            "active_hazard_categories": "TEXT",
+        }
+
+        with engine.begin() as conn:
+            for column_name, column_type in columns_to_add.items():
+                if column_name in columns:
+                    continue
+                if is_sqlite:
+                    try:
+                        conn.execute(
+                            text(f"ALTER TABLE projects ADD COLUMN {column_name} {column_type}")
+                        )
+                    except Exception as e:
+                        if "duplicate column" not in str(e).lower():
+                            raise
+                else:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE projects ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+                        )
+                    )
+    except Exception as e:
+        print(f"[!] Error ensuring project extended columns: {e}")
+        raise
+
+
 def ensure_project_probability_columns():
     """Ensure probability_levels exist and have defaults."""
     try:
@@ -224,6 +278,10 @@ def init_database():
         # Ensure new columns exist for severity configuration
         ensure_project_severity_columns()
         print("[+] Project severity configuration ensured")
+
+        # Ensure extended project columns exist
+        ensure_project_extended_columns()
+        print("[+] Project extended columns ensured")
 
         # Ensure probability levels column exists
         ensure_project_probability_columns()
