@@ -4,17 +4,22 @@ Service for generating Risk Management Report DOCX documents
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.enum.section import WD_ORIENT
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from io import BytesIO
 from datetime import datetime
 from typing import Dict, List, Optional
 import json
+import re
+import os
 from reportlab.lib.pagesizes import letter, A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from html2docx import html2docx
 
 
@@ -62,6 +67,90 @@ class RiskManagementReportGenerator:
     def generate(self) -> BytesIO:
         """Generate the complete document and return as BytesIO"""
         try:
+            html_content = self._generate_html_content()
+            print("DEBUG: Converting HTML preview to DOCX")
+            return self._generate_docx_from_html(html_content)
+        except Exception as e:
+            print(f"DEBUG: HTML->DOCX failed, falling back to legacy generator: {e}")
+            return self._generate_docx_legacy()
+
+    def _generate_html_content(self) -> str:
+        """Generate HTML content identical to the preview"""
+        # Import the HTML generation function from documents.py
+        from ..routers.documents import generate_html_preview
+
+        # Create a mock project object that behaves like a SQLAlchemy model
+        class MockProject:
+            def __init__(self, data):
+                for key, value in data.items():
+                    setattr(self, key, value)
+
+        # Create a mock doc_version object
+        class MockDocVersion:
+            def __init__(self, project_data):
+                self.created_at = datetime.now()
+                self.report_number = project_data.get('report_number', 'RMR-2025-01')
+                self.version = project_data.get('version', '1.0')
+                # Store reference to project data for attribute access
+                self._project_data = project_data
+
+        mock_project = MockProject(self.project)
+        mock_doc_version = MockDocVersion(self.project)
+
+        return generate_html_preview(mock_project, mock_doc_version, self.risks, self.team)
+
+    def _generate_docx_from_html(self, html_content: str) -> BytesIO:
+        """Generate DOCX from HTML preview content."""
+        body_match = re.search(r"<body[^>]*>(?P<body>.*)</body>", html_content, re.IGNORECASE | re.DOTALL)
+        if body_match:
+            html_content = f"<html><body>{body_match.group('body')}</body></html>"
+
+        file_stream = html2docx(html_content, "Risk Management Report")
+        file_bytes = file_stream.getvalue()
+        if not file_bytes:
+            raise ValueError("HTML to DOCX conversion returned empty data")
+
+        doc = Document(BytesIO(file_bytes))
+        table_count = html_content.lower().count("<table")
+        if table_count and len(doc.tables) < table_count:
+            raise ValueError("HTML conversion produced incomplete tables")
+        self._apply_docx_landscape(doc)
+        if not self._doc_has_content(doc):
+            raise ValueError("HTML to DOCX conversion produced empty document")
+
+        output_stream = BytesIO()
+        doc.save(output_stream)
+        output_stream.seek(0)
+        return output_stream
+
+    def _doc_has_content(self, doc: Document) -> bool:
+        """Check if a docx Document has any meaningful content."""
+        if doc.tables:
+            return True
+        for paragraph in doc.paragraphs:
+            if paragraph.text and paragraph.text.strip():
+                return True
+        return False
+
+    def _apply_docx_landscape(self, doc: Document):
+        """Force DOCX to use landscape orientation with compact margins."""
+        try:
+            style = doc.styles['Normal']
+            style.font.name = 'Calibri'
+            style.font.size = Pt(8)
+        except Exception:
+            pass
+        for section in doc.sections:
+            section.orientation = WD_ORIENT.LANDSCAPE
+            section.page_width, section.page_height = section.page_height, section.page_width
+            section.top_margin = Inches(0.5)
+            section.bottom_margin = Inches(0.5)
+            section.left_margin = Inches(0.5)
+            section.right_margin = Inches(0.5)
+
+    def _generate_docx_legacy(self) -> BytesIO:
+        """Legacy DOCX generation method (kept as fallback)."""
+        try:
             print("DEBUG: Setting up document styles")
             self._setup_document_styles()
             print("DEBUG: Adding title page")
@@ -84,43 +173,17 @@ class RiskManagementReportGenerator:
             self._add_references()
 
             print("DEBUG: Saving document to BytesIO")
-            # Save to BytesIO
             file_stream = BytesIO()
             self.doc.save(file_stream)
             file_stream.seek(0)
-            print("DEBUG: Document generation completed successfully")
+            print("DEBUG: Document generation completed successfully (legacy)")
             return file_stream
         except Exception as e:
-            print(f"DEBUG: Error in document generation: {e}")
+            print(f"DEBUG: Error in legacy document generation: {e}")
             print(f"DEBUG: Error type: {type(e)}")
             import traceback
             print(f"DEBUG: Traceback: {traceback.format_exc()}")
             raise
-
-    def _generate_html_content(self) -> str:
-        """Generate HTML content identical to the preview"""
-        # Import the HTML generation function from documents.py
-        from ..routers.documents import generate_html_preview
-
-        # Create a mock project object that behaves like a SQLAlchemy model
-        class MockProject:
-            def __init__(self, data):
-                for key, value in data.items():
-                    setattr(self, key, value)
-
-        # Create a mock doc_version object
-        class MockDocVersion:
-            def __init__(self, project_data):
-                self.created_at = None
-                self.report_number = project_data.get('report_number', 'RMR-2025-01')
-                self.version = project_data.get('version', '1.0')
-                # Store reference to project data for attribute access
-                self._project_data = project_data
-
-        mock_project = MockProject(self.project)
-        mock_doc_version = MockDocVersion(self.project)
-
-        return generate_html_preview(mock_project, mock_doc_version, self.risks, self.team)
     
     def _get_field_value(self, value, default_placeholder='[PLACEHOLDER]'):
         """Get field value or return 'не заполнено' if empty"""
@@ -139,13 +202,15 @@ class RiskManagementReportGenerator:
         font.name = 'Calibri'
         font.size = Pt(8)
 
-        # Set compact margins
+        # Set compact margins + landscape orientation
         sections = self.doc.sections
         for section in sections:
             section.top_margin = Inches(0.5)
             section.bottom_margin = Inches(0.5)
             section.left_margin = Inches(0.5)
             section.right_margin = Inches(0.5)
+            section.orientation = WD_ORIENT.LANDSCAPE
+            section.page_width, section.page_height = section.page_height, section.page_width
     
     def _add_title_page(self):
         """Add title page - Section 1"""
@@ -922,52 +987,61 @@ class PDFRiskManagementReportGenerator:
         self.table_data = table_data
         self.team = team_members
         self.styles = getSampleStyleSheet()
+        self.page_size = landscape(A4)
+        self.page_width, self.page_height = self.page_size
+        self.left_margin = 18
+        self.right_margin = 18
+        self.top_margin = 18
+        self.bottom_margin = 18
+        self.content_width = self.page_width - self.left_margin - self.right_margin
+        self.font_name, self.font_name_bold = self._register_fonts()
 
         # Create custom styles - compact for landscape printing
-        self.styles.add(ParagraphStyle(
-            name='CustomTitle',
-            parent=self.styles['Title'],
-            fontSize=12,
-            alignment=TA_CENTER,
-            spaceAfter=15
-        ))
+        if 'CustomTitle' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='CustomTitle',
+                parent=self.styles['Title'],
+                fontName=self.font_name_bold,
+                fontSize=12,
+                alignment=TA_CENTER,
+                spaceAfter=15
+            ))
 
-        self.styles.add(ParagraphStyle(
-            name='Heading1',
-            parent=self.styles['Heading1'],
-            fontSize=11,
-            spaceAfter=8,
-            alignment=TA_LEFT
-        ))
+        heading1 = self.styles['Heading1']
+        heading1.fontName = self.font_name_bold
+        heading1.fontSize = 11
+        heading1.spaceAfter = 8
+        heading1.alignment = TA_LEFT
 
-        self.styles.add(ParagraphStyle(
-            name='Heading2',
-            parent=self.styles['Heading2'],
-            fontSize=10,
-            spaceAfter=5,
-            alignment=TA_LEFT
-        ))
+        heading2 = self.styles['Heading2']
+        heading2.fontName = self.font_name_bold
+        heading2.fontSize = 10
+        heading2.spaceAfter = 5
+        heading2.alignment = TA_LEFT
 
-        self.styles.add(ParagraphStyle(
-            name='Heading3',
-            parent=self.styles['Heading3'],
-            fontSize=9,
-            spaceAfter=3,
-            alignment=TA_LEFT
-        ))
+        heading3 = self.styles['Heading3']
+        heading3.fontName = self.font_name_bold
+        heading3.fontSize = 9
+        heading3.spaceAfter = 3
+        heading3.alignment = TA_LEFT
 
-        self.styles.add(ParagraphStyle(
-            name='Normal',
-            parent=self.styles['Normal'],
-            fontSize=8,
-            alignment=TA_JUSTIFY,
-            wordWrap='CJK'
-        ))
+        normal = self.styles['Normal']
+        normal.fontName = self.font_name
+        normal.fontSize = 8
+        normal.alignment = TA_JUSTIFY
+        normal.wordWrap = 'CJK'
 
     def generate(self) -> BytesIO:
         """Generate the complete PDF document and return as BytesIO"""
         file_stream = BytesIO()
-        doc = SimpleDocTemplate(file_stream, pagesize=A4)
+        doc = SimpleDocTemplate(
+            file_stream,
+            pagesize=self.page_size,
+            leftMargin=self.left_margin,
+            rightMargin=self.right_margin,
+            topMargin=self.top_margin,
+            bottomMargin=self.bottom_margin
+        )
         story = []
 
         # Build the document content
@@ -985,6 +1059,115 @@ class PDFRiskManagementReportGenerator:
         doc.build(story)
         file_stream.seek(0)
         return file_stream
+
+    def _register_fonts(self):
+        """Register a Unicode-capable font for Cyrillic text."""
+        env_font = os.getenv("REPORT_FONT_PATH")
+        env_bold = os.getenv("REPORT_FONT_BOLD_PATH")
+        font_candidates = [
+            env_font,
+            os.path.join(os.path.dirname(__file__), "..", "assets", "fonts", "DejaVuSans.ttf"),
+            r"C:\Windows\Fonts\arial.ttf",
+            r"C:\Windows\Fonts\calibri.ttf",
+            r"C:\Windows\Fonts\times.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+            "/Library/Fonts/Arial Unicode.ttf",
+        ]
+
+        for font_path in font_candidates:
+            if not font_path:
+                continue
+            font_path = os.path.abspath(font_path)
+            if os.path.isfile(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont("ReportFont", font_path))
+                    bold_path = self._find_bold_font_path(font_path, env_bold)
+                    if bold_path and os.path.isfile(bold_path):
+                        pdfmetrics.registerFont(TTFont("ReportFontBold", bold_path))
+                        return "ReportFont", "ReportFontBold"
+                    return "ReportFont", "ReportFont"
+                except Exception as e:
+                    print(f"DEBUG: Failed to register font {font_path}: {e}")
+        print("DEBUG: Falling back to Helvetica fonts (Cyrillic may not render)")
+        return "Helvetica", "Helvetica-Bold"
+
+    def _find_bold_font_path(self, font_path: str, env_bold: Optional[str]) -> Optional[str]:
+        if env_bold:
+            return os.path.abspath(env_bold)
+
+        font_dir = os.path.dirname(font_path)
+        font_name = os.path.basename(font_path).lower()
+        bold_candidates = []
+
+        if "dejavu" in font_name:
+            bold_candidates.append(os.path.join(font_dir, "DejaVuSans-Bold.ttf"))
+        if "arial" in font_name:
+            bold_candidates.append(os.path.join(font_dir, "arialbd.ttf"))
+        if "calibri" in font_name:
+            bold_candidates.append(os.path.join(font_dir, "calibrib.ttf"))
+        if "times" in font_name:
+            bold_candidates.append(os.path.join(font_dir, "timesbd.ttf"))
+
+        for candidate in bold_candidates:
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    def _calc_col_widths(self, ratios: List[float]) -> List[float]:
+        if not ratios:
+            return []
+        total = sum(ratios)
+        if total <= 0:
+            ratios = [1.0 for _ in ratios]
+            total = len(ratios)
+        return [self.content_width * (ratio / total) for ratio in ratios]
+
+    def _apply_table_style(self, table: Table, style_commands: List[tuple]):
+        base_commands = [
+            ('FONTNAME', (0, 0), (-1, -1), self.font_name),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ]
+        table.hAlign = 'LEFT'
+        table.setStyle(TableStyle(base_commands + style_commands))
+
+    def _wrap_table_data(self, table_data: List[List[object]], header_size: int, body_size: int):
+        header_style = ParagraphStyle(
+            name='TableHeader',
+            parent=self.styles['Normal'],
+            fontName=self.font_name_bold,
+            fontSize=header_size,
+            leading=header_size + 1,
+            wordWrap='CJK'
+        )
+        body_style = ParagraphStyle(
+            name='TableBody',
+            parent=self.styles['Normal'],
+            fontName=self.font_name,
+            fontSize=body_size,
+            leading=body_size + 1,
+            wordWrap='CJK'
+        )
+
+        wrapped = []
+        for row_index, row in enumerate(table_data):
+            row_style = header_style if row_index == 0 else body_style
+            wrapped_row = []
+            for cell in row:
+                text = '' if cell is None else str(cell)
+                wrapped_row.append(Paragraph(text, row_style))
+            wrapped.append(wrapped_row)
+        return wrapped
+
+    def _section_spacing(self, story):
+        story.append(Spacer(1, 12))
 
     def _get_field_value(self, value, default_placeholder='[PLACEHOLDER]'):
         """Get field value or return 'не заполнено' if empty"""
@@ -1034,7 +1217,7 @@ class PDFRiskManagementReportGenerator:
         story.append(Paragraph(f'Reviewed by: {reviewed_by}', self.styles['Normal']))
         story.append(Paragraph(f'Approved by: {approved_by}', self.styles['Normal']))
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_table_of_contents(self, story):
         """Add table of contents - Section 2"""
@@ -1053,21 +1236,29 @@ class PDFRiskManagementReportGenerator:
             ['10', 'References and Document Control', '10']
         ]
 
-        table = Table(toc_data)
-        table.setStyle(TableStyle([
+        toc_data = self._wrap_table_data(toc_data, header_size=8, body_size=7)
+        table = Table(
+            toc_data,
+            colWidths=self._calc_col_widths([1, 6, 1]),
+            repeatRows=1
+        )
+        self._apply_table_style(table, [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ])
         story.append(table)
         story.append(Spacer(1, 20))
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_device_identification(self, story):
         """Add device identification section - Section 3"""
@@ -1093,17 +1284,25 @@ class PDFRiskManagementReportGenerator:
         for field, value in fields_data:
             table_data.append([field, value])
 
-        table = Table(table_data)
-        table.setStyle(TableStyle([
+        table_data = self._wrap_table_data(table_data, header_size=10, body_size=8)
+        table = Table(
+            table_data,
+            colWidths=self._calc_col_widths([1, 3]),
+            repeatRows=1
+        )
+        self._apply_table_style(table, [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ])
         story.append(table)
         story.append(Spacer(1, 20))
 
@@ -1125,7 +1324,7 @@ class PDFRiskManagementReportGenerator:
         else:
             story.append(Paragraph('[PLACEHOLDER: Hazard Categories]', self.styles['Normal']))
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_hazard_identification(self, story):
         """Add hazard identification section - Section 4"""
@@ -1174,18 +1373,25 @@ class PDFRiskManagementReportGenerator:
                     data.get('harm', '')
                 ])
 
-            table = Table(table_data)
-            table.setStyle(TableStyle([
+            table_data = self._wrap_table_data(table_data, header_size=8, body_size=7)
+            table = Table(
+                table_data,
+                colWidths=self._calc_col_widths([1, 3, 4, 2]),
+                repeatRows=1
+            )
+            self._apply_table_style(table, [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+                ('FONTNAME', (0, 1), (-1, -1), self.font_name),
                 ('FONTSIZE', (0, 0), (-1, 0), 8),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
                 ('FONTSIZE', (0, 1), (-1, -1), 7),
-            ]))
+                ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+            ])
             story.append(table)
         else:
             story.append(Paragraph('[PLACEHOLDER: No hazards identified yet]', self.styles['Normal']))
@@ -1200,7 +1406,7 @@ class PDFRiskManagementReportGenerator:
         )
         story.append(Paragraph(summary, self.styles['Normal']))
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_risk_analysis(self, story):
         """Add risk analysis section - Section 5"""
@@ -1234,17 +1440,25 @@ class PDFRiskManagementReportGenerator:
                 ['5', 'Критический', 'Смерть или необратимое повреждение органа'],
             ]
 
-        table = Table(table_data)
-        table.setStyle(TableStyle([
+        if len(table_data[0]) == 4:
+            col_widths = self._calc_col_widths([1, 2, 4, 1])
+        else:
+            col_widths = self._calc_col_widths([1, 3, 4])
+        table_data = self._wrap_table_data(table_data, header_size=8, body_size=7)
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        self._apply_table_style(table, [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ])
         story.append(table)
         story.append(Spacer(1, 10))
 
@@ -1269,17 +1483,25 @@ class PDFRiskManagementReportGenerator:
                 ['5', 'Частое', 'Происходит часто'],
             ]
 
-        table = Table(table_data)
-        table.setStyle(TableStyle([
+        table_data = self._wrap_table_data(table_data, header_size=8, body_size=7)
+        table = Table(
+            table_data,
+            colWidths=self._calc_col_widths([1, 3, 4]),
+            repeatRows=1
+        )
+        self._apply_table_style(table, [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ])
         story.append(table)
         story.append(Spacer(1, 10))
 
@@ -1338,17 +1560,25 @@ class PDFRiskManagementReportGenerator:
                     score_str
                 ])
 
-            table = Table(table_data)
-            table.setStyle(TableStyle([
+            table_data = self._wrap_table_data(table_data, header_size=8, body_size=7)
+            table = Table(
+                table_data,
+                colWidths=self._calc_col_widths([1, 4, 1, 1, 1.5]),
+                repeatRows=1
+            )
+            self._apply_table_style(table, [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+                ('FONTNAME', (0, 1), (-1, -1), self.font_name),
                 ('FONTSIZE', (0, 0), (-1, 0), 8),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ]))
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+            ])
             story.append(table)
         else:
             story.append(Paragraph('[PLACEHOLDER: No risk data available]', self.styles['Normal']))
@@ -1357,7 +1587,7 @@ class PDFRiskManagementReportGenerator:
 
         # Section 5.3 removed as per requirements
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_risk_control_measures(self, story):
         """Add risk control measures section - Section 6"""
@@ -1449,22 +1679,27 @@ class PDFRiskManagementReportGenerator:
                     data.get('protective_measure', '')   # Защитная мера/средство
                 ])
 
-            table = Table(table_data)
-            table.setStyle(TableStyle([
+            col_widths = self._calc_col_widths([1] * len(table_data[0]))
+            table_data = self._wrap_table_data(table_data, header_size=6, body_size=5)
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
+            self._apply_table_style(table, [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+                ('FONTNAME', (0, 1), (-1, -1), self.font_name),
                 ('FONTSIZE', (0, 0), (-1, 0), 5),
+                ('FONTSIZE', (0, 1), (-1, -1), 5),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ]))
+                ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+            ])
             story.append(table)
         else:
             story.append(Paragraph('[PLACEHOLDER: No control measures data available]', self.styles['Normal']))
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_residual_risk_evaluation(self, story):
         """Add residual risk evaluation section - Section 7"""
@@ -1528,17 +1763,22 @@ class PDFRiskManagementReportGenerator:
                     data.get('new_risks', '')   # Новые риски в результате принятия мер по управлению
                 ])
 
-            table = Table(table_data)
-            table.setStyle(TableStyle([
+            table_data = self._wrap_table_data(table_data, header_size=6, body_size=5)
+            col_widths = self._calc_col_widths([1] * len(table_data[0]))
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
+            self._apply_table_style(table, [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+                ('FONTNAME', (0, 1), (-1, -1), self.font_name),
                 ('FONTSIZE', (0, 0), (-1, 0), 6),
+                ('FONTSIZE', (0, 1), (-1, -1), 5),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ]))
+                ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+            ])
             story.append(table)
         else:
             story.append(Paragraph('[PLACEHOLDER: No residual risk data available]', self.styles['Normal']))
@@ -1546,7 +1786,7 @@ class PDFRiskManagementReportGenerator:
             unacceptable_residual = 0
 
        
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_overall_risk_acceptability(self, story):
         """Add overall risk acceptability section - Section 8"""
@@ -1563,7 +1803,7 @@ class PDFRiskManagementReportGenerator:
         
         story.append(Paragraph('[PLACEHOLDER: Benefit-risk assessment if unacceptable risks remain]', self.styles['Normal']))
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_conclusions(self, story):
         """Add conclusions section - Section 9"""
@@ -1618,20 +1858,28 @@ class PDFRiskManagementReportGenerator:
                     datetime.now().strftime('%d.%m.%Y')
                 ])
 
-        table = Table(table_data)
-        table.setStyle(TableStyle([
+        table_data = self._wrap_table_data(table_data, header_size=8, body_size=7)
+        table = Table(
+            table_data,
+            colWidths=self._calc_col_widths([2, 2, 1.2, 1.2]),
+            repeatRows=1
+        )
+        self._apply_table_style(table, [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ])
         story.append(table)
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_references(self, story):
         """Add references section - Section 10"""
@@ -1650,17 +1898,25 @@ class PDFRiskManagementReportGenerator:
             ['7', 'IFU-CP-01', 'Instructions for Use'],
         ]
 
-        table = Table(references_data)
-        table.setStyle(TableStyle([
+        references_data = self._wrap_table_data(references_data, header_size=8, body_size=7)
+        table = Table(
+            references_data,
+            colWidths=self._calc_col_widths([1, 2, 5]),
+            repeatRows=1
+        )
+        self._apply_table_style(table, [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ])
         story.append(table)
 
         story.append(Paragraph('10.2 Управление документом', self.styles['Heading2']))
@@ -1676,20 +1932,28 @@ class PDFRiskManagementReportGenerator:
             ['Controlled copy location', 'QMS Repository / Folder: "Risk Management"'],
         ]
 
-        table = Table(control_data)
-        table.setStyle(TableStyle([
+        control_data = self._wrap_table_data(control_data, header_size=8, body_size=7)
+        table = Table(
+            control_data,
+            colWidths=self._calc_col_widths([1.5, 3.5]),
+            repeatRows=1
+        )
+        self._apply_table_style(table, [
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.font_name),
             ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
+            ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ])
         story.append(table)
 
-        story.append(PageBreak())
+        self._section_spacing(story)
 
     def _add_appendix(self, story):
         """Add appendix - Full Excel table from project"""
@@ -1737,17 +2001,22 @@ class PDFRiskManagementReportGenerator:
 
                 table_data.append(row_data)
 
-            table = Table(table_data)
-            table.setStyle(TableStyle([
+            col_widths = self._calc_col_widths([1] * len(table_data[0]))
+            table_data = self._wrap_table_data(table_data, header_size=6, body_size=5)
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
+            self._apply_table_style(table, [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), self.font_name_bold),
+                ('FONTNAME', (0, 1), (-1, -1), self.font_name),
                 ('FONTSIZE', (0, 0), (-1, 0), 6),
+                ('FONTSIZE', (0, 1), (-1, -1), 5),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ]))
+                ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+            ])
             story.append(table)
         else:
             story.append(Paragraph('[PLACEHOLDER: No risk data for appendix]', self.styles['Normal']))

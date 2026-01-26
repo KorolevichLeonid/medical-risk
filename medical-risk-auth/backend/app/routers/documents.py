@@ -23,6 +23,91 @@ from ..services.document_generator import RiskManagementReportGenerator
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
+def _build_generation_context(project, db: Session, version_number: str, report_number: str):
+    project_data = {
+        'id': project.id,
+        'device_name': project.device_name,
+        'device_model': project.device_model,
+        'device_classification': project.device_classification,
+        'intended_use': project.intended_use,
+        'user_profile': project.user_profile,
+        'operating_environment': project.operating_environment,
+        'standards': project.standards,
+        'lifecycle_stages': project.lifecycle_stages,
+        'active_hazard_categories': project.active_hazard_categories,
+        'version': version_number,
+        'report_number': report_number,
+        # Manufacturer information
+        'manufacturer': project.manufacturer,
+        'manufacturer_address': project.manufacturer_address,
+        # Additional device characteristics
+        'patient_population': project.patient_population,
+        'key_performance_characteristics': project.key_performance_characteristics,
+        'safety_characteristics': project.safety_characteristics,
+        # Risk configuration
+        'severity_levels': project.severity_levels,
+        'probability_levels': project.probability_levels,
+        'risk_threshold': project.risk_threshold,
+        # Checklist answers
+        'hazard_checklist_answers': project.hazard_checklist_answers,
+    }
+
+    risk_tables = db.query(RiskManagementTable).filter(
+        RiskManagementTable.project_id == project.id
+    ).all()
+
+    all_risks = []
+    for table in risk_tables:
+        rows = db.query(RiskTableRow).filter(
+            RiskTableRow.table_id == table.id
+        ).order_by(RiskTableRow.row_index).all()
+
+        for row in rows:
+            row_data = row.data if isinstance(row.data, dict) else {}
+            all_risks.append({
+                'id': row.id,
+                'row_number': row.row_number,
+                'data': row_data,
+                'table_name': table.name or table.sheet_id
+            })
+
+    team_members = []
+    try:
+        members = db.query(ProjectMember, User).join(
+            User, ProjectMember.user_id == User.id
+        ).filter(ProjectMember.project_id == project.id).all()
+
+        for member, user in members:
+            if user:
+                team_members.append({
+                    'name': f"{user.first_name or ''} {user.last_name or ''}".strip(),
+                    'email': user.email or '',
+                    'role': getattr(member.role, 'value', str(member.role)) if member.role else ''
+                })
+
+        owner = db.query(User).filter(User.id == project.owner_id).first()
+        if owner and not any(m.get('email') == owner.email for m in team_members):
+            team_members.append({
+                'name': f"{owner.first_name or ''} {owner.last_name or ''}".strip(),
+                'email': owner.email or '',
+                'role': 'admin'
+            })
+    except Exception as e:
+        print(f"DEBUG: Error gathering team members: {e}")
+        team_members = []
+
+    table_data = {
+        'tables': []
+    }
+    for table in risk_tables:
+        table_data['tables'].append({
+            'name': table.name or table.sheet_id,
+            'sheet_id': table.sheet_id
+        })
+
+    return project_data, all_risks, table_data, team_members
+
+
 @router.post("/projects/{project_id}/generate", response_model=DocumentVersionResponse)
 async def generate_document(
     project_id: int,
@@ -77,92 +162,12 @@ async def generate_document(
     # Determine report number
     report_number = request.report_number or f"RMR-{datetime.now().year}-{project_id:02d}"
     
-    # Gather project data
-    project_data = {
-        'id': project.id,
-        'device_name': project.device_name,
-        'device_model': project.device_model,
-        'device_classification': project.device_classification,
-        'intended_use': project.intended_use,
-        'user_profile': project.user_profile,
-        'operating_environment': project.operating_environment,
-        'standards': project.standards,
-        'lifecycle_stages': project.lifecycle_stages,
-        'active_hazard_categories': project.active_hazard_categories,
-        'version': version_number,
-        'report_number': report_number,
-        # Manufacturer information
-        'manufacturer': project.manufacturer,
-        'manufacturer_address': project.manufacturer_address,
-        # Additional device characteristics
-        'patient_population': project.patient_population,
-        'key_performance_characteristics': project.key_performance_characteristics,
-        'safety_characteristics': project.safety_characteristics,
-        # Risk configuration
-        'severity_levels': project.severity_levels,
-        'probability_levels': project.probability_levels,
-        'risk_threshold': project.risk_threshold,
-        # Checklist answers
-        'hazard_checklist_answers': project.hazard_checklist_answers,
-    }
-    
-    # Gather risk data from all tables
-    risk_tables = db.query(RiskManagementTable).filter(
-        RiskManagementTable.project_id == project_id
-    ).all()
-    
-    all_risks = []
-    for table in risk_tables:
-        rows = db.query(RiskTableRow).filter(
-            RiskTableRow.table_id == table.id
-        ).order_by(RiskTableRow.row_index).all()
-        
-        for row in rows:
-            # Ensure row.data is a dict, fallback to empty dict if None
-            row_data = row.data if isinstance(row.data, dict) else {}
-            all_risks.append({
-                'id': row.id,
-                'row_number': row.row_number,
-                'data': row_data,
-                'table_name': table.name or table.sheet_id
-            })
-    
-    # Gather team members
-    team_members = []
-    try:
-        members = db.query(ProjectMember, User).join(
-            User, ProjectMember.user_id == User.id
-        ).filter(ProjectMember.project_id == project_id).all()
-
-        for member, user in members:
-            if user:  # Ensure user exists
-                team_members.append({
-                    'name': f"{user.first_name or ''} {user.last_name or ''}".strip(),
-                    'email': user.email or '',
-                    'role': getattr(member.role, 'value', str(member.role)) if member.role else ''
-                })
-
-        # Add project owner if not in members
-        owner = db.query(User).filter(User.id == project.owner_id).first()
-        if owner and not any(m.get('email') == owner.email for m in team_members):
-            team_members.append({
-                'name': f"{owner.first_name or ''} {owner.last_name or ''}".strip(),
-                'email': owner.email or '',
-                'role': 'admin'
-            })
-    except Exception as e:
-        print(f"DEBUG: Error gathering team members: {e}")
-        team_members = []  # Fallback to empty list
-    
-    # Create table data structure
-    table_data = {
-        'tables': []
-    }
-    for table in risk_tables:
-        table_data['tables'].append({
-            'name': table.name or table.sheet_id,
-            'sheet_id': table.sheet_id
-        })
+    project_data, all_risks, table_data, team_members = _build_generation_context(
+        project,
+        db,
+        version_number,
+        report_number
+    )
     
     # Generate document
     try:
@@ -367,6 +372,7 @@ async def download_document_options():
 async def download_document(
     project_id: int,
     version_id: int,
+    format: str = "docx",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -397,34 +403,66 @@ async def download_document(
     if not doc_version:
         raise HTTPException(status_code=404, detail="Document version not found")
     
-    if not doc_version.file_data:
-        raise HTTPException(status_code=404, detail="Document file not found")
-    
+    requested_format = (format or "docx").lower()
+    if requested_format not in {"docx", "pdf"}:
+        raise HTTPException(status_code=400, detail="Unsupported format")
+
+    file_data = None
+    media_type = None
+    output_filename = doc_version.file_name or f"document_{doc_version.id}.{requested_format}"
+
+    if requested_format == "docx":
+        if doc_version.file_name.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="Requested DOCX for a PDF version")
+        if not doc_version.file_data:
+            raise HTTPException(status_code=404, detail="Document file not found")
+        file_data = doc_version.file_data
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    else:
+        if doc_version.file_name.lower().endswith(".pdf") and doc_version.file_data:
+            file_data = doc_version.file_data
+            output_filename = doc_version.file_name
+        else:
+            project_data, all_risks, table_data, team_members = _build_generation_context(
+                project,
+                db,
+                doc_version.version,
+                doc_version.report_number
+            )
+            from ..services.document_generator import PDFRiskManagementReportGenerator
+            generator = PDFRiskManagementReportGenerator(
+                project_data=project_data,
+                risk_data=all_risks,
+                table_data=table_data,
+                team_members=team_members
+            )
+            file_stream = generator.generate()
+            file_data = file_stream.read()
+            output_filename = f"Risk_Management_Report_{project.device_name}_{doc_version.version}.pdf".replace(' ', '_')
+        media_type = "application/pdf"
+
     # Create a safe ASCII filename for headers
     try:
         import unicodedata
         import re
 
-        # Convert to ASCII-safe filename by transliterating non-ASCII chars
-        safe_filename = unicodedata.normalize('NFKD', doc_version.file_name)
-        safe_filename = ''.join(c for c in safe_filename if ord(c) < 128)  # Keep only ASCII chars
-        safe_filename = re.sub(r'[^\w\-_\. ]', '_', safe_filename)  # Replace remaining non-alphanumeric chars with underscores
-        safe_filename = re.sub(r'_+', '_', safe_filename)  # Replace multiple underscores with single
+        safe_filename = unicodedata.normalize('NFKD', output_filename)
+        safe_filename = ''.join(c for c in safe_filename if ord(c) < 128)
+        safe_filename = re.sub(r'[^\w\-_\. ]', '_', safe_filename)
+        safe_filename = re.sub(r'_+', '_', safe_filename)
 
         if not safe_filename or len(safe_filename) < 5:
-            safe_filename = f"document_{doc_version.id}.docx"
+            safe_filename = f"document_{doc_version.id}.{requested_format}"
     except Exception as e:
-        # Fallback to simple ASCII filename if encoding fails
         print(f"DEBUG: Filename encoding failed: {e}, using fallback")
-        safe_filename = f"document_{doc_version.id}.docx"
+        safe_filename = f"document_{doc_version.id}.{requested_format}"
 
-    # Return file directly with proper headers
     return Response(
-        content=doc_version.file_data,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        content=file_data,
+        media_type=media_type,
         headers={
             "Content-Disposition": f'attachment; filename="{safe_filename}"',
-            "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "Content-Type": media_type,
             "Cache-Control": "no-cache",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
