@@ -44,8 +44,13 @@ default_origins = [
     "https://medical-risk-backend.onrender.com",   # Production backend (for docs)
 ]
 
+# Add Render-provided URLs if present
+render_external_url = os.getenv("RENDER_EXTERNAL_URL")
+frontend_url = os.getenv("FRONTEND_URL")
+render_origins = [url for url in [render_external_url, frontend_url] if url]
+
 # Combine environment origins with defaults, remove duplicates
-all_origins = list(set(default_origins + cors_origins))
+all_origins = list(set(default_origins + cors_origins + render_origins))
 
 # Debug output for CORS configuration
 print(f"🔥 DEBUG: CORS Origins configured: {all_origins}")

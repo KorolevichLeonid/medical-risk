@@ -1,0 +1,35 @@
+databases:
+  - name: medical-risk-db
+    plan: free
+
+services:
+  - type: web
+    name: medical-risk-backend
+    env: python
+    rootDir: medical-risk-auth/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start.sh
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: medical-risk-db
+          property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: FRONTEND_URL
+        fromService:
+          name: medical-risk-frontend
+          type: static
+          property: url
+
+  - type: static
+    name: medical-risk-frontend
+    rootDir: medical-risk-auth/frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: build
+    envVars:
+      - key: REACT_APP_API_BASE_URL
+        fromService:
+          name: medical-risk-backend
+          type: web
+          property: url
