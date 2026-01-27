@@ -161,6 +161,28 @@ const BatchRiskEvaluation = ({ risks, acceptableRiskLevel, onComplete, onCancel 
               />
             </div>
           </div>
+          {risks.length > 1 && (
+            <div className="batch-modal-footer">
+              <button
+                className="bre-btn bre-btn-secondary"
+                onClick={handleCancelAll}
+              >
+                Закрыть без сохранения
+              </button>
+              <button
+                className="bre-btn bre-btn-success"
+                onClick={handleSaveAll}
+                disabled={Object.keys(evaluations).length === 0}
+                title={
+                  Object.keys(evaluations).length === 0
+                    ? 'Сначала сохраните хотя бы один риск'
+                    : 'Сохранить все завершенные риски и закрыть'
+                }
+              >
+                Сохранить все риски
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

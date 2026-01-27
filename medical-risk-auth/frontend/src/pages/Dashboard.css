@@ -112,6 +112,101 @@
   gap: 25px;
 }
 
+.projects-grid.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.view-toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #131313;
+  white-space: nowrap;
+}
+
+.view-toggle-group {
+  display: inline-flex;
+  border: 1px solid #D9D9D9;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.view-toggle-btn {
+  border: none;
+  background: transparent;
+  color: #333;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-toggle-btn.active {
+  background: #131313;
+  color: #fff;
+}
+
+.view-toggle-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.project-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 2.5fr) minmax(140px, 1.2fr) minmax(120px, 1fr) minmax(90px, 0.7fr) minmax(240px, 2fr);
+  gap: 16px;
+  align-items: center;
+  padding: 16px 18px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.project-row:hover {
+  border-color: #D9D9D9;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.project-row-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #131313;
+  overflow-wrap: anywhere;
+}
+
+.project-row-role .role-badge {
+  max-width: 200px;
+  text-align: center;
+}
+
+.project-row-team,
+.project-row-progress {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4A4A4A;
+}
+
+.project-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .project-card {
   background: white;
   border-radius: 15px;

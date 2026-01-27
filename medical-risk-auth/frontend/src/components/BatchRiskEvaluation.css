@@ -120,6 +120,14 @@
   gap: 8px;
 }
 
+.batch-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 4px 4px;
+  border-top: 1px solid #eee;
+}
+
 /* Универсальные кнопки */
 .bre-btn {
   padding: 12px 18px;

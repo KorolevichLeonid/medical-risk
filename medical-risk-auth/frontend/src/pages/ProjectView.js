@@ -57,7 +57,7 @@ const ProjectView = () => {
             name: projectData.name,
             description: projectData.description,
             status: projectData.status,
-            progress: 0,
+            progress: projectData.progress_percentage || 0,
             createdDate: projectData.created_at,
             lastUpdated: projectData.updated_at || projectData.created_at,
             ownerId: projectData.owner_id,

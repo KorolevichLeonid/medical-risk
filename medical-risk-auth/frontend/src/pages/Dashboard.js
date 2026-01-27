@@ -12,6 +12,9 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [showReturn, setShowReturn] = useState(false);
+  const [viewMode, setViewMode] = useState(
+    () => localStorage.getItem('project_view_mode') || 'grid'
+  );
 
   // Load real projects from API
   useEffect(() => {
@@ -185,6 +188,11 @@ const Dashboard = () => {
     else window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('project_view_mode', mode);
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -242,12 +250,36 @@ const Dashboard = () => {
           </div>
         )}
 
+        <div className="view-toggle">
+          <span className="view-toggle-label">View:</span>
+          <div className="view-toggle-group" role="group" aria-label="Project view mode">
+            <button
+              type="button"
+              className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => handleViewModeChange('grid')}
+              aria-pressed={viewMode === 'grid'}
+            >
+              <span className="view-toggle-icon">▦</span>
+              Cards
+            </button>
+            <button
+              type="button"
+              className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => handleViewModeChange('list')}
+              aria-pressed={viewMode === 'list'}
+            >
+              <span className="view-toggle-icon">≡</span>
+              List
+            </button>
+          </div>
+        </div>
+
         <Link to="/project/new" className="add-project-btn">
           ➕ Create project
         </Link>
       </div>
 
-      <div className="projects-grid">
+      <div className={`projects-grid ${viewMode === 'list' ? 'list' : ''}`}>
         {filteredProjects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
@@ -262,6 +294,58 @@ const Dashboard = () => {
               Create Project
             </Link>
           </div>
+        ) : viewMode === 'list' ? (
+          filteredProjects.map(project => (
+            <div
+              key={project.id}
+              className="project-row"
+              onClick={() => handleProjectClick(project.id)}
+            >
+              <div className="project-row-name">
+                <span>{project.name}</span>
+              </div>
+              <div className="project-row-role">
+                {project.userRole && getRoleBadge(project.userRole)}
+              </div>
+              <div className="project-row-team">
+                {project.memberCount + 1} members
+              </div>
+              <div className="project-row-progress">
+                {project.progress}%
+              </div>
+              <div className="project-row-actions">
+                {canEditProject(project) && (
+                  <button
+                    className="action-btn edit-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/project/${project.id}/edit`);
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  className="action-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/project/${project.id}/risks`);
+                  }}
+                >
+                  Risks
+                </button>
+                {canDeleteProject(project) && (
+                  <button
+                    className="action-btn delete-btn"
+                    onClick={(e) => handleDeleteProject(project.id, project.name, e)}
+                    title="Delete project"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
         ) : (
           filteredProjects.map(project => (
             <div
