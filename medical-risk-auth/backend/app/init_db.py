@@ -235,6 +235,78 @@ def ensure_project_probability_columns():
         raise
 
 
+def ensure_project_member_extended_columns():
+    """Ensure newer project_members columns exist for both SQLite and PostgreSQL."""
+    try:
+        inspector = inspect(engine)
+        if "project_members" not in inspector.get_table_names():
+            return
+
+        columns = {col["name"] for col in inspector.get_columns("project_members")}
+        is_sqlite = engine.url.drivername.startswith("sqlite")
+
+        if "assigned_lifecycle_stage" in columns:
+            return
+
+        with engine.begin() as conn:
+            if is_sqlite:
+                try:
+                    conn.execute(
+                        text("ALTER TABLE project_members ADD COLUMN assigned_lifecycle_stage VARCHAR(255)")
+                    )
+                except Exception as e:
+                    if "duplicate column" not in str(e).lower():
+                        raise
+            else:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS assigned_lifecycle_stage VARCHAR(255)"
+                    )
+                )
+    except Exception as e:
+        print(f"[!] Error ensuring project member extended columns: {e}")
+        raise
+
+
+def ensure_project_member_roles_normalized():
+    """Normalize legacy project member roles to current enum values."""
+    try:
+        inspector = inspect(engine)
+        if "project_members" not in inspector.get_table_names():
+            return
+
+        with engine.begin() as conn:
+            # SQLAlchemy Enum(ProjectRole) persists enum NAMES (uppercase), so normalize to names.
+            role_mapping = {
+                # legacy uppercase enum names
+                "PRODUCT_MANAGER": "MANAGER",
+                "RISK_ASSESSMENT_TEAM_LEADER": "RISK_ASSESSMENT_TEAM_LEADER",
+                "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
+                "DOCTOR": "DOCTOR",
+                "QUALITY_MANAGEMENT_REPRESENTATIVE": "SPECIALIST",
+                # legacy lowercase string values (from older migrations)
+                "product_manager": "MANAGER",
+                "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
+                "risk_assessment_team_member": "SPECIALIST",
+                "doctor": "DOCTOR",
+                "quality_management_representative": "SPECIALIST",
+                "manager": "MANAGER",
+                "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
+                "doctor": "DOCTOR",
+                "specialist": "SPECIALIST",
+                "admin": "ADMIN",
+            }
+
+            for old_role, new_role in role_mapping.items():
+                conn.execute(
+                    text("UPDATE project_members SET role = :new_role WHERE role = :old_role"),
+                    {"new_role": new_role, "old_role": old_role}
+                )
+    except Exception as e:
+        print(f"[!] Error normalizing project member roles: {e}")
+        raise
+
+
 def run_postgresql_migration():
     """Run PostgreSQL migration to add missing project fields"""
     try:
@@ -286,6 +358,14 @@ def init_database():
         # Ensure probability levels column exists
         ensure_project_probability_columns()
         print("[+] Project probability levels configuration ensured")
+
+        # Ensure extended project member columns exist
+        ensure_project_member_extended_columns()
+        print("[+] Project member extended columns ensured")
+
+        # Normalize legacy role values to current enum names
+        ensure_project_member_roles_normalized()
+        print("[+] Project member roles normalized")
 
         # Run PostgreSQL migration if needed
         run_postgresql_migration()

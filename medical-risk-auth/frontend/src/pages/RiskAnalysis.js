@@ -25,6 +25,7 @@ const RiskAnalysis = () => {
   const [selectedRisk, setSelectedRisk] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [userProjectRole, setUserProjectRole] = useState(null);
+  const [assignedLifecycleStage, setAssignedLifecycleStage] = useState(null);
   const [newRisk, setNewRisk] = useState({
     lifecycleStage: '',
     hazardName: '',
@@ -85,9 +86,11 @@ const RiskAnalysis = () => {
         const roleData = await response.json();
         console.log('Loaded user project role:', roleData);
         setUserProjectRole(roleData.user_role);
+        setAssignedLifecycleStage(roleData.assigned_lifecycle_stage || null);
       } else {
         console.error('Failed to load user project role - status:', response.status);
         setUserProjectRole(null);
+        setAssignedLifecycleStage(null);
       }
     } catch (error) {
       console.error('Failed to load user project role:', error);
@@ -102,8 +105,8 @@ const RiskAnalysis = () => {
     }
     // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // In project: only admin and manager can add risks (doctor can only view)
-    return userProjectRole === 'admin' || userProjectRole === 'manager';
+    // Product manager, risk team leader, and specialists can add risks.
+    return ['manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
   };
 
   const canEditRisks = () => {
@@ -112,8 +115,8 @@ const RiskAnalysis = () => {
     }
     // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // In project: only admin and manager can edit risks (doctor can only view)
-    return userProjectRole === 'admin' || userProjectRole === 'manager';
+    // Product manager, risk team leader, and specialists can edit risks.
+    return ['manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
   };
 
   const canDeleteRisks = () => {
@@ -122,8 +125,16 @@ const RiskAnalysis = () => {
     }
     // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // In project: only admin and manager can delete risks (doctor can only view)
-    return userProjectRole === 'admin' || userProjectRole === 'manager';
+    // Product manager, risk team leader, and specialists can delete risks.
+    return ['manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
+  };
+
+  const canOpenRiskTable = () => {
+    if (!currentUser || !userProjectRole) {
+      return false;
+    }
+    if (currentUser.role === 'SYS_ADMIN') return true;
+    return ['manager', 'risk_assessment_team_leader', 'doctor', 'specialist'].includes(userProjectRole);
   };
 
   useEffect(() => {
@@ -248,6 +259,11 @@ const RiskAnalysis = () => {
 
   const filterRisks = () => {
     let filtered = risks;
+    
+    // Специалист видит только риски своего жизненного цикла
+    if (userProjectRole === 'specialist' && assignedLifecycleStage) {
+      filtered = filtered.filter(risk => risk.lifecycleStage === assignedLifecycleStage);
+    }
     
     if (filterSeverity !== 'all') {
       filtered = filtered.filter(risk => {
@@ -617,15 +633,17 @@ const RiskAnalysis = () => {
           <Link to={`/project/${id}`} className="btn btn-secondary">
             Back to Project
           </Link>
-          <button
-            className="btn btn-info"
-            onClick={() => {
-              // Открываем таблицу управления рисками с первым листом
-              navigate(`/project/${id}?openRiskTable=true&sheet=first`);
-            }}
-          >
-            📊 Risk Management Table
-          </button>
+          {canOpenRiskTable() && (
+            <button
+              className="btn btn-info"
+              onClick={() => {
+                // Открываем таблицу управления рисками с первым листом
+                navigate(`/project/${id}?openRiskTable=true&sheet=first`);
+              }}
+            >
+              📊 Risk Management Table
+            </button>
+          )}
           {canAddRisks() && (
             <button
               className="btn btn-primary"
@@ -913,21 +931,23 @@ const RiskAnalysis = () => {
                         🗑️
                       </button>
                     )}
-                    <button
-                      className="action-btn view"
-                      onClick={() => {
-                        // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
-                        const sheetId = risk.lifecycleStage;
+                    {canOpenRiskTable() && (
+                      <button
+                        className="action-btn view"
+                        onClick={() => {
+                          // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
+                          const sheetId = risk.lifecycleStage;
 
-                        sessionStorage.setItem('highlightRiskId', risk.id);
-                        sessionStorage.setItem('openSheet', sheetId);
+                          sessionStorage.setItem('highlightRiskId', risk.id);
+                          sessionStorage.setItem('openSheet', sheetId);
 
-                        navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${risk.id}`);
-                      }}
-                      title="Open in Risk Table"
-                    >
-                      📊
-                    </button>
+                          navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${risk.id}`);
+                        }}
+                        title="Open in Risk Table"
+                      >
+                        📊
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
@@ -981,12 +1001,19 @@ const RiskAnalysis = () => {
                     value={newRisk.lifecycleStage}
                     onChange={(e) => setNewRisk({...newRisk, lifecycleStage: e.target.value})}
                     required
+                    disabled={userProjectRole === 'specialist' && assignedLifecycleStage !== null}
                   >
-                    {lifecycleStages.map(stage => (
-                      <option key={stage} value={stage}>
-                        {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                    {userProjectRole === 'specialist' && assignedLifecycleStage ? (
+                      <option value={assignedLifecycleStage}>
+                        {assignedLifecycleStage.charAt(0).toUpperCase() + assignedLifecycleStage.slice(1)}
                       </option>
-                    ))}
+                    ) : (
+                      lifecycleStages.map(stage => (
+                        <option key={stage} value={stage}>
+                          {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>
@@ -1252,23 +1279,25 @@ const RiskAnalysis = () => {
             </div>
             
             <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
-                  const sheetId = selectedRisk.lifecycleStage;
+              {canOpenRiskTable() && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
+                    const sheetId = selectedRisk.lifecycleStage;
 
-                  // Сохраняем информацию о том, какой риск нужно подсветить
-                  sessionStorage.setItem('highlightRiskId', selectedRisk.id);
-                  sessionStorage.setItem('openSheet', sheetId);
+                    // Сохраняем информацию о том, какой риск нужно подсветить
+                    sessionStorage.setItem('highlightRiskId', selectedRisk.id);
+                    sessionStorage.setItem('openSheet', sheetId);
 
-                  // Перенаправляем на страницу проекта с флагом открытия таблицы
-                  navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${selectedRisk.id}`);
-                }}
-              >
-                📊 Open in Risk Table
-              </button>
+                    // Перенаправляем на страницу проекта с флагом открытия таблицы
+                    navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${selectedRisk.id}`);
+                  }}
+                >
+                  📊 Open in Risk Table
+                </button>
+              )}
               <button type="button" className="btn btn-secondary" onClick={() => setShowViewRisk(false)}>
                 Close
               </button>

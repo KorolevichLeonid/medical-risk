@@ -147,6 +147,15 @@ def check_user_permission(user: User, permission_key: str, project_id: int = Non
 
     # Get permissions for the role
     if project_role:
+        if project_role == "admin" and permission_key in {
+            "edit_risk_tables",
+            "edit_risks",
+            "assess_severity",
+            "assess_probability",
+            "create_report",
+        }:
+            return False
+
         from ..models.project import RolePermission
         role_permissions = db.query(RolePermission).filter(
             RolePermission.role_name == project_role
@@ -160,6 +169,26 @@ def check_user_permission(user: User, permission_key: str, project_id: int = Non
 def check_risk_table_edit_permission(project: Project, user: User, db: Session):
     """Check if user can edit risk tables in this project"""
     return check_user_permission(user, "edit_risk_tables", project.id, db)
+
+
+def check_specialist_sheet_access(user: User, project_id: int, sheet_id: str, db: Session):
+    """Check if a specialist has access to a specific sheet/lifecycle stage. Non-specialists always have access."""
+    if hasattr(user, 'role') and str(user.role) == 'SYS_ADMIN':
+        return True
+    member = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user.id
+    ).first()
+    if not member:
+        # Could be project owner
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project and project.owner_id == user.id:
+            return True
+        return False
+    if member.role != ProjectRole.SPECIALIST:
+        return True  # Non-specialists have access to all sheets
+    # Specialist can only access their assigned lifecycle stage sheet
+    return member.assigned_lifecycle_stage == sheet_id
 
 
 @router.get("/project/{project_id}/sheets/{sheet_id}", response_model=RiskManagementTableResponse)
@@ -393,6 +422,13 @@ async def delete_table(
             detail="Not enough permissions to edit risk tables in this project"
         )
 
+    # Specialist can only edit their assigned lifecycle stage sheet
+    if not check_specialist_sheet_access(current_user, project_id, sheet_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only edit their assigned lifecycle stage"
+        )
+
     # Find table
     table = db.query(RiskManagementTable).filter(
         RiskManagementTable.project_id == project_id,
@@ -426,6 +462,13 @@ async def add_row(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to edit risk tables in this project"
+        )
+
+    # Specialist can only edit their assigned lifecycle stage sheet
+    if not check_specialist_sheet_access(current_user, project_id, sheet_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only edit their assigned lifecycle stage"
         )
 
     table = db.query(RiskManagementTable).filter(
@@ -472,6 +515,13 @@ async def update_row(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to edit risk tables in this project"
+        )
+
+    # Specialist can only edit their assigned lifecycle stage sheet
+    if not check_specialist_sheet_access(current_user, row.table.project_id, row.table.sheet_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only edit their assigned lifecycle stage"
         )
 
     # Update fields
@@ -528,6 +578,13 @@ async def delete_row(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to edit risk tables in this project"
+        )
+
+    # Specialist can only edit their assigned lifecycle stage sheet
+    if not check_specialist_sheet_access(current_user, row.table.project_id, row.table.sheet_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only edit their assigned lifecycle stage"
         )
 
     # Get table to recalculate row numbers
@@ -823,6 +880,13 @@ async def batch_update_rows(
             detail="Not enough permissions to edit risk tables in this project"
         )
 
+    # Specialist can only edit their assigned lifecycle stage sheet
+    if not check_specialist_sheet_access(current_user, project_id, sheet_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only edit their assigned lifecycle stage"
+        )
+
     # Get the table
     table = db.query(RiskManagementTable).filter(
         RiskManagementTable.project_id == project_id,
@@ -914,6 +978,13 @@ async def create_or_update_table_incremental(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to edit risk tables in this project"
+        )
+
+    # Specialist can only edit their assigned lifecycle stage sheet
+    if not check_specialist_sheet_access(current_user, project_id, sheet_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only edit their assigned lifecycle stage"
         )
 
     # Find existing table or create new one

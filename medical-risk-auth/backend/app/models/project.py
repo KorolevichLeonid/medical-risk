@@ -48,13 +48,11 @@ class RolePermission(Base):
 
 class ProjectRole(PyEnum):
     """Project-level user roles"""
-    ADMIN = "admin"      # Project creator/owner - full project control
-    MANAGER = "manager"  # Project management, user management, risk editing
-    DOCTOR = "doctor"    # View risks and edit risk evaluation table only
-    QUALITY_MANAGEMENT_REPRESENTATIVE = "quality_management_representative"
-    PRODUCT_MANAGER = "product_manager"
-    RISK_ASSESSMENT_TEAM_LEADER = "risk_assessment_team_leader"
-    RISK_ASSESSMENT_TEAM_MEMBER = "risk_assessment_team_member"
+    ADMIN = "admin"                    # Project creator - full control, manages subscriptions and project settings
+    MANAGER = "manager"               # Product manager
+    RISK_ASSESSMENT_TEAM_LEADER = "risk_assessment_team_leader"  # Risk team leader
+    DOCTOR = "doctor"                  # Doctor (severity/harm assessment)
+    SPECIALIST = "specialist"          # Assigned to specific lifecycle stage, creates/edits risks only in own stage
 
 
 class ProjectStatus(PyEnum):
@@ -151,7 +149,8 @@ class ProjectMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(Enum(ProjectRole), default=ProjectRole.DOCTOR, nullable=False)  # Project role
+    role = Column(Enum(ProjectRole), default=ProjectRole.SPECIALIST, nullable=False)  # Project role
+    assigned_lifecycle_stage = Column(String, nullable=True)  # For specialist role: which lifecycle stage they manage
     
     # Timestamps
     joined_at = Column(DateTime(timezone=True), server_default=func.now())

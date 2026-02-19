@@ -16,26 +16,31 @@ def init_permissions():
     try:
         print("[*] Initializing permissions...")
 
-        # Define all permissions
+        # ── 1. Clear old role_permissions (full reset) ──
+        db.query(RolePermission).delete()
+        db.commit()
+        print("[*] Cleared old role-permission mappings")
+
+        # ── 2. Define all permissions ──
         permissions_data = [
             {"key": "view_project", "label_ru": "Просмотр проекта"},
+            {"key": "view_all", "label_ru": "Просмотр всех этапов и данных"},
+            {"key": "view_own_stage", "label_ru": "Просмотр только своего этапа ЖЦ"},
+            {"key": "create_project", "label_ru": "Создание проекта"},
             {"key": "edit_project", "label_ru": "Редактирование проекта"},
             {"key": "delete_project", "label_ru": "Удаление проекта"},
-            {"key": "manage_members", "label_ru": "Управление членами проекта"},
-            {"key": "edit_risks", "label_ru": "Редактирование рисков"},
-            {"key": "edit_risk_tables", "label_ru": "Редактирование таблиц рисков"},
-            {"key": "view_all", "label_ru": "Просмотр всех блоков"},
-            {"key": "edit_source_data", "label_ru": "Редактирование исходных данных"},
-            {"key": "edit_risk_values", "label_ru": "Редактирование вероятности/вреда"},
-            {"key": "verify_report", "label_ru": "Проверка/верификация отчёта"},
-            {"key": "view_report", "label_ru": "Просмотр отчётов"},
-            {"key": "manage_users_roles", "label_ru": "Управление пользователями/ролями"},
-            {"key": "create_rmf", "label_ru": "Создание RMF"},
-            {"key": "chat_comment", "label_ru": "Чат/комментарии к отклонению"},
-            {"key": "edit_own_lifecycle_stage", "label_ru": "Редактирование своего этапа жизненного цикла"}
+            {"key": "manage_subscriptions", "label_ru": "Управление подписками"},
+            {"key": "assign_lifecycle_access", "label_ru": "Назначение доступа к этапам ЖЦ"},
+            {"key": "manage_members", "label_ru": "Управление участниками проекта"},
+            {"key": "create_risks", "label_ru": "Создание рисков и мер управления"},
+            {"key": "edit_risks", "label_ru": "Редактирование рисков и мер управления"},
+            {"key": "edit_risk_tables", "label_ru": "Работа с таблицами управления рисками"},
+            {"key": "assess_severity", "label_ru": "Оценка тяжести вреда и пользы/вреда"},
+            {"key": "assess_probability", "label_ru": "Оценка вероятности"},
+            {"key": "create_report", "label_ru": "Создание отчёта"},
         ]
 
-        # Insert permissions
+        # Insert / update permissions
         for perm_data in permissions_data:
             existing = db.query(Permission).filter(Permission.key == perm_data["key"]).first()
             if not existing:
@@ -45,61 +50,93 @@ def init_permissions():
                 )
                 db.add(permission)
                 print(f"[+] Added permission: {perm_data['key']}")
+            else:
+                existing.label_ru = perm_data["label_ru"]
+                print(f"[~] Updated permission: {perm_data['key']}")
 
         db.commit()
 
-        # Define role-permission mappings
+        # Remove old permissions that are no longer used
+        old_permission_keys = [
+            "edit_source_data", "edit_risk_values", "verify_report",
+            "view_report", "manage_users_roles", "create_rmf",
+            "chat_comment", "edit_own_lifecycle_stage",
+            "assign_product_manager"
+        ]
+        for old_key in old_permission_keys:
+            old_perm = db.query(Permission).filter(Permission.key == old_key).first()
+            if old_perm:
+                db.delete(old_perm)
+                print(f"[-] Removed old permission: {old_key}")
+        db.commit()
+
+        # ── 3. Define role-permission mappings ──
+        #
+        # Roles (new system):
+        #   admin                         – creates project and appoints product manager
+        #   manager (product manager)     – fills project and manages non-admin/non-manager roles
+        #   risk_assessment_team_leader   – risk team leader (probability-focused)
+        #   doctor                        – doctor (severity/harm-focused)
+        #   specialist                    – own lifecycle stage risks only
+        #
         role_permissions_data = [
-            # Admin - all permissions
+            # ── Admin ──
             {"role": "admin", "permissions": [
-                "view_project", "edit_project", "delete_project", "manage_members",
-                "edit_risks", "edit_risk_tables", "view_all", "edit_source_data",
-                "edit_risk_values", "verify_report", "manage_users_roles",
-                "create_rmf", "chat_comment", "edit_own_lifecycle_stage"
+                "view_project",
+                "view_all",
+                "create_project",
+                "delete_project",
+                "manage_subscriptions",
+                "manage_members",
             ]},
-            # Top Manager
+            # ── Manager ──
             {"role": "manager", "permissions": [
-                "view_project", "edit_project", "manage_members", "edit_risks", "view_all", "chat_comment"
+                "view_project",
+                "view_all",
+                "edit_project",
+                "assign_lifecycle_access",
+                "manage_members",
+                "create_risks",
+                "edit_risks",
+                "edit_risk_tables",
+                "create_report",
             ]},
-            # Quality Management Representative
-            {"role": "quality_management_representative", "permissions": [
-                "view_project", "view_all", "chat_comment", "view_report"
-            ]},
-            # Product Manager / Quality Manager
-            {"role": "product_manager", "permissions": [
-                "view_project", "view_all", "edit_source_data", "view_report"
-            ]},
-            # Risk Assessment Team Leader
+            # ── Risk Assessment Team Leader ──
             {"role": "risk_assessment_team_leader", "permissions": [
-                "view_project", "view_all", "edit_source_data", "edit_risk_values",
-                "verify_report", "chat_comment", "edit_risk_tables"
+                "view_project",
+                "view_all",
+                "create_risks",
+                "edit_risks",
+                "edit_risk_tables",
+                "assess_probability",
             ]},
-            # Member of the Risk Assessment Team
-            {"role": "risk_assessment_team_member", "permissions": [
-                "view_project", "view_all", "edit_risk_values", "edit_risk_tables"
-            ]},
-            # Clinical Evaluation / Doctor
+            # ── Doctor ──
             {"role": "doctor", "permissions": [
-                "view_project", "view_all", "edit_risk_values", "edit_risk_tables"
-            ]}
+                "view_project",
+                "view_all",
+                "edit_risk_tables",
+                "assess_severity",
+            ]},
+            # ── Specialist (lifecycle stage) ──
+            {"role": "specialist", "permissions": [
+                "view_project",
+                "view_own_stage",
+                "create_risks",
+                "edit_risks",
+                "edit_risk_tables",
+            ]},
         ]
 
         # Insert role-permission mappings
         for role_data in role_permissions_data:
             role_name = role_data["role"]
             for perm_key in role_data["permissions"]:
-                existing = db.query(RolePermission).filter(
-                    RolePermission.role_name == role_name,
-                    RolePermission.permission_key == perm_key
-                ).first()
-
-                if not existing:
-                    role_perm = RolePermission(
-                        role_name=role_name,
-                        permission_key=perm_key
-                    )
-                    db.add(role_perm)
-                    print(f"[+] Added role-permission: {role_name} -> {perm_key}")
+                role_perm = RolePermission(
+                    role_name=role_name,
+                    permission_key=perm_key
+                )
+                db.add(role_perm)
+                print(f"[+] Added role-permission: {role_name} -> {perm_key}")
 
         db.commit()
         print("[+] Permissions initialization completed!")

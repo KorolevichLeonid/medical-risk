@@ -195,9 +195,9 @@
   color: #1976D2;
 }
 
-.role-doctor {
-  background-color: #E8F5E8;
-  color: #2E7D32;
+.role-specialist {
+  background-color: #FFF3E0;
+  color: #E65100;
 }
 
 .role-info { display: flex; align-items: center; gap: 12px; margin-bottom: 0; }

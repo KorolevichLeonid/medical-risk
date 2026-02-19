@@ -23,6 +23,17 @@ from ..services.document_generator import RiskManagementReportGenerator
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
+def ensure_document_access(project: Project, current_user: User, db: Session):
+    """Only users with report permission can open document endpoints."""
+    if not check_project_access(project, current_user, db):
+        raise HTTPException(status_code=403, detail="Access denied to this project")
+    if not check_user_permission(current_user, "create_report", project.id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to access documents in this project"
+        )
+
+
 def _build_generation_context(project, db: Session, version_number: str, report_number: str):
     project_data = {
         'id': project.id,
@@ -128,8 +139,8 @@ async def generate_document(
     if not check_project_access(project, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied to this project")
 
-    # Check verify_report permission
-    if not check_user_permission(current_user, "verify_report", project.id, db):
+    # Check create_report permission
+    if not check_user_permission(current_user, "create_report", project.id, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to generate reports in this project"
@@ -278,9 +289,7 @@ async def get_document_versions(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    # Check user access
-    if not check_project_access(project, current_user, db):
-        raise HTTPException(status_code=403, detail="Access denied to this project")
+    ensure_document_access(project, current_user, db)
     
     # Get all versions
     versions = db.query(DocumentVersion, User).join(
@@ -320,8 +329,7 @@ async def get_document_version_details(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    if not check_project_access(project, current_user, db):
-        raise HTTPException(status_code=403, detail="Access denied")
+    ensure_document_access(project, current_user, db)
     
     # Get version
     doc_version = db.query(DocumentVersion, User).join(
@@ -384,11 +392,10 @@ async def download_document(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    if not check_project_access(project, current_user, db):
-        raise HTTPException(status_code=403, detail="Access denied")
+    ensure_document_access(project, current_user, db)
 
-    # Check verify_report permission
-    if not check_user_permission(current_user, "verify_report", project.id, db):
+    # Check create_report permission
+    if not check_user_permission(current_user, "create_report", project.id, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to download reports in this project"
@@ -486,8 +493,7 @@ async def preview_document(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    if not check_project_access(project, current_user, db):
-        raise HTTPException(status_code=403, detail="Access denied")
+    ensure_document_access(project, current_user, db)
     
     # Get document version
     doc_version = db.query(DocumentVersion).filter(
@@ -1090,13 +1096,9 @@ def format_role_display_name(role: str) -> str:
     Used in documents to display roles consistently
     """
     role_mapping = {
-        'admin': 'ADMIN',
-        'manager': 'MANAGER',
-        'doctor': 'DOCTOR',
-        'product_manager': 'PRODUCT MANAGER',
-        'risk_assessment_team_leader': 'RISK ASSESSMENT TEAM LEADER',
-        'quality_management_representative': 'QUALITY MANAGMENT REPRESENTATIVE',
-        'risk_assessment_team_member': 'RISK ASSESSMENT TEAM MEMBER'
+        'admin': 'АДМИНИСТРАТОР',
+        'manager': 'МЕНЕДЖЕР',
+        'specialist': 'СПЕЦИАЛИСТ ПО ЖИЗНЕННОМУ ЦИКЛУ'
     }
     return role_mapping.get(role, role.upper() if role else 'UNKNOWN')
 
@@ -1225,8 +1227,7 @@ async def get_current_document(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    if not check_project_access(project, current_user, db):
-        raise HTTPException(status_code=403, detail="Access denied")
+    ensure_document_access(project, current_user, db)
     
     # Get current version
     doc_version = db.query(DocumentVersion, User).join(

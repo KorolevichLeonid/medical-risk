@@ -118,13 +118,11 @@ const RoleManagement = () => {
 
   const getProjectRoleBadge = (role) => {
     const roleConfig = {
-      admin: { label: 'ADMIN', className: 'role-admin' },
-      manager: { label: 'MANAGER', className: 'role-manager' },
-      doctor: { label: 'DOCTOR', className: 'role-doctor' },
-      product_manager: { label: 'PRODUCT MANAGER', className: 'role-product-manager' },
-      risk_assessment_team_leader: { label: 'RISK ASSESSMENT TEAM LEADER', className: 'role-risk-leader' },
-      quality_management_representative: { label: 'QUALITY MANAGMENT REPRESENTATIVE', className: 'role-quality-rep' },
-      risk_assessment_team_member: { label: 'RISK ASSESSMENT TEAM MEMBER', className: 'role-risk-member' }
+      admin: { label: 'АДМИНИСТРАТОР', className: 'role-admin' },
+      manager: { label: 'ПРОДУКТ-МЕНЕДЖЕР', className: 'role-manager' },
+      risk_assessment_team_leader: { label: 'РУКОВОДИТЕЛЬ КОМАНДЫ ПО РИСКАМ', className: 'role-risk-leader' },
+      doctor: { label: 'ДОКТОР', className: 'role-doctor' },
+      specialist: { label: 'СПЕЦИАЛИСТ ПО ЖЦ', className: 'role-specialist' }
     };
     
     const config = roleConfig[role] || { label: role?.toUpperCase() || 'UNKNOWN', className: 'role-unknown' };
@@ -258,12 +256,14 @@ const RoleManagement = () => {
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
           >
-            <option value="all">All roles</option>
-            <option value="SYS_ADMIN">System admin</option>
-            <option value="USER">System user</option>
-            <option value="admin">Project admin</option>
-            <option value="manager">Project manager</option>
-            <option value="doctor">Project doctor</option>
+            <option value="all">Все роли</option>
+            <option value="SYS_ADMIN">Сис. администратор</option>
+            <option value="USER">Пользователь</option>
+            <option value="admin">Администратор проекта</option>
+            <option value="manager">Продукт-менеджер</option>
+            <option value="risk_assessment_team_leader">Руководитель команды по рискам</option>
+            <option value="doctor">Доктор</option>
+            <option value="specialist">Специалист по ЖЦ</option>
           </select>
         </div>
       </div>

@@ -866,34 +866,22 @@
   box-shadow: 0 2px 4px rgba(78, 205, 196, 0.3);
 }
 
-.role-doctor {
-  background: linear-gradient(135deg, #45B7D1 0%, #6BCFE8 100%);
-  color: white !important;
-  box-shadow: 0 2px 4px rgba(69, 183, 209, 0.3);
-}
-
-.role-product-manager {
-  background: linear-gradient(135deg, #9B59B6 0%, #BB6FDD 100%);
-  color: white !important;
-  box-shadow: 0 2px 4px rgba(155, 89, 182, 0.3);
-}
-
 .role-risk-leader {
   background: linear-gradient(135deg, #3498DB 0%, #5AB0F0 100%);
   color: white !important;
   box-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
 }
 
-.role-quality-rep {
+.role-doctor {
+  background: linear-gradient(135deg, #45B7D1 0%, #6BCFE8 100%);
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(69, 183, 209, 0.3);
+}
+
+.role-specialist {
   background: linear-gradient(135deg, #F39C12 0%, #FFB84D 100%);
   color: white !important;
   box-shadow: 0 2px 4px rgba(243, 156, 18, 0.3);
-}
-
-.role-risk-member {
-  background: linear-gradient(135deg, #95A5A6 0%, #B8C5C6 100%);
-  color: white !important;
-  box-shadow: 0 2px 4px rgba(149, 165, 166, 0.3);
 }
 
 .role-unknown {

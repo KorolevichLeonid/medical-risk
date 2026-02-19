@@ -1203,29 +1203,47 @@ const ProjectForm = () => {
     setError('');
 
     try {
-      // Проверка обязательных полей с дополнительной валидацией
+      // Для создания проекта-пустышки требуем только название проекта.
+      // Остальные поля можно заполнить позже на странице проекта.
       const errors = [];
       if (!formData.name || formData.name.trim() === '') {
         errors.push('Название проекта');
       }
-      if (!formData.deviceName || formData.deviceName.trim() === '') {
-        errors.push('Название устройства');
-      }
-      if (!formData.devicePurpose || formData.devicePurpose.trim() === '') {
-        errors.push('Назначение устройства');
-      }
-      if (!formData.lifecycleStages || formData.lifecycleStages.length === 0) {
-        errors.push('Этапы жизненного цикла');
-      }
 
-      const severityScoreError = validateLevelScores(formData.severityLevels, 'уровни тяжести');
-      if (severityScoreError) {
-        errors.push(severityScoreError);
-      }
+      // Расширенная валидация нужна только в режиме редактирования полной анкеты проекта.
+      if (isEditMode) {
+        const requiredEditFields = [
+          { key: 'description', label: 'Описание проекта' },
+          { key: 'deviceName', label: 'Название устройства' },
+          { key: 'deviceModel', label: 'Модель устройства' },
+          { key: 'devicePurpose', label: 'Назначение устройства' },
+          { key: 'deviceDescription', label: 'Описание устройства' },
+          { key: 'deviceClassification', label: 'Классификация устройства' },
+          { key: 'operatingEnvironment', label: 'Условия эксплуатации' },
+          { key: 'technicalSpecs', label: 'Технические характеристики' },
+          { key: 'regulatoryRequirements', label: 'Нормативные требования' },
+          { key: 'standards', label: 'Применимые стандарты' },
+        ];
+        requiredEditFields.forEach(({ key, label }) => {
+          const value = formData[key];
+          if (typeof value !== 'string' || value.trim() === '') {
+            errors.push(label);
+          }
+        });
 
-      const probabilityScoreError = validateLevelScores(formData.probabilityLevels, 'уровни вероятностей');
-      if (probabilityScoreError) {
-        errors.push(probabilityScoreError);
+        if (!formData.lifecycleStages || formData.lifecycleStages.length === 0) {
+          errors.push('Этапы жизненного цикла (минимум один)');
+        }
+
+        const severityScoreError = validateLevelScores(formData.severityLevels, 'уровни тяжести');
+        if (severityScoreError) {
+          errors.push(severityScoreError);
+        }
+
+        const probabilityScoreError = validateLevelScores(formData.probabilityLevels, 'уровни вероятностей');
+        if (probabilityScoreError) {
+          errors.push(probabilityScoreError);
+        }
       }
 
       if (errors.length > 0) {
@@ -1239,25 +1257,23 @@ const ProjectForm = () => {
       
       const method = isEditMode ? 'PUT' : 'POST';
       
-      // Вычисляем выбранные категории опасностей на основе чеклиста
-      const selectedHazardCategories = calculateSelectedHazardCategories(formData.hazardQuestions);
-      
-      console.log('Selected Hazard Categories:', selectedHazardCategories);
-      
-      const normalizedThreshold = clampRiskThreshold(
-        parseInt(formData.riskThreshold),
-        formData.severityLevels,
-        formData.probabilityLevels
-      );
+      let requestBody = {
+        name: formData.name.trim(),
+      };
 
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: formData.name,
+      if (isEditMode) {
+        // Вычисляем выбранные категории опасностей на основе чеклиста
+        const selectedHazardCategories = calculateSelectedHazardCategories(formData.hazardQuestions);
+        console.log('Selected Hazard Categories:', selectedHazardCategories);
+
+        const normalizedThreshold = clampRiskThreshold(
+          parseInt(formData.riskThreshold),
+          formData.severityLevels,
+          formData.probabilityLevels
+        );
+
+        requestBody = {
+          ...requestBody,
           description: formData.description,
           device_name: formData.deviceName,
           device_model: formData.deviceModel,
@@ -1279,15 +1295,30 @@ const ProjectForm = () => {
           severity_levels: formData.severityLevels,
           probability_levels: formData.probabilityLevels,
           risk_threshold: normalizedThreshold
-        })
+        };
+      }
+
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
         const projectData = await response.json();
         navigate(`/project/${projectData.id}`);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Не удалось сохранить проект');
+        let message = 'Не удалось сохранить проект';
+        try {
+          const errorData = await response.json();
+          message = errorData.detail || message;
+        } catch (_) {
+          // ignore parse errors and keep fallback message
+        }
+        throw new Error(message);
       }
 
     } catch (err) {
@@ -1308,6 +1339,54 @@ const ProjectForm = () => {
           <div className="loading-spinner"></div>
           <p>Загрузка проекта...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!isEditMode) {
+    return (
+      <div className="project-form">
+        <div className="form-header">
+          <h1>Создать новый проект</h1>
+          <p>Быстрое создание: укажите только название проекта</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="form">
+          <div className="form-section">
+            <h2>Основная информация</h2>
+            <div className="form-group">
+              <label htmlFor="name">Название проекта</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="Введите название проекта"
+                required
+              />
+            </div>
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => navigate(-1)}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Сохранение...' : 'Создать проект'}
+            </button>
+          </div>
+        </form>
       </div>
     );
   }
@@ -1398,6 +1477,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Опишите цели и область проекта"
               rows="3"
+              required={isEditMode}
             />
           </div>
         </div>
@@ -1416,7 +1496,7 @@ const ProjectForm = () => {
                 value={formData.deviceName}
                 onChange={handleInputChange}
                 placeholder="Введите название устройства"
-                required
+                required={isEditMode}
               />
             </div>
 
@@ -1429,6 +1509,7 @@ const ProjectForm = () => {
                 value={formData.deviceModel}
                 onChange={handleInputChange}
                 placeholder="Введите номер модели"
+                required={isEditMode}
               />
             </div>
           </div>
@@ -1442,7 +1523,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Опишите назначение устройства"
               rows="2"
-              required
+              required={isEditMode}
             />
           </div>
 
@@ -1455,6 +1536,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Предоставьте подробное описание устройства"
               rows="3"
+              required={isEditMode}
             />
           </div>
 
@@ -1466,6 +1548,7 @@ const ProjectForm = () => {
                 name="deviceClassification"
                 value={formData.deviceClassification}
                 onChange={handleInputChange}
+                required={isEditMode}
               >
                 <option value="">Выберите классификацию</option>
                 <option value="Class I">Класс I</option>
@@ -1485,6 +1568,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Условия окружающей среды"
               rows="3"
+              required={isEditMode}
             />
           </div>
         </div>
@@ -1502,6 +1586,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Ключевые технические характеристики и особенности"
               rows="3"
+              required={isEditMode}
             />
           </div>
 
@@ -1514,6 +1599,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Применимые нормативные требования (FDA, CE и т.д.)"
               rows="2"
+              required={isEditMode}
             />
           </div>
 
@@ -1526,6 +1612,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Соответствующие отраслевые стандарты (ISO, IEC и т.д.)"
               rows="2"
+              required={isEditMode}
             />
           </div>
         </div>
@@ -1566,6 +1653,11 @@ const ProjectForm = () => {
         <div className="form-section">
           <h2>Этапы жизненного цикла</h2>
           <p>Выберите этапы жизненного цикла устройства. Это определяет количество вкладок в чек-листе. Всегда включайте "Другие".</p>
+          {isEditMode && (
+            <p style={{ color: '#b45309', fontSize: '13px', marginTop: '-4px' }}>
+              Подсказка: перед сохранением должен быть выбран минимум один этап жизненного цикла.
+            </p>
+          )}
 
           <div className="form-group">
             <label>Этапы жизненного цикла</label>

@@ -31,11 +31,7 @@ def format_role_display_name(role: str) -> str:
     role_mapping = {
         'admin': 'ADMIN',
         'manager': 'MANAGER',
-        'doctor': 'DOCTOR',
-        'product_manager': 'PRODUCT MANAGER',
-        'risk_assessment_team_leader': 'RISK ASSESSMENT TEAM LEADER',
-        'quality_management_representative': 'QUALITY MANAGMENT REPRESENTATIVE',
-        'risk_assessment_team_member': 'RISK ASSESSMENT TEAM MEMBER'
+        'specialist': 'SPECIALIST'
     }
     return role_mapping.get(role, role.upper() if role else 'UNKNOWN')
 

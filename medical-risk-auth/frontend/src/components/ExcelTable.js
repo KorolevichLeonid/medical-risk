@@ -24,6 +24,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [userRole, setUserRole] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
   const [loadingRole, setLoadingRole] = useState(true);
+  const [assignedLifecycleStage, setAssignedLifecycleStage] = useState(null);
   
   // Состояние для оценки рисков
   const [showBatchEvaluation, setShowBatchEvaluation] = useState(false);
@@ -802,8 +803,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         }
 
         setUserRole(roleData.user_role);
+        const assignedStage = roleData.assigned_lifecycle_stage || null;
+        setAssignedLifecycleStage(assignedStage);
         setLifecycleStages(roleData.lifecycle_stages || []);
         setCustomLifecycleStages(roleData.custom_lifecycle_stages || []);
+        
+        // Специалист автоматически переключается на свой лист ЖЦ
+        if (roleData.user_role === 'specialist' && assignedStage && activeSheet !== assignedStage) {
+          setActiveSheet(assignedStage);
+        }
 
         // Получаем информацию о проекте для получения порога риска и уровней
         try {
@@ -1088,8 +1096,8 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     }
     
     // Проверяем, может ли текущий пользователь оценивать риски
-    if (userRole !== 'doctor' && userRole !== 'admin') {
-      return []; // Только doctor и admin могут оценивать
+    if (!userPermissions.includes('assess_severity') && !userPermissions.includes('assess_probability')) {
+      return []; // Только пользователи с правами оценки могут оценивать
     }
     
     const risksNeedingEval = [];
@@ -1570,16 +1578,14 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     return '#00FF00';                   // Зеленый - минимальный риск
   };
 
-  // Получить отображаемое название роли (в том же стиле, что и на дашборде)
+  // Получить отображаемое название роли
   const getRoleDisplayName = (role) => {
     const roleConfig = {
-      admin: 'ADMIN',
-      manager: 'MANAGER',
-      doctor: 'DOCTOR',
-      product_manager: 'PRODUCT MANAGER',
-      risk_assessment_team_leader: 'RISK ASSESSMENT TEAM LEADER',
-      quality_management_representative: 'QUALITY MANAGMENT REPRESENTATIVE',
-      risk_assessment_team_member: 'RISK ASSESSMENT TEAM MEMBER'
+      admin: 'АДМИНИСТРАТОР',
+      manager: 'ПРОДУКТ-МЕНЕДЖЕР',
+      risk_assessment_team_leader: 'РУКОВОДИТЕЛЬ КОМАНДЫ ПО РИСКАМ',
+      doctor: 'ДОКТОР',
+      specialist: 'СПЕЦИАЛИСТ ПО ЖЦ'
     };
     return roleConfig[role] || (role?.toUpperCase() || 'UNKNOWN');
   };
@@ -1589,37 +1595,72 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const roleConfig = {
       admin: 'role-admin',
       manager: 'role-manager',
-      doctor: 'role-doctor',
-      product_manager: 'role-product-manager',
       risk_assessment_team_leader: 'role-risk-leader',
-      quality_management_representative: 'role-quality-rep',
-      risk_assessment_team_member: 'role-risk-member'
+      doctor: 'role-doctor',
+      specialist: 'role-specialist'
     };
     return roleConfig[role] || 'role-unknown';
   };
 
   // Проверить, может ли пользователь редактировать данный столбец
-  const canEditColumn = (columnKey) => {
+  const canEditColumn = (columnKey, row = null) => {
+    // Автоматически рассчитываемые столбцы — никто не редактирует
     if (['risk_level_1', 'risk_level_2', 'risk_score', 'residual_risk_score'].includes(columnKey)) {
       return false;
     }
 
-    // Определяем столбцы с баллами риска
-    const riskScoreColumns = ['severity_score', 'probability_score', 'risk_score', 'residual_risk_level', 'residual_probability', 'residual_risk_score'];
-
-    // Если столбец содержит баллы риска, проверяем разрешение edit_risk_values
-    if (riskScoreColumns.includes(columnKey)) {
-      return userPermissions.includes('edit_risk_values');
+    // Доктор может редактировать только столбцы тяжести
+    if (userRole === 'doctor') {
+      const severityColumns = ['severity_score', 'residual_risk_level'];
+      return severityColumns.includes(columnKey) && userPermissions.includes('assess_severity');
     }
 
-    // Для остальных столбцов проверяем роль пользователя
-    // Администраторы и менеджеры могут редактировать все столбцы
-    return userRole === 'admin' || userRole === 'manager';
+    // Специалист не может редактировать комментарии
+    if (userRole === 'specialist') {
+      if (columnKey === 'comment_1' || columnKey === 'comment_2') {
+        return false;
+      }
+    }
+
+    // Столбцы тяжести вреда — assess_severity
+    const severityColumns = ['severity_score', 'residual_risk_level'];
+    if (severityColumns.includes(columnKey)) {
+      return userPermissions.includes('assess_severity');
+    }
+
+    // Столбцы вероятности — assess_probability
+    // Руководитель команды может оценивать вероятность только после оценки тяжести от доктора
+    const probabilityColumns = ['probability_score', 'residual_probability'];
+    if (probabilityColumns.includes(columnKey)) {
+      if (!userPermissions.includes('assess_probability')) {
+        return false;
+      }
+      // Для руководителя команды проверяем наличие соответствующей оценки тяжести
+      if (userRole === 'risk_assessment_team_leader' && row) {
+        if (columnKey === 'probability_score') {
+          // Для первичной вероятности нужна первичная оценка тяжести
+          const hasSeverity = row.severity_score && row.severity_score.toString().trim() !== '';
+          if (!hasSeverity) {
+            return false; // Нет первичной оценки тяжести - нельзя оценивать первичную вероятность
+          }
+        } else if (columnKey === 'residual_probability') {
+          // Для вторичной вероятности нужна вторичная оценка тяжести
+          const hasResidualSeverity = row.residual_risk_level && row.residual_risk_level.toString().trim() !== '';
+          if (!hasResidualSeverity) {
+            return false; // Нет вторичной оценки тяжести - нельзя оценивать вторичную вероятность
+          }
+        }
+      }
+      return true;
+    }
+
+    // Остальные столбцы — edit_risk_tables (admin, manager, specialist)
+    return userPermissions.includes('edit_risk_tables');
   };
 
   // Получить стиль для ячейки в зависимости от прав доступа
-  const getCellStyle = (columnKey, cellColor) => {
-    const canEdit = canEditColumn(columnKey);
+  const getCellStyle = (columnKey, cellColor, row = null) => {
+    const canEdit = canEditColumn(columnKey, row);
 
     if (!canEdit) {
       // Недоступные для редактирования ячейки выделяем серым
@@ -1639,14 +1680,14 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Проверить, может ли пользователь добавлять новые элементы
   const canAddElements = () => {
-    // Только администраторы и менеджеры могут добавлять новые элементы
-    return userRole !== 'doctor' && userRole !== 'guest';
+    // Пользователи с правом edit_risk_tables или create_risks могут добавлять
+    return userPermissions.includes('edit_risk_tables') || userPermissions.includes('create_risks');
   };
 
   // Проверить, может ли пользователь удалять элементы
   const canDeleteElements = () => {
-    // Только администраторы могут удалять элементы
-    return userRole === 'admin';
+    // Пользователи с правом delete_risk_table_rows или edit_risk_tables могут удалять
+    return userPermissions.includes('delete_risk_table_rows') || userPermissions.includes('edit_risk_tables');
   };
 
   // Получить визуальный индикатор состояния риска
@@ -1829,12 +1870,27 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
     let value = row[column.key] || '';
     const cellColor = getCellColor(rowIndex, column.key);
-    const canEdit = canEditColumn(column.key);
-    const cellStyle = getCellStyle(column.key, cellColor);
+    const canEdit = canEditColumn(column.key, row);
+    const cellStyle = getCellStyle(column.key, cellColor, row);
     const isLocked = isCellLocked(rowIndex, column.key);
     const handleCellClick = (e) => {
       e.stopPropagation();
       if (isLocked) {
+        return;
+      }
+      // Для руководителя команды блокируем клик по столбцам вероятности, если нет соответствующей оценки тяжести
+      if (userRole === 'risk_assessment_team_leader' && !canEdit) {
+        const probabilityColumns = ['probability_score', 'residual_probability'];
+        if (probabilityColumns.includes(column.key)) {
+          // Показываем сообщение, почему нельзя редактировать
+          if (column.key === 'probability_score' && (!row.severity_score || row.severity_score.toString().trim() === '')) {
+            alert('Необходимо сначала получить оценку тяжести от доктора в столбце "Тяжесть вреда, балл"');
+            return;
+          } else if (column.key === 'residual_probability' && (!row.residual_risk_level || row.residual_risk_level.toString().trim() === '')) {
+            alert('Необходимо сначала получить оценку тяжести от доктора в столбце "Тяжесть вреда, балл" (остаточный риск)');
+            return;
+          }
+        }
         return;
       }
       if (!isEditing && canEdit) {
@@ -2054,7 +2110,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
         {/* Вкладки листов */}
         <div className="excel-tabs">
-          {sheets.map(sheet => {
+          {(userRole === 'specialist' && assignedLifecycleStage 
+            ? sheets.filter(sheet => sheet.id === assignedLifecycleStage || sheet.id === 'sheet7')
+            : sheets
+          ).map(sheet => {
             const sheetChanges = allSheetsChanges[sheet.id]?.size || 0;
             return (
               <div

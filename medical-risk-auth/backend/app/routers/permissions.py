@@ -39,6 +39,7 @@ async def get_user_permissions(
     """Get current user's permissions, optionally for a specific project"""
     permissions = []
     project_role = None
+    assigned_lifecycle_stage = None
 
     # System admin has all permissions
     if hasattr(current_user, 'role') and current_user.role == "SYS_ADMIN":
@@ -63,6 +64,7 @@ async def get_user_permissions(
 
                 if member:
                     project_role = member.role.value
+                    assigned_lifecycle_stage = member.assigned_lifecycle_stage
 
             # Get permissions based on project role
             if project_role:
@@ -78,6 +80,7 @@ async def get_user_permissions(
         "user_role": getattr(current_user, 'role', None),
         "project_id": project_id,
         "project_role": project_role,
+        "assigned_lifecycle_stage": assigned_lifecycle_stage,
         "permissions": permissions
     }
 

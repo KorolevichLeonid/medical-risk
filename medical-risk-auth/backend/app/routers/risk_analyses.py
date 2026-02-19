@@ -273,6 +273,14 @@ def check_user_permission(user: User, permission_key: str, project_id: int = Non
 
     # Get permissions for the role
     if project_role:
+        if project_role == "admin" and permission_key in {
+            "create_risks",
+            "edit_risks",
+            "assess_severity",
+            "assess_probability",
+        }:
+            return False
+
         from ..models.project import RolePermission
         role_permissions = db.query(RolePermission).filter(
             RolePermission.role_name == project_role
@@ -286,6 +294,38 @@ def check_user_permission(user: User, permission_key: str, project_id: int = Non
 def check_risk_edit_permission(project: Project, user: User, db: Session):
     """Check if user can edit risks in this project"""
     return check_user_permission(user, "edit_risks", project.id, db)
+
+
+def get_specialist_lifecycle_stage(user: User, project_id: int, db: Session):
+    """Get the lifecycle stage assigned to a specialist. Returns None if user is not a specialist."""
+    member = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user.id,
+        ProjectMember.role == ProjectRole.SPECIALIST
+    ).first()
+    if member:
+        return member.assigned_lifecycle_stage
+    return None
+
+
+def check_specialist_lifecycle_access(user: User, project_id: int, lifecycle_stage: str, db: Session):
+    """Check if a specialist has access to a specific lifecycle stage. Non-specialists always have access."""
+    if user.role == UserRole.SYS_ADMIN:
+        return True
+    member = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user.id
+    ).first()
+    if not member:
+        # Could be project owner
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project and project.owner_id == user.id:
+            return True
+        return False
+    if member.role != ProjectRole.SPECIALIST:
+        return True  # Non-specialists have access to all stages
+    # Specialist can only access their assigned lifecycle stage
+    return member.assigned_lifecycle_stage == lifecycle_stage
 
 
 @router.get("/project/{project_id}", response_model=RiskAnalysisResponse)
@@ -475,6 +515,15 @@ async def add_risk_factor(
             detail="Not enough permissions to edit risks in this project"
         )
     
+    # Specialist can only create risks in their assigned lifecycle stage
+    if factor.lifecycle_stage and not check_specialist_lifecycle_access(
+        current_user, db_analysis.project_id, factor.lifecycle_stage, db
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only create risks in their assigned lifecycle stage"
+        )
+    
     # Risk score is optional now, calculated only if both severity and probability are provided
     risk_score = None
     if factor.severity_score is not None and factor.probability_score is not None:
@@ -544,6 +593,15 @@ async def update_risk_factor(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to edit risks in this project"
+        )
+    
+    # Specialist can only edit risks in their assigned lifecycle stage
+    if db_factor.lifecycle_stage and not check_specialist_lifecycle_access(
+        current_user, db_factor.analysis.project_id, db_factor.lifecycle_stage, db
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only edit risks in their assigned lifecycle stage"
         )
     
     # Store old values for logging
@@ -619,6 +677,15 @@ async def delete_risk_factor(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions to edit risks in this project"
+        )
+    
+    # Specialist can only delete risks in their assigned lifecycle stage
+    if db_factor.lifecycle_stage and not check_specialist_lifecycle_access(
+        current_user, db_factor.analysis.project_id, db_factor.lifecycle_stage, db
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Specialists can only delete risks in their assigned lifecycle stage"
         )
     
     # Store data for logging before deletion
@@ -730,10 +797,16 @@ async def get_project_risk_factors(
     if not analysis:
         return []
     
+    # For specialist role: filter to only their assigned lifecycle stage
+    specialist_stage = get_specialist_lifecycle_stage(current_user, project_id, db)
+    
     # Get risk status from risk tables for each risk factor
     risk_factors_with_status = []
     
     for factor in analysis.risk_factors:
+        # If specialist, skip factors from other lifecycle stages
+        if specialist_stage and factor.lifecycle_stage != specialist_stage:
+            continue
         factor_dict = {
             "id": factor.id,
             "analysis_id": factor.analysis_id,

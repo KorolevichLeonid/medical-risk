@@ -11,7 +11,7 @@ const RegisterPage = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'doctor'
+    role: 'specialist'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -125,10 +125,8 @@ const RegisterPage = () => {
                   onChange={handleChange}
                   required
                 >
-                  <option value="doctor">Доктор - проведение анализа рисков</option>
-                  <option value="manager">Менеджер - управление проектами и командой</option>
-                  <option value="admin">Администратор - управление проектами и пользователями</option>
-                  <option value="sys_admin">Системный администратор - полный доступ к системе</option>
+                  <option value="USER">Пользователь</option>
+                  <option value="SYS_ADMIN">Системный администратор - полный доступ к системе</option>
                 </select>
               </div>
 

@@ -8,6 +8,8 @@ from .database import engine, get_db
 from .init_db import (
     ensure_project_severity_columns,
     ensure_project_extended_columns,
+    ensure_project_member_extended_columns,
+    ensure_project_member_roles_normalized,
     run_postgresql_migration,
 )
 from .models import user, project, risk_analysis
@@ -80,6 +82,8 @@ def startup_migrations():
     """Ensure new columns exist when running under uvicorn."""
     ensure_project_severity_columns()
     ensure_project_extended_columns()
+    ensure_project_member_extended_columns()
+    ensure_project_member_roles_normalized()
     run_postgresql_migration()
 
 @app.get("/")

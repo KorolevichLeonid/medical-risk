@@ -101,7 +101,7 @@ const Dashboard = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      draft: { label: 'Draft', className: 'status-draft' },
+      draft: { label: 'Ожидание продукт-менеджера', className: 'status-draft' },
       in_progress: { label: 'In Progress', className: 'status-progress' },
       review: { label: 'Review', className: 'status-review' },
       completed: { label: 'Completed', className: 'status-completed' }
@@ -113,13 +113,11 @@ const Dashboard = () => {
 
   const getRoleBadge = (role) => {
     const roleConfig = {
-      admin: { label: 'ADMIN', className: 'role-admin' },
-      manager: { label: 'MANAGER', className: 'role-manager' },
-      doctor: { label: 'DOCTOR', className: 'role-doctor' },
-      product_manager: { label: 'PRODUCT MANAGER', className: 'role-product-manager' },
-      risk_assessment_team_leader: { label: 'RISK ASSESSMENT TEAM LEADER', className: 'role-risk-leader' },
-      quality_management_representative: { label: 'QUALITY MANAGMENT REPRESENTATIVE', className: 'role-quality-rep' },
-      risk_assessment_team_member: { label: 'RISK ASSESSMENT TEAM MEMBER', className: 'role-risk-member' }
+      admin: { label: 'АДМИНИСТРАТОР', className: 'role-admin' },
+      manager: { label: 'ПРОДУКТ-МЕНЕДЖЕР', className: 'role-manager' },
+      risk_assessment_team_leader: { label: 'РУКОВОДИТЕЛЬ КОМАНДЫ ПО РИСКАМ', className: 'role-risk-leader' },
+      doctor: { label: 'ДОКТОР', className: 'role-doctor' },
+      specialist: { label: 'СПЕЦИАЛИСТ ПО ЖЦ', className: 'role-specialist' }
     };
     
     const config = roleConfig[role] || { label: role?.toUpperCase() || 'UNKNOWN', className: 'role-unknown' };
@@ -127,18 +125,13 @@ const Dashboard = () => {
   };
 
   const canEditProject = (project) => {
-    // Доступ к редактированию проекта:
-    // - admin: полный доступ
-    // - manager: может редактировать информацию проекта
-    // - doctor: НЕ может редактировать
-    return project.userRole === 'admin' || project.userRole === 'manager';
+    // Только продукт-менеджер продолжает заполнение проекта.
+    return project.userRole === 'manager';
   };
 
   const canDeleteProject = (project) => {
     // Доступ к удалению проекта:
-    // - admin: полный доступ (владелец проекта или участник с ролью admin)
-    // - manager: НЕ может удалять
-    // - doctor: НЕ может удалять
+    // - admin: полный доступ (владелец проекта)
     return project.userRole === 'admin';
   };
 
@@ -244,8 +237,8 @@ const Dashboard = () => {
             >
               <option value="all">All Roles</option>
               <option value="admin">Administrator</option>
-              <option value="manager">Manager</option>
-              <option value="doctor">Doctor</option>
+              <option value="manager">Product manager</option>
+              <option value="specialist">Specialist</option>
             </select>
           </div>
         )}

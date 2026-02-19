@@ -11,7 +11,7 @@ class ProjectBase(BaseModel):
     """Base project schema"""
     name: str
     description: Optional[str] = None
-    device_name: str
+    device_name: Optional[str] = ""
     device_model: Optional[str] = None
     device_purpose: Optional[str] = None
     device_description: Optional[str] = None
@@ -103,7 +103,8 @@ class ProjectUpdate(BaseModel):
 class ProjectMemberBase(BaseModel):
     """Base project member schema"""
     user_id: int
-    role: ProjectRole = ProjectRole.DOCTOR
+    role: ProjectRole = ProjectRole.SPECIALIST
+    assigned_lifecycle_stage: Optional[str] = None  # For specialist role
 
 
 class ProjectMemberCreate(ProjectMemberBase):
@@ -114,6 +115,7 @@ class ProjectMemberCreate(ProjectMemberBase):
 class ProjectMemberRoleUpdate(BaseModel):
     """Schema for updating a project member role"""
     role: ProjectRole
+    assigned_lifecycle_stage: Optional[str] = None  # For specialist role
 
 
 class ProjectMemberResponse(BaseModel):
@@ -122,6 +124,7 @@ class ProjectMemberResponse(BaseModel):
     project_id: int
     user_id: int
     role: str  # String for compatibility with existing frontend
+    assigned_lifecycle_stage: Optional[str] = None  # For specialist role
     joined_at: datetime
     
     # User information
