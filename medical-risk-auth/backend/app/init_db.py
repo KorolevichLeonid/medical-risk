@@ -276,32 +276,45 @@ def ensure_project_member_roles_normalized():
             return
 
         with engine.begin() as conn:
-            # PostgreSQL enum values must be lowercase (as defined in ProjectRole enum)
-            # Map legacy roles to current enum values (lowercase)
-            role_mapping = {
-                # legacy uppercase enum names -> lowercase enum values
-                "PRODUCT_MANAGER": "manager",
-                "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
-                "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
-                "DOCTOR": "doctor",
-                "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
-                # legacy lowercase string values
-                "product_manager": "manager",
-                "risk_assessment_team_leader": "risk_assessment_team_leader",
-                "risk_assessment_team_member": "specialist",
-                "doctor": "doctor",
-                "quality_management_representative": "specialist",
-                # current values (already correct, but ensure consistency)
-                "manager": "manager",
-                "specialist": "specialist",
-                "admin": "admin",
-            }
-
-            for old_role, new_role in role_mapping.items():
-                # Only update if old_role exists and is different from new_role
-                if old_role != new_role:
+            # SQLAlchemy Enum(ProjectRole) persists enum NAMES (uppercase) in PostgreSQL.
+            # In PostgreSQL, enum values are stored as enum names (ADMIN, MANAGER, etc.), not strings.
+            # In SQLite, they are stored as strings.
+            is_sqlite = engine.url.drivername.startswith("sqlite")
+            
+            if is_sqlite:
+                # SQLite: use string values
+                role_mapping = {
+                    "PRODUCT_MANAGER": "manager",
+                    "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
+                    "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
+                    "DOCTOR": "doctor",
+                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
+                    "product_manager": "manager",
+                    "risk_assessment_team_leader": "risk_assessment_team_leader",
+                    "risk_assessment_team_member": "specialist",
+                    "doctor": "doctor",
+                    "quality_management_representative": "specialist",
+                }
+                
+                for old_role, new_role in role_mapping.items():
                     conn.execute(
                         text("UPDATE project_members SET role = :new_role WHERE role = :old_role"),
+                        {"new_role": new_role, "old_role": old_role}
+                    )
+            else:
+                # PostgreSQL: enum values are stored as enum NAMES (uppercase)
+                # Map old enum names to new enum names
+                role_mapping = {
+                    "PRODUCT_MANAGER": "MANAGER",
+                    "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
+                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "SPECIALIST",
+                }
+                
+                for old_role, new_role in role_mapping.items():
+                    # PostgreSQL: update enum using enum name directly
+                    # Use ::text to compare and ::projectrole to cast
+                    conn.execute(
+                        text("UPDATE project_members SET role = :new_role::projectrole WHERE role::text = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
                     )
     except Exception as e:
@@ -373,18 +386,11 @@ def init_database():
         run_postgresql_migration()
 
         # Initialize permissions
-        try:
-            import sys
-            import os
-            backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            if backend_dir not in sys.path:
-                sys.path.insert(0, backend_dir)
-            from init_permissions import init_permissions
-            init_permissions()
-            print("[+] Permissions initialized")
-        except Exception as e:
-            print(f"[!] Warning: Failed to initialize permissions: {e}")
-            print("[!] Permissions may need to be initialized manually")
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from init_permissions import init_permissions
+        init_permissions()
 
         # Check admin user status (Azure auth system)
         create_admin_user()
