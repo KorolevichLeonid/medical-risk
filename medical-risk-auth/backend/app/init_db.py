@@ -371,11 +371,18 @@ def init_database():
         run_postgresql_migration()
 
         # Initialize permissions
-        import sys
-        import os
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from init_permissions import init_permissions
-        init_permissions()
+        try:
+            import sys
+            import os
+            backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if backend_dir not in sys.path:
+                sys.path.insert(0, backend_dir)
+            from init_permissions import init_permissions
+            init_permissions()
+            print("[+] Permissions initialized")
+        except Exception as e:
+            print(f"[!] Warning: Failed to initialize permissions: {e}")
+            print("[!] Permissions may need to be initialized manually")
 
         # Check admin user status (Azure auth system)
         create_admin_user()
