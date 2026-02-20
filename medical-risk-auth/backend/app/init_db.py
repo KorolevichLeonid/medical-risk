@@ -276,48 +276,41 @@ def ensure_project_member_roles_normalized():
             return
 
         with engine.begin() as conn:
-            # SQLAlchemy Enum(ProjectRole) persists enum NAMES (uppercase) in PostgreSQL.
-            # In PostgreSQL, enum values are stored as enum names (ADMIN, MANAGER, etc.), not strings.
-            # In SQLite, they are stored as strings.
+            # SQLAlchemy Enum(ProjectRole) stores enum VALUES (lowercase strings), not enum names
+            # In SQLite, they are stored as strings directly
+            # In PostgreSQL, we need to use CAST to convert string value to enum type
             is_sqlite = engine.url.drivername.startswith("sqlite")
+            
+            # Complete role mapping covering all legacy values
+            role_mapping = {
+                # legacy uppercase enum names
+                "PRODUCT_MANAGER": "manager",
+                "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
+                "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
+                "DOCTOR": "doctor",
+                "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
+                # legacy lowercase string values (from older migrations)
+                "product_manager": "manager",
+                "risk_assessment_team_leader": "risk_assessment_team_leader",
+                "risk_assessment_team_member": "specialist",
+                "doctor": "doctor",
+                "quality_management_representative": "specialist",
+                "manager": "manager",
+                "specialist": "specialist",
+                "admin": "admin",
+            }
             
             if is_sqlite:
                 # SQLite: use string values (lowercase as defined in enum)
-                role_mapping = {
-                    "PRODUCT_MANAGER": "manager",
-                    "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
-                    "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
-                    "DOCTOR": "doctor",
-                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
-                    "product_manager": "manager",
-                    "risk_assessment_team_leader": "risk_assessment_team_leader",
-                    "risk_assessment_team_member": "specialist",
-                    "doctor": "doctor",
-                    "quality_management_representative": "specialist",
-                }
-                
                 for old_role, new_role in role_mapping.items():
                     conn.execute(
                         text("UPDATE project_members SET role = :new_role WHERE role = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
                     )
             else:
-                # PostgreSQL: SQLAlchemy stores enum VALUES (lowercase strings), not enum names
-                # Map old roles to new enum VALUES (as defined in ProjectRole enum)
-                role_mapping = {
-                    # Old enum names (uppercase) -> new enum values (lowercase)
-                    "PRODUCT_MANAGER": "manager",
-                    "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
-                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
-                    # Old enum values (lowercase) -> new enum values (lowercase)
-                    "product_manager": "manager",
-                    "risk_assessment_team_member": "specialist",
-                    "quality_management_representative": "specialist",
-                }
-                
+                # PostgreSQL: use CAST to convert string value to enum type
+                # We use the enum VALUE (lowercase string), not the enum NAME
                 for old_role, new_role in role_mapping.items():
-                    # PostgreSQL: use CAST to convert string value to enum type
-                    # We use the enum VALUE (lowercase string), not the enum NAME
                     conn.execute(
                         text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
