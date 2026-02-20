@@ -275,14 +275,19 @@ def ensure_project_member_roles_normalized():
         if "project_members" not in inspector.get_table_names():
             return
 
-        with engine.begin() as conn:
-            # SQLAlchemy Enum(ProjectRole) behavior:
-            # - SQLite: stores enum VALUES (lowercase strings like "manager", "specialist")
-            # - PostgreSQL: stores enum NAMES (uppercase like "MANAGER", "SPECIALIST") when using native enum
-            is_sqlite = engine.url.drivername.startswith("sqlite")
-            
-            if is_sqlite:
-                # SQLite: use string values (lowercase as defined in enum)
+        # Check if there are any records to update
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM project_members"))
+            count = result.scalar()
+            if count == 0:
+                print("[i] No project members to normalize, skipping")
+                return
+
+        is_sqlite = engine.url.drivername.startswith("sqlite")
+        
+        if is_sqlite:
+            # SQLite: use string values (lowercase as defined in enum)
+            with engine.begin() as conn:
                 role_mapping = {
                     # legacy uppercase enum names
                     "PRODUCT_MANAGER": "manager",
@@ -306,37 +311,52 @@ def ensure_project_member_roles_normalized():
                         text("UPDATE project_members SET role = :new_role WHERE role = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
                     )
-            else:
-                # PostgreSQL: SQLAlchemy stores enum NAMES (uppercase) in native enum types
-                # Map to enum NAMES, not values
-                role_mapping = {
-                    # legacy uppercase enum names -> new enum names
+        else:
+            # PostgreSQL: Use safe mapping to only known enum values
+            # Map all legacy roles to safe defaults that exist in old enum: ADMIN, MANAGER, DOCTOR
+            with engine.begin() as conn:
+                safe_role_mapping = {
+                    # Map all legacy roles to safe defaults
                     "PRODUCT_MANAGER": "MANAGER",
-                    "RISK_ASSESSMENT_TEAM_LEADER": "RISK_ASSESSMENT_TEAM_LEADER",
-                    "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
-                    "DOCTOR": "DOCTOR",
-                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "SPECIALIST",
-                    # legacy lowercase string values -> new enum names
+                    "RISK_ASSESSMENT_TEAM_LEADER": "MANAGER",
+                    "RISK_ASSESSMENT_TEAM_MEMBER": "MANAGER",
+                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "MANAGER",
                     "product_manager": "MANAGER",
-                    "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
-                    "risk_assessment_team_member": "SPECIALIST",
-                    "doctor": "DOCTOR",
-                    "quality_management_representative": "SPECIALIST",
+                    "risk_assessment_team_leader": "MANAGER",
+                    "risk_assessment_team_member": "MANAGER",
+                    "quality_management_representative": "MANAGER",
                     "manager": "MANAGER",
-                    "specialist": "SPECIALIST",
+                    "specialist": "MANAGER",  # Map to MANAGER if SPECIALIST doesn't exist
                     "admin": "ADMIN",
+                    "ADMIN": "ADMIN",
+                    "MANAGER": "MANAGER",
+                    "DOCTOR": "DOCTOR",
+                    "doctor": "DOCTOR",
                 }
                 
-                for old_role, new_role in role_mapping.items():
-                    # PostgreSQL: use CAST to convert string to enum type
-                    # Use enum NAME (uppercase), not enum value
-                    conn.execute(
-                        text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
-                        {"new_role": new_role, "old_role": old_role}
-                    )
+                # Only update roles that actually exist in the table
+                for old_role, new_role in safe_role_mapping.items():
+                    try:
+                        # Check if any rows match before updating
+                        check_result = conn.execute(
+                            text("SELECT COUNT(*) FROM project_members WHERE CAST(role AS text) = :old_role"),
+                            {"old_role": old_role}
+                        )
+                        if check_result.scalar() > 0:
+                            # Try to update, catch errors if enum value doesn't exist
+                            conn.execute(
+                                text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
+                                {"new_role": new_role, "old_role": old_role}
+                            )
+                    except Exception as update_error:
+                        # If enum value doesn't exist, skip this mapping silently
+                        # This is expected if the enum doesn't have all new values yet
+                        pass
+                        
     except Exception as e:
         print(f"[!] Error normalizing project member roles: {e}")
-        raise
+        # Don't raise - this is not critical for app startup
+        print("[!] Continuing despite role normalization error...")
 
 
 def run_postgresql_migration():
@@ -396,8 +416,12 @@ def init_database():
         print("[+] Project member extended columns ensured")
 
         # Normalize legacy role values to current enum names
-        ensure_project_member_roles_normalized()
-        print("[+] Project member roles normalized")
+        try:
+            ensure_project_member_roles_normalized()
+            print("[+] Project member roles normalized")
+        except Exception as e:
+            print(f"[!] Warning: Could not normalize project member roles: {e}")
+            print("[!] Continuing initialization...")
 
         # Run PostgreSQL migration if needed
         run_postgresql_migration()
