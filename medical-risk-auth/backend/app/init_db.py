@@ -276,32 +276,34 @@ def ensure_project_member_roles_normalized():
             return
 
         with engine.begin() as conn:
-            # SQLAlchemy Enum(ProjectRole) persists enum NAMES (uppercase), so normalize to names.
+            # PostgreSQL enum values must be lowercase (as defined in ProjectRole enum)
+            # Map legacy roles to current enum values (lowercase)
             role_mapping = {
-                # legacy uppercase enum names
-                "PRODUCT_MANAGER": "MANAGER",
-                "RISK_ASSESSMENT_TEAM_LEADER": "RISK_ASSESSMENT_TEAM_LEADER",
-                "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
-                "DOCTOR": "DOCTOR",
-                "QUALITY_MANAGEMENT_REPRESENTATIVE": "SPECIALIST",
-                # legacy lowercase string values (from older migrations)
-                "product_manager": "MANAGER",
-                "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
-                "risk_assessment_team_member": "SPECIALIST",
-                "doctor": "DOCTOR",
-                "quality_management_representative": "SPECIALIST",
-                "manager": "MANAGER",
-                "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
-                "doctor": "DOCTOR",
-                "specialist": "SPECIALIST",
-                "admin": "ADMIN",
+                # legacy uppercase enum names -> lowercase enum values
+                "PRODUCT_MANAGER": "manager",
+                "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
+                "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
+                "DOCTOR": "doctor",
+                "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
+                # legacy lowercase string values
+                "product_manager": "manager",
+                "risk_assessment_team_leader": "risk_assessment_team_leader",
+                "risk_assessment_team_member": "specialist",
+                "doctor": "doctor",
+                "quality_management_representative": "specialist",
+                # current values (already correct, but ensure consistency)
+                "manager": "manager",
+                "specialist": "specialist",
+                "admin": "admin",
             }
 
             for old_role, new_role in role_mapping.items():
-                conn.execute(
-                    text("UPDATE project_members SET role = :new_role WHERE role = :old_role"),
-                    {"new_role": new_role, "old_role": old_role}
-                )
+                # Only update if old_role exists and is different from new_role
+                if old_role != new_role:
+                    conn.execute(
+                        text("UPDATE project_members SET role = :new_role WHERE role = :old_role"),
+                        {"new_role": new_role, "old_role": old_role}
+                    )
     except Exception as e:
         print(f"[!] Error normalizing project member roles: {e}")
         raise
