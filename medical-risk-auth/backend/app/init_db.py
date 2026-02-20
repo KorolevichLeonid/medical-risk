@@ -312,9 +312,9 @@ def ensure_project_member_roles_normalized():
                 
                 for old_role, new_role in role_mapping.items():
                     # PostgreSQL: update enum using enum name directly
-                    # Use ::text to compare and ::projectrole to cast
+                    # Use CAST for proper enum casting with SQLAlchemy parameters
                     conn.execute(
-                        text("UPDATE project_members SET role = :new_role::projectrole WHERE role::text = :old_role"),
+                        text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
                     )
     except Exception as e:
