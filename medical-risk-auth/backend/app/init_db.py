@@ -276,25 +276,23 @@ def ensure_project_member_roles_normalized():
             return
 
         with engine.begin() as conn:
-            # SQLAlchemy Enum(ProjectRole) persists enum NAMES (uppercase), so normalize to names.
+            # SQLAlchemy Enum(ProjectRole) stores enum VALUES (lowercase), so normalize to values.
             role_mapping = {
                 # legacy uppercase enum names
-                "PRODUCT_MANAGER": "MANAGER",
-                "RISK_ASSESSMENT_TEAM_LEADER": "RISK_ASSESSMENT_TEAM_LEADER",
-                "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
-                "DOCTOR": "DOCTOR",
-                "QUALITY_MANAGEMENT_REPRESENTATIVE": "SPECIALIST",
+                "PRODUCT_MANAGER": "manager",
+                "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
+                "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
+                "DOCTOR": "doctor",
+                "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
                 # legacy lowercase string values (from older migrations)
-                "product_manager": "MANAGER",
-                "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
-                "risk_assessment_team_member": "SPECIALIST",
-                "doctor": "DOCTOR",
-                "quality_management_representative": "SPECIALIST",
-                "manager": "MANAGER",
-                "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
-                "doctor": "DOCTOR",
-                "specialist": "SPECIALIST",
-                "admin": "ADMIN",
+                "product_manager": "manager",
+                "risk_assessment_team_leader": "risk_assessment_team_leader",
+                "risk_assessment_team_member": "specialist",
+                "doctor": "doctor",
+                "quality_management_representative": "specialist",
+                "manager": "manager",
+                "specialist": "specialist",
+                "admin": "admin",
             }
 
             for old_role, new_role in role_mapping.items():
