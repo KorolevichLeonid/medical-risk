@@ -282,7 +282,7 @@ def ensure_project_member_roles_normalized():
             is_sqlite = engine.url.drivername.startswith("sqlite")
             
             if is_sqlite:
-                # SQLite: use string values
+                # SQLite: use string values (lowercase as defined in enum)
                 role_mapping = {
                     "PRODUCT_MANAGER": "manager",
                     "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
@@ -304,6 +304,7 @@ def ensure_project_member_roles_normalized():
             else:
                 # PostgreSQL: enum values are stored as enum NAMES (uppercase)
                 # Map old enum names to new enum names
+                # Note: PostgreSQL enum names must match exactly (case-sensitive)
                 role_mapping = {
                     "PRODUCT_MANAGER": "MANAGER",
                     "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
@@ -311,8 +312,8 @@ def ensure_project_member_roles_normalized():
                 }
                 
                 for old_role, new_role in role_mapping.items():
-                    # PostgreSQL: update enum using enum name directly
-                    # Use CAST for proper enum casting with SQLAlchemy parameters
+                    # PostgreSQL: use CAST to convert string to enum type
+                    # The enum name must match the actual enum definition in PostgreSQL
                     conn.execute(
                         text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
