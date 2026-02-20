@@ -302,18 +302,22 @@ def ensure_project_member_roles_normalized():
                         {"new_role": new_role, "old_role": old_role}
                     )
             else:
-                # PostgreSQL: enum values are stored as enum NAMES (uppercase)
-                # Map old enum names to new enum names
-                # Note: PostgreSQL enum names must match exactly (case-sensitive)
+                # PostgreSQL: SQLAlchemy stores enum VALUES (lowercase strings), not enum names
+                # Map old roles to new enum VALUES (as defined in ProjectRole enum)
                 role_mapping = {
-                    "PRODUCT_MANAGER": "MANAGER",
-                    "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
-                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "SPECIALIST",
+                    # Old enum names (uppercase) -> new enum values (lowercase)
+                    "PRODUCT_MANAGER": "manager",
+                    "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
+                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
+                    # Old enum values (lowercase) -> new enum values (lowercase)
+                    "product_manager": "manager",
+                    "risk_assessment_team_member": "specialist",
+                    "quality_management_representative": "specialist",
                 }
                 
                 for old_role, new_role in role_mapping.items():
-                    # PostgreSQL: use CAST to convert string to enum type
-                    # The enum name must match the actual enum definition in PostgreSQL
+                    # PostgreSQL: use CAST to convert string value to enum type
+                    # We use the enum VALUE (lowercase string), not the enum NAME
                     conn.execute(
                         text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
