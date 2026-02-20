@@ -276,41 +276,60 @@ def ensure_project_member_roles_normalized():
             return
 
         with engine.begin() as conn:
-            # SQLAlchemy Enum(ProjectRole) stores enum VALUES (lowercase strings), not enum names
-            # In SQLite, they are stored as strings directly
-            # In PostgreSQL, we need to use CAST to convert string value to enum type
+            # SQLAlchemy Enum(ProjectRole) behavior:
+            # - SQLite: stores enum VALUES (lowercase strings like "manager", "specialist")
+            # - PostgreSQL: stores enum NAMES (uppercase like "MANAGER", "SPECIALIST") when using native enum
             is_sqlite = engine.url.drivername.startswith("sqlite")
-            
-            # Complete role mapping covering all legacy values
-            role_mapping = {
-                # legacy uppercase enum names
-                "PRODUCT_MANAGER": "manager",
-                "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
-                "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
-                "DOCTOR": "doctor",
-                "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
-                # legacy lowercase string values (from older migrations)
-                "product_manager": "manager",
-                "risk_assessment_team_leader": "risk_assessment_team_leader",
-                "risk_assessment_team_member": "specialist",
-                "doctor": "doctor",
-                "quality_management_representative": "specialist",
-                "manager": "manager",
-                "specialist": "specialist",
-                "admin": "admin",
-            }
             
             if is_sqlite:
                 # SQLite: use string values (lowercase as defined in enum)
+                role_mapping = {
+                    # legacy uppercase enum names
+                    "PRODUCT_MANAGER": "manager",
+                    "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
+                    "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
+                    "DOCTOR": "doctor",
+                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
+                    # legacy lowercase string values (from older migrations)
+                    "product_manager": "manager",
+                    "risk_assessment_team_leader": "risk_assessment_team_leader",
+                    "risk_assessment_team_member": "specialist",
+                    "doctor": "doctor",
+                    "quality_management_representative": "specialist",
+                    "manager": "manager",
+                    "specialist": "specialist",
+                    "admin": "admin",
+                }
+                
                 for old_role, new_role in role_mapping.items():
                     conn.execute(
                         text("UPDATE project_members SET role = :new_role WHERE role = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
                     )
             else:
-                # PostgreSQL: use CAST to convert string value to enum type
-                # We use the enum VALUE (lowercase string), not the enum NAME
+                # PostgreSQL: SQLAlchemy stores enum NAMES (uppercase) in native enum types
+                # Map to enum NAMES, not values
+                role_mapping = {
+                    # legacy uppercase enum names -> new enum names
+                    "PRODUCT_MANAGER": "MANAGER",
+                    "RISK_ASSESSMENT_TEAM_LEADER": "RISK_ASSESSMENT_TEAM_LEADER",
+                    "RISK_ASSESSMENT_TEAM_MEMBER": "SPECIALIST",
+                    "DOCTOR": "DOCTOR",
+                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "SPECIALIST",
+                    # legacy lowercase string values -> new enum names
+                    "product_manager": "MANAGER",
+                    "risk_assessment_team_leader": "RISK_ASSESSMENT_TEAM_LEADER",
+                    "risk_assessment_team_member": "SPECIALIST",
+                    "doctor": "DOCTOR",
+                    "quality_management_representative": "SPECIALIST",
+                    "manager": "MANAGER",
+                    "specialist": "SPECIALIST",
+                    "admin": "ADMIN",
+                }
+                
                 for old_role, new_role in role_mapping.items():
+                    # PostgreSQL: use CAST to convert string to enum type
+                    # Use enum NAME (uppercase), not enum value
                     conn.execute(
                         text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
                         {"new_role": new_role, "old_role": old_role}
