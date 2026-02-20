@@ -23,6 +23,15 @@ services:
           name: medical-risk-frontend
           type: static
           property: url
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ORIGINS
+        fromService:
+          name: medical-risk-frontend
+          type: static
+          property: url
 
   - type: static
     name: medical-risk-frontend
