@@ -64,8 +64,62 @@ DEFAULT_PROBABILITY_LEVELS = [
     }
 ]
 
+def ensure_postgresql_enum_values():
+    """Ensure PostgreSQL enum has all required values before creating tables."""
+    try:
+        is_sqlite = engine.url.drivername.startswith("sqlite")
+        if is_sqlite:
+            return  # SQLite doesn't use native enums
+        
+        with engine.begin() as conn:
+            # Check if enum type exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_type WHERE typname = 'projectrole'
+                )
+            """))
+            enum_exists = result.scalar()
+            
+            if not enum_exists:
+                # Create enum with all values
+                conn.execute(text("""
+                    CREATE TYPE projectrole AS ENUM (
+                        'admin', 'manager', 'risk_assessment_team_leader', 
+                        'doctor', 'specialist'
+                    )
+                """))
+                print("[+] Created projectrole enum with all values")
+            else:
+                # Check existing values and add missing ones
+                result = conn.execute(text("""
+                    SELECT enumlabel FROM pg_enum 
+                    WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'projectrole')
+                    ORDER BY enumsortorder
+                """))
+                existing_values = {row[0] for row in result.fetchall()}
+                
+                required_values = {'admin', 'manager', 'risk_assessment_team_leader', 'doctor', 'specialist'}
+                missing_values = required_values - existing_values
+                
+                if missing_values:
+                    for value in missing_values:
+                        try:
+                            conn.execute(text(f"ALTER TYPE projectrole ADD VALUE IF NOT EXISTS '{value}'"))
+                            print(f"[+] Added '{value}' to projectrole enum")
+                        except Exception as e:
+                            # Value might already exist or there's a constraint
+                            if "already exists" not in str(e).lower():
+                                print(f"[!] Warning: Could not add '{value}' to enum: {e}")
+    except Exception as e:
+        print(f"[!] Warning: Could not ensure enum values: {e}")
+        # Don't raise - continue with table creation
+
+
 def create_tables():
     """Create all database tables"""
+    # Ensure PostgreSQL enum has all values before creating tables
+    ensure_postgresql_enum_values()
+    
     from .models import user, project, risk_analysis
     from .models import changelog as changelog_model
     from .models import document as document_model
@@ -312,30 +366,29 @@ def ensure_project_member_roles_normalized():
                         {"new_role": new_role, "old_role": old_role}
                     )
         else:
-            # PostgreSQL: Use safe mapping to only known enum values
-            # Map all legacy roles to safe defaults that exist in old enum: ADMIN, MANAGER, DOCTOR
+            # PostgreSQL: SQLAlchemy stores enum VALUES (lowercase strings), not enum names
+            # After ensure_postgresql_enum_values(), all required values should exist
             with engine.begin() as conn:
-                safe_role_mapping = {
-                    # Map all legacy roles to safe defaults
-                    "PRODUCT_MANAGER": "MANAGER",
-                    "RISK_ASSESSMENT_TEAM_LEADER": "MANAGER",
-                    "RISK_ASSESSMENT_TEAM_MEMBER": "MANAGER",
-                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "MANAGER",
-                    "product_manager": "MANAGER",
-                    "risk_assessment_team_leader": "MANAGER",
-                    "risk_assessment_team_member": "MANAGER",
-                    "quality_management_representative": "MANAGER",
-                    "manager": "MANAGER",
-                    "specialist": "MANAGER",  # Map to MANAGER if SPECIALIST doesn't exist
-                    "admin": "ADMIN",
-                    "ADMIN": "ADMIN",
-                    "MANAGER": "MANAGER",
-                    "DOCTOR": "DOCTOR",
-                    "doctor": "DOCTOR",
+                role_mapping = {
+                    # legacy uppercase enum names -> new enum values (lowercase)
+                    "PRODUCT_MANAGER": "manager",
+                    "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
+                    "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
+                    "DOCTOR": "doctor",
+                    "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
+                    # legacy lowercase string values -> new enum values
+                    "product_manager": "manager",
+                    "risk_assessment_team_leader": "risk_assessment_team_leader",
+                    "risk_assessment_team_member": "specialist",
+                    "doctor": "doctor",
+                    "quality_management_representative": "specialist",
+                    "manager": "manager",
+                    "specialist": "specialist",
+                    "admin": "admin",
                 }
                 
                 # Only update roles that actually exist in the table
-                for old_role, new_role in safe_role_mapping.items():
+                for old_role, new_role in role_mapping.items():
                     try:
                         # Check if any rows match before updating
                         check_result = conn.execute(
@@ -343,14 +396,15 @@ def ensure_project_member_roles_normalized():
                             {"old_role": old_role}
                         )
                         if check_result.scalar() > 0:
-                            # Try to update, catch errors if enum value doesn't exist
+                            # Update using enum value (lowercase string)
                             conn.execute(
                                 text("UPDATE project_members SET role = CAST(:new_role AS projectrole) WHERE CAST(role AS text) = :old_role"),
                                 {"new_role": new_role, "old_role": old_role}
                             )
                     except Exception as update_error:
                         # If enum value doesn't exist, skip this mapping silently
-                        # This is expected if the enum doesn't have all new values yet
+                        # This should not happen after ensure_postgresql_enum_values()
+                        print(f"[!] Warning: Could not map '{old_role}' to '{new_role}': {update_error}")
                         pass
                         
     except Exception as e:
