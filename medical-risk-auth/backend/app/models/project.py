@@ -149,7 +149,15 @@ class ProjectMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    role = Column(Enum(ProjectRole), default=ProjectRole.SPECIALIST, nullable=False)  # Project role
+    role = Column(
+        Enum(
+            ProjectRole,
+            name="projectrole",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=ProjectRole.SPECIALIST,
+        nullable=False,
+    )  # Project role
     assigned_lifecycle_stage = Column(String, nullable=True)  # For specialist role: which lifecycle stage they manage
     
     # Timestamps

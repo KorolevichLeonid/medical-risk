@@ -344,10 +344,13 @@ def ensure_project_member_roles_normalized():
             with engine.begin() as conn:
                 role_mapping = {
                     # legacy uppercase enum names
+                    "ADMIN": "admin",
+                    "MANAGER": "manager",
                     "PRODUCT_MANAGER": "manager",
                     "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
                     "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
                     "DOCTOR": "doctor",
+                    "SPECIALIST": "specialist",
                     "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
                     # legacy lowercase string values (from older migrations)
                     "product_manager": "manager",
@@ -371,10 +374,13 @@ def ensure_project_member_roles_normalized():
             with engine.begin() as conn:
                 role_mapping = {
                     # legacy uppercase enum names -> new enum values (lowercase)
+                    "ADMIN": "admin",
+                    "MANAGER": "manager",
                     "PRODUCT_MANAGER": "manager",
                     "RISK_ASSESSMENT_TEAM_LEADER": "risk_assessment_team_leader",
                     "RISK_ASSESSMENT_TEAM_MEMBER": "specialist",
                     "DOCTOR": "doctor",
+                    "SPECIALIST": "specialist",
                     "QUALITY_MANAGEMENT_REPRESENTATIVE": "specialist",
                     # legacy lowercase string values -> new enum values
                     "product_manager": "manager",
