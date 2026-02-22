@@ -146,6 +146,7 @@ def _calculate_coverage_progress(db: Session, project: Project) -> float:
     return float(coverage_percentage)
 
 router = APIRouter()
+MAX_MEMBERS_PER_NON_ADMIN_ROLE = 5
 
 
 class ProductManagerAssignRequest(BaseModel):
@@ -155,6 +156,24 @@ class ProductManagerAssignRequest(BaseModel):
 def get_project(db: Session, project_id: int) -> Project:
     """Get project by ID"""
     return db.query(Project).filter(Project.id == project_id).first()
+
+
+def _ensure_role_capacity(db: Session, project_id: int, role: ProjectRole, exclude_user_id: int = None):
+    """Enforce per-project cap for non-admin roles."""
+    if role == ProjectRole.ADMIN:
+        return
+    query = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.role == role
+    )
+    if exclude_user_id is not None:
+        query = query.filter(ProjectMember.user_id != exclude_user_id)
+    current_count = query.count()
+    if current_count >= MAX_MEMBERS_PER_NON_ADMIN_ROLE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Role '{role.value}' already has {MAX_MEMBERS_PER_NON_ADMIN_ROLE} members in this project"
+        )
 
 
 def check_project_access(project: Project, user: User, db: Session):
@@ -1019,13 +1038,7 @@ async def add_project_member(
     if existing_member:
         raise HTTPException(status_code=400, detail="User is already a member")
 
-    if member.role == ProjectRole.MANAGER:
-        existing_manager = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.role == ProjectRole.MANAGER
-        ).first()
-        if existing_manager:
-            raise HTTPException(status_code=400, detail="Product manager is already assigned")
+    _ensure_role_capacity(db, project_id, member.role)
     
     # For specialist role, validate that assigned_lifecycle_stage is provided
     if member.role == ProjectRole.SPECIALIST:
@@ -1035,15 +1048,6 @@ async def add_project_member(
         lifecycle_stages = _safe_json_list(db_project.lifecycle_stages) + _safe_json_list(db_project.custom_lifecycle_stages)
         if member.assigned_lifecycle_stage not in lifecycle_stages:
             raise HTTPException(status_code=400, detail="Invalid lifecycle stage for this project")
-        # Check that no other specialist is already assigned to this stage
-        existing_specialist = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.role == ProjectRole.SPECIALIST,
-            ProjectMember.assigned_lifecycle_stage == member.assigned_lifecycle_stage
-        ).first()
-        if existing_specialist:
-            raise HTTPException(status_code=400, detail=f"A specialist is already assigned to lifecycle stage '{member.assigned_lifecycle_stage}'")
-
     db_member = ProjectMember(
         project_id=project_id,
         user_id=member.user_id,
@@ -1087,7 +1091,7 @@ async def assign_product_manager(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Assign or replace product manager for a project."""
+    """Assign product manager for a project (up to role capacity)."""
     db_project = get_project(db, project_id=project_id)
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -1115,22 +1119,13 @@ async def assign_product_manager(
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    existing_manager = db.query(ProjectMember).filter(
-        ProjectMember.project_id == project_id,
-        ProjectMember.role == ProjectRole.MANAGER
-    ).first()
-
     target_member = db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id,
         ProjectMember.user_id == payload.user_id
     ).first()
 
-    # Replace existing product manager if selecting a different user.
-    if existing_manager and existing_manager.user_id != payload.user_id:
-        db.delete(existing_manager)
-        db.flush()
-
     if not target_member:
+        _ensure_role_capacity(db, project_id, ProjectRole.MANAGER)
         target_member = ProjectMember(
             project_id=project_id,
             user_id=payload.user_id,
@@ -1139,6 +1134,8 @@ async def assign_product_manager(
         )
         db.add(target_member)
     else:
+        if target_member.role != ProjectRole.MANAGER:
+            _ensure_role_capacity(db, project_id, ProjectRole.MANAGER, exclude_user_id=payload.user_id)
         target_member.role = ProjectRole.MANAGER
         target_member.assigned_lifecycle_stage = None
 
@@ -1221,14 +1218,8 @@ async def update_project_member_role(
             detail="Product manager can edit only doctor, risk team leader, or specialist roles"
         )
 
-    if role_update.role == ProjectRole.MANAGER:
-        existing_manager = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.role == ProjectRole.MANAGER,
-            ProjectMember.user_id != user_id
-        ).first()
-        if existing_manager:
-            raise HTTPException(status_code=400, detail="Product manager is already assigned")
+    if member.role != role_update.role:
+        _ensure_role_capacity(db, project_id, role_update.role, exclude_user_id=user_id)
 
     # For specialist role, validate assigned_lifecycle_stage
     if role_update.role == ProjectRole.SPECIALIST:
@@ -1237,16 +1228,6 @@ async def update_project_member_role(
         lifecycle_stages = _safe_json_list(db_project.lifecycle_stages) + _safe_json_list(db_project.custom_lifecycle_stages)
         if role_update.assigned_lifecycle_stage not in lifecycle_stages:
             raise HTTPException(status_code=400, detail="Invalid lifecycle stage for this project")
-        # Check that no other specialist is already assigned to this stage
-        existing_specialist = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.role == ProjectRole.SPECIALIST,
-            ProjectMember.assigned_lifecycle_stage == role_update.assigned_lifecycle_stage,
-            ProjectMember.user_id != user_id
-        ).first()
-        if existing_specialist:
-            raise HTTPException(status_code=400, detail=f"A specialist is already assigned to lifecycle stage '{role_update.assigned_lifecycle_stage}'")
-
     old_role = member.role.value
     member.role = role_update.role
     member.assigned_lifecycle_stage = role_update.assigned_lifecycle_stage if role_update.role == ProjectRole.SPECIALIST else None
