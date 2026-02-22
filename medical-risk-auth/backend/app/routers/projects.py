@@ -974,15 +974,20 @@ async def delete_project(
             detail=f"Error deleting project: {str(e)}"
         )
 
-    # Log project deletion
-    await log_project_deleted(
-        db=db,
-        user=current_user,
-        project_id=project_id,
-        project_name=project_name,
-        project_data=project_data,
-        request=request
-    )
+    # Log project deletion. Logging must not break successful deletion response.
+    try:
+        await log_project_deleted(
+            db=db,
+            user=current_user,
+            project_id=project_id,
+            project_name=project_name,
+            project_data=project_data,
+            request=request
+        )
+    except Exception as log_error:
+        # The project is already deleted; changelog write can fail due to FK constraints
+        # or legacy schema differences. Ignore to keep DELETE idempotent for clients.
+        print(f"[!] Warning: failed to log project deletion for project {project_id}: {log_error}")
 
     return {"message": "Project deleted successfully"}
 

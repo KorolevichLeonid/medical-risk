@@ -349,7 +349,6 @@ const ProjectView = () => {
     if (!selectedUser) return;
     const isAdminLimited = isLimitedProjectAdmin();
     const isPm = isProductManager();
-    const currentManager = getCurrentProductManager();
     if (isPm && !isProjectReadyForRoleManagement()) {
       alert('Сначала заполните обязательные поля проекта и выберите минимум один этап жизненного цикла.');
       return;
@@ -383,15 +382,6 @@ const ProjectView = () => {
       }
 
       if (isAdminLimited) {
-        if (currentManager && currentManager.id !== userId) {
-          const confirmed = window.confirm(
-            'Вы точно хотите изменить продукт-менеджера? Текущий продукт-менеджер будет заменен.'
-          );
-          if (!confirmed) {
-            setAddingMember(false);
-            return;
-          }
-        }
         endpoint = `${API_BASE_URL}/api/projects/${id}/product-manager`;
         body = { user_id: userId };
       }
