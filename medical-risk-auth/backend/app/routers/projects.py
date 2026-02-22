@@ -1316,11 +1316,6 @@ async def remove_project_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    if actor_project_role == "admin" and member.role != ProjectRole.MANAGER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Project admin can manage only product manager assignment"
-        )
     if actor_project_role == "manager" and member.role not in {
         ProjectRole.SPECIALIST,
         ProjectRole.DOCTOR,

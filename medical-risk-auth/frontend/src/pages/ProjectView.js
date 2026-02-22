@@ -579,7 +579,7 @@ const ProjectView = () => {
               }}
               style={{ marginRight: '8px' }}
             >
-              {getCurrentProductManager() ? '🔄 Change Product Manager' : '➕ Add Product Manager'}
+              ➕ Add Product Manager
             </button>
           )}
           {!isLimitedProjectAdmin() && (
@@ -723,7 +723,7 @@ const ProjectView = () => {
                       ✎
                     </button>
                   )}
-                  {!isLimitedProjectAdmin() && canAddMembers() && member.role !== 'admin' && (!isProductManager() || ['specialist', 'doctor', 'risk_assessment_team_leader'].includes(member.role)) && (
+                  {canAddMembers() && member.id !== project.ownerId && (!isProductManager() || ['specialist', 'doctor', 'risk_assessment_team_leader'].includes(member.role)) && (
                     <button 
                       className="remove-member-btn"
                       onClick={() => handleRemoveMember(member.id)}
@@ -746,7 +746,7 @@ const ProjectView = () => {
                 setShowAddMember(true);
               }}
             >
-              {isLimitedProjectAdmin() ? (getCurrentProductManager() ? '🔄 Change Product Manager' : '➕ Add Product Manager') : '➕ Add member'}
+              {isLimitedProjectAdmin() ? '➕ Add Product Manager' : '➕ Add member'}
             </button>
           )}
           {isProductManager() && !isProjectReadyForRoleManagement() && (
