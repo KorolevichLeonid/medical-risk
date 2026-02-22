@@ -79,37 +79,12 @@ async def get_current_user(
             )
         return user
     except Exception as e:
-        # DEVELOPMENT BYPASS: If authentication fails, create/use a mock user
-        print(f"⚠️  Authentication failed ({str(e)}), using development mock user")
-        try:
-            # Try to find or create a mock user
-            mock_user = get_user_by_email(db, email="dev@example.com")
-            if not mock_user:
-                mock_user = User(
-                    email="dev@example.com",
-                    azure_object_id="dev-mock-user",
-                    first_name="Dev",
-                    last_name="User",
-                    role=UserRole.SYS_ADMIN,  # Give admin privileges for testing
-                    is_active=True,
-                    is_verified=True,
-                    language="en"
-                )
-                db.add(mock_user)
-                db.commit()
-                db.refresh(mock_user)
-                print("✅ Created development mock user")
-            else:
-                print("✅ Using existing development mock user")
-            return mock_user
-        except Exception as db_error:
-            print(f"❌ Failed to create/use mock user: {db_error}")
-            # If even the mock user fails, raise the original error
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication failed and fallback user creation failed",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        print(f"⚠️  Authentication failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
