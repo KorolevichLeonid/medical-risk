@@ -953,14 +953,27 @@ async def delete_project(
         from ..models.changelog import ChangeLog
         db.query(ChangeLog).filter(ChangeLog.project_id == project_id).delete()
 
-        # 7. Delete project invitations (if the table exists)
-        try:
-            # Try to delete from project_invitations table if it exists
-            from sqlalchemy import text
-            db.execute(text("DELETE FROM project_invitations WHERE project_id = :project_id"), {"project_id": project_id})
-        except Exception:
-            # Table might not exist, continue silently
-            pass
+        # 7. Delete project invitations (if the table exists).
+        # IMPORTANT: in PostgreSQL, executing SQL against a missing table aborts
+        # the whole transaction, so we must check existence first.
+        from sqlalchemy import text
+        invitation_table_exists = db.execute(
+            text(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'project_invitations'
+                )
+                """
+            )
+        ).scalar()
+        if invitation_table_exists:
+            db.execute(
+                text("DELETE FROM project_invitations WHERE project_id = :project_id"),
+                {"project_id": project_id},
+            )
 
         # 8. Finally, delete the project itself
         db.delete(db_project)
