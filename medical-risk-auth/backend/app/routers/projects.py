@@ -1048,6 +1048,17 @@ async def add_project_member(
         lifecycle_stages = _safe_json_list(db_project.lifecycle_stages) + _safe_json_list(db_project.custom_lifecycle_stages)
         if member.assigned_lifecycle_stage not in lifecycle_stages:
             raise HTTPException(status_code=400, detail="Invalid lifecycle stage for this project")
+        # Check that no more than 5 specialists are assigned to this lifecycle stage
+        stage_specialist_count = db.query(ProjectMember).filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.role == ProjectRole.SPECIALIST,
+            ProjectMember.assigned_lifecycle_stage == member.assigned_lifecycle_stage
+        ).count()
+        if stage_specialist_count >= MAX_MEMBERS_PER_NON_ADMIN_ROLE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Specialist limit for lifecycle stage '{member.assigned_lifecycle_stage}' reached (max {MAX_MEMBERS_PER_NON_ADMIN_ROLE})"
+            )
     db_member = ProjectMember(
         project_id=project_id,
         user_id=member.user_id,
@@ -1228,6 +1239,18 @@ async def update_project_member_role(
         lifecycle_stages = _safe_json_list(db_project.lifecycle_stages) + _safe_json_list(db_project.custom_lifecycle_stages)
         if role_update.assigned_lifecycle_stage not in lifecycle_stages:
             raise HTTPException(status_code=400, detail="Invalid lifecycle stage for this project")
+        # Check that no more than 5 specialists are assigned to this lifecycle stage
+        stage_specialist_count = db.query(ProjectMember).filter(
+            ProjectMember.project_id == project_id,
+            ProjectMember.role == ProjectRole.SPECIALIST,
+            ProjectMember.assigned_lifecycle_stage == role_update.assigned_lifecycle_stage,
+            ProjectMember.user_id != user_id
+        ).count()
+        if stage_specialist_count >= MAX_MEMBERS_PER_NON_ADMIN_ROLE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Specialist limit for lifecycle stage '{role_update.assigned_lifecycle_stage}' reached (max {MAX_MEMBERS_PER_NON_ADMIN_ROLE})"
+            )
     old_role = member.role.value
     member.role = role_update.role
     member.assigned_lifecycle_stage = role_update.assigned_lifecycle_stage if role_update.role == ProjectRole.SPECIALIST else None
