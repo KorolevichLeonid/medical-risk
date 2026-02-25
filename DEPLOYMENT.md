@@ -25,11 +25,17 @@ git push origin render
 ### 3. Переменные окружения:
 
 Все необходимые переменные окружения настроены в `render.yaml`:
-- `DATABASE_URL` - автоматически из базы данных
-- `FRONTEND_URL` - автоматически из frontend сервиса
-- `REACT_APP_API_BASE_URL` - автоматически из backend сервиса
-- `SECRET_KEY` - автоматически генерируется
-- `CORS_ORIGINS` - автоматически из frontend URL
+- Backend:
+  - `DATABASE_URL` - автоматически из базы данных
+  - `FRONTEND_URL` - автоматически из frontend сервиса
+  - `CORS_ORIGINS` - автоматически из frontend URL
+  - `SECRET_KEY` - автоматически генерируется
+  - `PYTHON_VERSION`, `PYTHONUNBUFFERED`
+- Frontend:
+  - `REACT_APP_API_BASE_URL` - автоматически из backend сервиса
+  - `REACT_APP_REDIRECT_URI` - автоматически из frontend URL
+  - `REACT_APP_POST_LOGOUT_REDIRECT_URI` - автоматически из frontend URL
+  - `NODE_VERSION`
 
 ### 4. Первый запуск:
 
@@ -63,9 +69,10 @@ medical-risk/
 ## Важные замечания:
 
 1. **База данных**: Используется PostgreSQL на Render (free tier)
-2. **Workers**: Backend запускается с 2 workers для лучшей производительности
+2. **Health check**: Backend проверяется через `/health`
 3. **CORS**: Автоматически настраивается для frontend URL
-4. **Переменные окружения**: Все настраиваются автоматически через render.yaml
+4. **SPA маршруты**: Для React настроен rewrite `/* -> /index.html`
+5. **Переменные окружения**: Все ключевые переменные настраиваются через `render.yaml`
 
 ## Troubleshooting:
 

@@ -164,6 +164,57 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     alert(`Недопустимое значение.\n${label}: допустимые баллы ${allowedValues.join(', ')}`);
   };
 
+  // Поля, которые продукт-менеджер может корректировать на любом этапе (включая закрытые риски).
+  const managerAlwaysEditableColumns = [
+    'control_measure_1',
+    'control_measure_2',
+    'control_measure_3',
+    'verification_1',
+    'verification_2',
+    'verification_3',
+    'new_risks'
+  ];
+
+  const isManagerAlwaysEditableField = (columnKey) =>
+    userRole === 'manager' && managerAlwaysEditableColumns.includes(columnKey);
+
+  const canUseRiskBenefitColumn = () =>
+    userRole === 'manager' || userRole === 'risk_assessment_team_leader';
+
+  const buildScoreOptions = (levels = []) => {
+    const optionsByValue = new Map();
+
+    levels.forEach((level) => {
+      const rawScore = Number(level?.score);
+      const rawLevel = Number(level?.level);
+      const value = Number.isFinite(rawScore) ? rawScore : rawLevel;
+      if (!Number.isFinite(value)) return;
+
+      const name = typeof level?.name === 'string' ? level.name.trim() : '';
+      const description = typeof level?.description === 'string' ? level.description.trim() : '';
+
+      if (!optionsByValue.has(value)) {
+        optionsByValue.set(value, {
+          value,
+          name,
+          description
+        });
+      }
+    });
+
+    return Array.from(optionsByValue.values()).sort((a, b) => a.value - b.value);
+  };
+
+  const severityScoreOptions = useMemo(
+    () => buildScoreOptions(severityLevels),
+    [severityLevels]
+  );
+
+  const probabilityScoreOptions = useMemo(
+    () => buildScoreOptions(probabilityLevels),
+    [probabilityLevels]
+  );
+
   // Проверка, заблокирована ли ячейка для редактирования
   const isCellLocked = (rowIndex, columnKey) => {
     // Получаем данные строки
@@ -175,8 +226,32 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       return true;
     }
 
+    // Анализ остаточного риска/пользы: доступ только у PM и руководителя команды по рискам.
+    if (columnKey === 'risk_benefit_analysis') {
+      if (!canUseRiskBenefitColumn()) return true;
+      if (!row.first_evaluation_done) return true;
+
+      const riskBenefitValue = String(row.risk_benefit_analysis || '').trim().toLowerCase();
+      // В pending_second держим ячейку закрытой только пока она пустая.
+      // Если пользователь уже выбрал "Да"/"Нет", разрешаем быстро переключить значение.
+      if (row.risk_status === 'pending_second' && !['да', 'нет'].includes(riskBenefitValue)) {
+        return true;
+      }
+      const isKnownState = ['да', 'нет', 'ожидание ответа'].includes(riskBenefitValue);
+      if (!isKnownState && !['pending_benefit', 'closed', 'fully_closed'].includes(row.risk_status)) {
+        return true;
+      }
+    }
+
     // Если риск полностью закрыт (fully_closed) - ВСЕ ячейки заблокированы
-    if (row.risk_status === 'fully_closed') {
+    const isLeaderNewRisksField =
+      userRole === 'risk_assessment_team_leader' && columnKey === 'new_risks';
+
+    if (
+      row.risk_status === 'fully_closed' &&
+      !isManagerAlwaysEditableField(columnKey) &&
+      !isLeaderNewRisksField
+    ) {
       return true;
     }
 
@@ -190,7 +265,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         'verification_1', 'verification_2', 'verification_3',
         'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2'
       ];
-      if (lockedUntilColumn20.includes(columnKey)) {
+      if (lockedUntilColumn20.includes(columnKey) && !isManagerAlwaysEditableField(columnKey)) {
         return true;
       }
     }
@@ -203,14 +278,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       }
     }
 
-    // Анализ остаточный риск/польза доступен только после завершения оценок
-    if (columnKey === 'risk_benefit_analysis') {
-      if (!row.first_evaluation_done) return true;
-      if (row.risk_status === 'pending_second') return true;
-    }
-
     // Новые риски доступны только после закрытия риска
     if (columnKey === 'new_risks') {
+      if (isManagerAlwaysEditableField(columnKey)) {
+        return false;
+      }
+      // Руководитель команды по рискам заполняет только после статуса "closed".
+      if (userRole === 'risk_assessment_team_leader') {
+        return row.risk_status !== 'closed' && row.risk_status !== 'fully_closed';
+      }
       return row.risk_status !== 'closed' && row.risk_status !== 'fully_closed';
     }
 
@@ -458,17 +534,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         {rowCells}
       </tr>
     ));
-  };
-
-  // Функция для получения буквы столбца (A, B, C...)
-  const getColumnLetter = (index) => {
-    let letter = '';
-    let num = index;
-    while (num >= 0) {
-      letter = String.fromCharCode(65 + (num % 26)) + letter;
-      num = Math.floor(num / 26) - 1;
-    }
-    return letter;
   };
 
   // Получить название листа (пользовательское или оригинальное)
@@ -995,10 +1060,31 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     };
 
     if (columnKey === 'risk_benefit_analysis') {
-      if (value === 'да' || value === 'нет') {
+      const normalizedValue = String(value || '').trim().toLowerCase();
+      if (normalizedValue === 'да') {
+        newData[rowIndex].risk_benefit_analysis = 'Да';
         newData[rowIndex].risk_status = 'closed';
-      } else {
+        newData[rowIndex].locked_after_second = true;
+      } else if (normalizedValue === 'нет') {
+        newData[rowIndex].risk_benefit_analysis = 'Нет';
+        // Повторный цикл вторичной оценки.
+        newData[rowIndex].risk_status = 'pending_second';
+        newData[rowIndex].locked_after_second = false;
+        newData[rowIndex].second_evaluation_done = false;
+        // Очищаем вторичные оценки, чтобы этап проходился заново.
+        newData[rowIndex].residual_risk_level = '';
+        newData[rowIndex].residual_probability = '';
+        newData[rowIndex].residual_risk_score = '';
+        newData[rowIndex].risk_level_2 = '';
+        newData[rowIndex].comment_2 = '';
+      } else if (normalizedValue === 'ожидание ответа') {
+        newData[rowIndex].risk_benefit_analysis = 'Ожидание ответа';
         newData[rowIndex].risk_status = 'pending_benefit';
+        newData[rowIndex].locked_after_second = true;
+      } else {
+        newData[rowIndex].risk_benefit_analysis = '';
+        newData[rowIndex].risk_status = 'pending_second';
+        newData[rowIndex].locked_after_second = false;
       }
     }
 
@@ -1219,13 +1305,18 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           row.comment_1 = evaluation.comment;
         }
 
-        // Если риск допустим — закрываем и блокируем
+        // Если риск допустим — автоматически считаем ответ "Да" и закрываем риск.
         if (evaluation.isAcceptable) {
-          row.risk_status = 'pending_benefit';
+          row.risk_benefit_analysis = 'Да';
+          row.risk_status = 'closed';
           row.locked_after_second = true;
+          row.second_evaluation_done = false;
         } else {
-          // Недопустим — нужен переход ко вторичной оценке
+          // Недопустим — нужен переход ко вторичной оценке, ячейка анализа пустая.
+          row.risk_benefit_analysis = '';
           row.risk_status = 'pending_second';
+          row.locked_after_second = false;
+          row.second_evaluation_done = false;
         }
       } else if (evaluation.evaluationType === 'second') {
         row.second_evaluation_done = true;
@@ -1236,8 +1327,9 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           row.comment_2 = evaluation.comment;
         }
 
-        // Во вторичной оценке риск всегда закрывается
+        // После вторичной оценки ожидаем решение в столбце анализа риск/польза.
         row.locked_after_second = true;
+        row.risk_benefit_analysis = 'Ожидание ответа';
         row.risk_status = 'pending_benefit';
       }
     });
@@ -1609,6 +1701,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       return false;
     }
 
+    if (columnKey === 'risk_benefit_analysis') {
+      return canUseRiskBenefitColumn();
+    }
+
+    // Продукт-менеджер всегда может корректировать столбцы мер управления и связанных новых рисков.
+    if (isManagerAlwaysEditableField(columnKey)) {
+      return true;
+    }
+
     // Доктор может редактировать только столбцы тяжести
     if (userRole === 'doctor') {
       const severityColumns = ['severity_score', 'residual_risk_level'];
@@ -1933,6 +2034,11 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     // Определяем стиль для всей ячейки
     const cellBackgroundStyle = cellColor && cellColor !== '#FFFFFF' ? { backgroundColor: cellColor } : {};
 
+    const scoreColumns = ['severity_score', 'probability_score', 'residual_risk_level', 'residual_probability'];
+    const isScoreColumn = scoreColumns.includes(column.key);
+    const isSeverityScoreColumn = ['severity_score', 'residual_risk_level'].includes(column.key);
+    const scoreOptions = isSeverityScoreColumn ? severityScoreOptions : probabilityScoreOptions;
+
     return (
       <div
         className="excel-cell-wrapper"
@@ -1963,8 +2069,38 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
               }}
             >
               <option value="">—</option>
-              <option value="да">да</option>
-              <option value="нет">нет</option>
+              {String(value || '').trim().toLowerCase() === 'ожидание ответа' && (
+                <option value="Ожидание ответа">Ожидание ответа</option>
+              )}
+              <option value="Да">Да</option>
+              <option value="Нет">Нет</option>
+            </select>
+          ) : isScoreColumn ? (
+            <select
+              className="excel-cell-input"
+              value={value ? String(value) : ''}
+              onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
+              onBlur={handleCellBlur}
+              autoFocus
+              style={{
+                backgroundColor: 'transparent',
+                width: '100%',
+                height: '100%',
+                boxSizing: 'border-box',
+                position: 'relative',
+                zIndex: 2
+              }}
+            >
+              <option value="">—</option>
+              {scoreOptions.map((option) => {
+                const labelParts = [option.name, option.description].filter(Boolean);
+                const details = labelParts.length ? ` - ${labelParts.join(' | ')}` : '';
+                return (
+                  <option key={option.value} value={String(option.value)}>
+                    {`${option.value}${details}`}
+                  </option>
+                );
+              })}
             </select>
           ) : (
             <input
@@ -2199,7 +2335,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                     style={{ width: getColumnWidth(column.key), minWidth: '60px' }}
                     onClick={() => setShowDeleteColumn(showDeleteColumn === column.key ? null : column.key)}
                   >
-                    {getColumnLetter(index)}
                     {!isAutoManagedSheet() && canDeleteElements() ? (
                       <button
                         className="delete-column-btn"
@@ -2223,9 +2358,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                 ))}
                 <th className="add-column-cell">
                   {isAutoManagedSheet() ? (
-                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '11px' }}>
-                      🔒 Управляется из Risk Analysis
-                    </div>
+                    <div style={{ padding: '8px' }}></div>
                   ) : canAddElements() ? (
                     <button className="add-column-btn" onClick={handleAddNewColumn} title="Добавить столбец">
                       ➕
@@ -2327,9 +2460,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
               <tr>
                 <td className="add-row-cell">
                   {isAutoManagedSheet() ? (
-                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '11px' }}>
-                      🔒 Управляется из Risk Analysis
-                    </div>
+                    <div style={{ padding: '8px' }}></div>
                   ) : canAddElements() ? (
                     <button className="add-row-btn-icon" onClick={handleAddNewRow} title="Добавить строку">
                       ➕
