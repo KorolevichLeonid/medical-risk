@@ -9,6 +9,7 @@ services:
     rootDir: medical-risk-auth/backend
     buildCommand: pip install -r requirements.txt
     startCommand: bash start.sh
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.8"
@@ -16,9 +17,16 @@ services:
         fromDatabase:
           name: medical-risk-db
           property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: FRONTEND_URL
+        fromService:
+          name: medical-risk-frontend
+          type: static
+          property: url
+      - key: CORS_ORIGINS
         fromService:
           name: medical-risk-frontend
           type: static
@@ -29,6 +37,10 @@ services:
     rootDir: medical-risk-auth/frontend
     buildCommand: npm install && npm run build
     staticPublishPath: build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: NODE_VERSION
         value: "20.11.1"
@@ -36,4 +48,14 @@ services:
         fromService:
           name: medical-risk-backend
           type: web
+          property: url
+      - key: REACT_APP_REDIRECT_URI
+        fromService:
+          name: medical-risk-frontend
+          type: static
+          property: url
+      - key: REACT_APP_POST_LOGOUT_REDIRECT_URI
+        fromService:
+          name: medical-risk-frontend
+          type: static
           property: url

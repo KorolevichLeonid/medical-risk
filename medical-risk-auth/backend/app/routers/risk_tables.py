@@ -2,6 +2,7 @@
 Risk management table API router
 """
 import logging
+import json
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -22,6 +23,26 @@ from ..routers.projects import get_project, check_project_access
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _decode_assigned_lifecycle_stages(raw_value) -> List[str]:
+    if not raw_value:
+        return []
+    if isinstance(raw_value, list):
+        return [str(stage).strip() for stage in raw_value if str(stage).strip()]
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        if not value:
+            return []
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return [str(stage).strip() for stage in parsed if str(stage).strip()]
+            except json.JSONDecodeError:
+                pass
+        return [value]
+    return []
 
 
 def clean_orphaned_rows(db: Session, table: RiskManagementTable, project_id: int, sheet_id: str):
@@ -187,8 +208,8 @@ def check_specialist_sheet_access(user: User, project_id: int, sheet_id: str, db
         return False
     if member.role != ProjectRole.SPECIALIST:
         return True  # Non-specialists have access to all sheets
-    # Specialist can only access their assigned lifecycle stage sheet
-    return member.assigned_lifecycle_stage == sheet_id
+    # Specialist can only access assigned lifecycle stage sheets
+    return sheet_id in _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
 
 
 @router.get("/project/{project_id}/sheets/{sheet_id}", response_model=RiskManagementTableResponse)

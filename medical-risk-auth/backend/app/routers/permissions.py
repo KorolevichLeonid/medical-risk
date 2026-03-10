@@ -2,6 +2,7 @@
 Permissions API router
 """
 from typing import List
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,26 @@ from ..models.user import User
 from ..routers.auth import get_current_active_user
 
 router = APIRouter()
+
+
+def _decode_assigned_lifecycle_stages(raw_value):
+    if not raw_value:
+        return []
+    if isinstance(raw_value, list):
+        return [str(stage).strip() for stage in raw_value if str(stage).strip()]
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        if not value:
+            return []
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return [str(stage).strip() for stage in parsed if str(stage).strip()]
+            except json.JSONDecodeError:
+                pass
+        return [value]
+    return []
 
 
 @router.get("/permissions", response_model=List[dict])
@@ -40,6 +61,7 @@ async def get_user_permissions(
     permissions = []
     project_role = None
     assigned_lifecycle_stage = None
+    assigned_lifecycle_stages = []
 
     # System admin has all permissions
     if hasattr(current_user, 'role') and current_user.role == "SYS_ADMIN":
@@ -64,7 +86,8 @@ async def get_user_permissions(
 
                 if member:
                     project_role = member.role.value
-                    assigned_lifecycle_stage = member.assigned_lifecycle_stage
+                    assigned_lifecycle_stages = _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
+                    assigned_lifecycle_stage = assigned_lifecycle_stages[0] if assigned_lifecycle_stages else None
 
             # Get permissions based on project role
             if project_role:
@@ -81,6 +104,7 @@ async def get_user_permissions(
         "project_id": project_id,
         "project_role": project_role,
         "assigned_lifecycle_stage": assigned_lifecycle_stage,
+        "assigned_lifecycle_stages": assigned_lifecycle_stages,
         "permissions": permissions
     }
 

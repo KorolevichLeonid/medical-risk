@@ -296,27 +296,41 @@ def ensure_project_member_extended_columns():
         if "project_members" not in inspector.get_table_names():
             return
 
-        columns = {col["name"] for col in inspector.get_columns("project_members")}
+        project_member_columns = inspector.get_columns("project_members")
+        columns = {col["name"] for col in project_member_columns}
+        assigned_stage_column = next(
+            (col for col in project_member_columns if col.get("name") == "assigned_lifecycle_stage"),
+            None,
+        )
         is_sqlite = engine.url.drivername.startswith("sqlite")
 
-        if "assigned_lifecycle_stage" in columns:
-            return
-
         with engine.begin() as conn:
-            if is_sqlite:
-                try:
+            if "assigned_lifecycle_stage" not in columns:
+                if is_sqlite:
+                    try:
+                        conn.execute(
+                            text("ALTER TABLE project_members ADD COLUMN assigned_lifecycle_stage TEXT")
+                        )
+                    except Exception as e:
+                        if "duplicate column" not in str(e).lower():
+                            raise
+                else:
                     conn.execute(
-                        text("ALTER TABLE project_members ADD COLUMN assigned_lifecycle_stage VARCHAR(255)")
+                        text(
+                            "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS assigned_lifecycle_stage TEXT"
+                        )
                     )
-                except Exception as e:
-                    if "duplicate column" not in str(e).lower():
-                        raise
-            else:
-                conn.execute(
-                    text(
-                        "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS assigned_lifecycle_stage VARCHAR(255)"
+            elif not is_sqlite:
+                # Render/PostgreSQL: promote legacy VARCHAR(255) to TEXT
+                # to safely store JSON arrays with multiple lifecycle stages.
+                column_type = str((assigned_stage_column or {}).get("type", "")).lower()
+                if "character varying" in column_type or "varchar" in column_type:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_members "
+                            "ALTER COLUMN assigned_lifecycle_stage TYPE TEXT"
+                        )
                     )
-                )
     except Exception as e:
         print(f"[!] Error ensuring project member extended columns: {e}")
         raise

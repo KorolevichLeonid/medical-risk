@@ -630,6 +630,13 @@ const normalizeLevelsWithScores = (levels = []) => {
     return null;
   };
 
+  const normalizeLifecycleStages = (stages = []) => {
+    const mapped = (Array.isArray(stages) ? stages : []).map((stage) =>
+      stage === 'operation' ? 'Эксплуатация' : stage
+    );
+    return [...new Set(mapped)];
+  };
+
 const ProjectForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -865,7 +872,7 @@ const ProjectForm = () => {
             { level: 4, score: 4, name: "Частый", description: "Происходит часто (происходит для многих или всех устройств несколько раз за время эксплуатации)" }
           ]),
           riskThreshold: projectData.risk_threshold || 10,
-          lifecycleStages: projectData.lifecycle_stages || [],
+          lifecycleStages: normalizeLifecycleStages(projectData.lifecycle_stages || []),
           customLifecycleStages: projectData.custom_lifecycle_stages || [],
           hazardQuestions: projectData.hazard_questions || {
             active: false,
@@ -1755,11 +1762,11 @@ const ProjectForm = () => {
               <label className="checkbox-label">
                 <input
                   type="checkbox"
-                  name="operation"
-                  checked={formData.lifecycleStages.includes('operation')}
-                  onChange={(e) => handleLifecycleCheckboxChange(e, 'operation')}
+                  name="operation_russian"
+                  checked={formData.lifecycleStages.includes('Эксплуатация')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'Эксплуатация')}
                 />
-                Эксплуатация (использование по назначению)
+                Эксплуатация
               </label>
               <label className="checkbox-label">
                 <input

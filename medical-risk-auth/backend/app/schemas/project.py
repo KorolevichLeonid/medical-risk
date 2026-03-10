@@ -104,7 +104,8 @@ class ProjectMemberBase(BaseModel):
     """Base project member schema"""
     user_id: int
     role: ProjectRole = ProjectRole.SPECIALIST
-    assigned_lifecycle_stage: Optional[str] = None  # For specialist role
+    assigned_lifecycle_stage: Optional[str] = None  # Backward-compatible single stage
+    assigned_lifecycle_stages: Optional[List[str]] = None  # Preferred multi-stage assignment for specialist
 
 
 class ProjectMemberCreate(ProjectMemberBase):
@@ -115,7 +116,8 @@ class ProjectMemberCreate(ProjectMemberBase):
 class ProjectMemberRoleUpdate(BaseModel):
     """Schema for updating a project member role"""
     role: ProjectRole
-    assigned_lifecycle_stage: Optional[str] = None  # For specialist role
+    assigned_lifecycle_stage: Optional[str] = None  # Backward-compatible single stage
+    assigned_lifecycle_stages: Optional[List[str]] = None  # Preferred multi-stage assignment for specialist
 
 
 class ProjectMemberResponse(BaseModel):
@@ -124,7 +126,8 @@ class ProjectMemberResponse(BaseModel):
     project_id: int
     user_id: int
     role: str  # String for compatibility with existing frontend
-    assigned_lifecycle_stage: Optional[str] = None  # For specialist role
+    assigned_lifecycle_stage: Optional[str] = None  # Primary stage for backward compatibility
+    assigned_lifecycle_stages: Optional[List[str]] = None  # Full list of assigned lifecycle stages
     joined_at: datetime
     
     # User information

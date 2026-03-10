@@ -158,7 +158,7 @@ class ProjectMember(Base):
         default=ProjectRole.SPECIALIST,
         nullable=False,
     )  # Project role
-    assigned_lifecycle_stage = Column(String, nullable=True)  # For specialist role: which lifecycle stage they manage
+    assigned_lifecycle_stage = Column(Text, nullable=True)  # Stores one or many lifecycle stages (JSON for multi-stage)
     
     # Timestamps
     joined_at = Column(DateTime(timezone=True), server_default=func.now())

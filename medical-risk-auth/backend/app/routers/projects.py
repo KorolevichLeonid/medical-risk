@@ -176,6 +176,95 @@ def _ensure_role_capacity(db: Session, project_id: int, role: ProjectRole, exclu
         )
 
 
+def _normalize_specialist_lifecycle_stages(single_stage, multiple_stages) -> List[str]:
+    """Normalize specialist lifecycle assignment from legacy/single and new/multi payloads."""
+    normalized: List[str] = []
+    candidates = []
+    if single_stage:
+        candidates.append(single_stage)
+    if isinstance(multiple_stages, list):
+        candidates.extend(multiple_stages)
+
+    for stage in candidates:
+        stage_value = str(stage or "").strip()
+        if stage_value and stage_value not in normalized:
+            normalized.append(stage_value)
+
+    return normalized
+
+
+def _decode_assigned_lifecycle_stages(raw_value) -> List[str]:
+    """Decode assigned lifecycle stages from DB string (legacy plain string or JSON array)."""
+    if not raw_value:
+        return []
+
+    if isinstance(raw_value, list):
+        return _normalize_specialist_lifecycle_stages(None, raw_value)
+
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        if not value:
+            return []
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return _normalize_specialist_lifecycle_stages(None, parsed)
+            except json.JSONDecodeError:
+                pass
+        return [value]
+
+    return []
+
+
+def _encode_assigned_lifecycle_stages(stages: List[str]):
+    if not stages:
+        return None
+    return json.dumps(stages, ensure_ascii=False)
+
+
+def _get_member_assigned_lifecycle_stages(member: ProjectMember) -> List[str]:
+    return _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
+
+
+def _get_member_primary_lifecycle_stage(member: ProjectMember):
+    stages = _get_member_assigned_lifecycle_stages(member)
+    return stages[0] if stages else None
+
+
+def _validate_specialist_stage_capacity(
+    db: Session,
+    project_id: int,
+    requested_stages: List[str],
+    exclude_user_id: int = None,
+):
+    """Validate per-stage specialist capacity for all requested stages."""
+    if not requested_stages:
+        return
+
+    specialist_members = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.role == ProjectRole.SPECIALIST,
+    ).all()
+
+    stage_counts = {}
+    for specialist in specialist_members:
+        if exclude_user_id is not None and specialist.user_id == exclude_user_id:
+            continue
+        for stage in _get_member_assigned_lifecycle_stages(specialist):
+            stage_counts[stage] = stage_counts.get(stage, 0) + 1
+
+    for stage in requested_stages:
+        if stage_counts.get(stage, 0) >= MAX_MEMBERS_PER_NON_ADMIN_ROLE:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Specialist limit for lifecycle stage '{stage}' reached "
+                    f"(max {MAX_MEMBERS_PER_NON_ADMIN_ROLE})"
+                ),
+            )
+
+
 def check_project_access(project: Project, user: User, db: Session):
     """Check if user has access to project"""
     # System admin can access all projects
@@ -493,7 +582,8 @@ async def create_project(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
-                assigned_lifecycle_stage=member.assigned_lifecycle_stage,
+                assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
+                assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
                 user_email=user.email,
                 user_first_name=user.first_name,
@@ -624,7 +714,8 @@ async def read_project(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
-                assigned_lifecycle_stage=member.assigned_lifecycle_stage,
+                assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
+                assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
                 user_email=user.email,
                 user_first_name=user.first_name,
@@ -824,7 +915,8 @@ async def update_project(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
-                assigned_lifecycle_stage=member.assigned_lifecycle_stage,
+                assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
+                assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
                 user_email=member_user.email,
                 user_first_name=member_user.first_name,
@@ -1058,30 +1150,34 @@ async def add_project_member(
 
     _ensure_role_capacity(db, project_id, member.role)
     
-    # For specialist role, validate that assigned_lifecycle_stage is provided
+    specialist_stages: List[str] = []
+    # For specialist role, validate lifecycle stage assignment(s)
     if member.role == ProjectRole.SPECIALIST:
-        if not member.assigned_lifecycle_stage:
-            raise HTTPException(status_code=400, detail="Specialist role requires an assigned lifecycle stage")
-        # Validate lifecycle stage belongs to project
+        specialist_stages = _normalize_specialist_lifecycle_stages(
+            member.assigned_lifecycle_stage,
+            member.assigned_lifecycle_stages,
+        )
+        if not specialist_stages:
+            raise HTTPException(status_code=400, detail="Specialist role requires at least one assigned lifecycle stage")
+
         lifecycle_stages = _safe_json_list(db_project.lifecycle_stages) + _safe_json_list(db_project.custom_lifecycle_stages)
-        if member.assigned_lifecycle_stage not in lifecycle_stages:
-            raise HTTPException(status_code=400, detail="Invalid lifecycle stage for this project")
-        # Check that no more than 5 specialists are assigned to this lifecycle stage
-        stage_specialist_count = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.role == ProjectRole.SPECIALIST,
-            ProjectMember.assigned_lifecycle_stage == member.assigned_lifecycle_stage
-        ).count()
-        if stage_specialist_count >= MAX_MEMBERS_PER_NON_ADMIN_ROLE:
+        invalid_stages = [stage for stage in specialist_stages if stage not in lifecycle_stages]
+        if invalid_stages:
             raise HTTPException(
                 status_code=400,
-                detail=f"Specialist limit for lifecycle stage '{member.assigned_lifecycle_stage}' reached (max {MAX_MEMBERS_PER_NON_ADMIN_ROLE})"
+                detail=f"Invalid lifecycle stage for this project: {', '.join(invalid_stages)}"
             )
+        _validate_specialist_stage_capacity(db, project_id, specialist_stages)
+
     db_member = ProjectMember(
         project_id=project_id,
         user_id=member.user_id,
         role=member.role,  # This will be ProjectRole enum
-        assigned_lifecycle_stage=member.assigned_lifecycle_stage if member.role == ProjectRole.SPECIALIST else None
+        assigned_lifecycle_stage=(
+            _encode_assigned_lifecycle_stages(specialist_stages)
+            if member.role == ProjectRole.SPECIALIST
+            else None
+        )
     )
     db.add(db_member)
     db.commit()
@@ -1105,7 +1201,8 @@ async def add_project_member(
         project_id=db_member.project_id,
         user_id=db_member.user_id,
         role=db_member.role.value,  # Convert enum to string
-        assigned_lifecycle_stage=db_member.assigned_lifecycle_stage,
+        assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(db_member),
+        assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(db_member),
         joined_at=db_member.joined_at,
         user_email=user.email,
         user_first_name=user.first_name,
@@ -1180,7 +1277,8 @@ async def assign_product_manager(
         project_id=target_member.project_id,
         user_id=target_member.user_id,
         role=target_member.role.value,
-        assigned_lifecycle_stage=target_member.assigned_lifecycle_stage,
+        assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(target_member),
+        assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(target_member),
         joined_at=target_member.joined_at,
         user_email=target_user.email,
         user_first_name=target_user.first_name,
@@ -1250,28 +1348,37 @@ async def update_project_member_role(
     if member.role != role_update.role:
         _ensure_role_capacity(db, project_id, role_update.role, exclude_user_id=user_id)
 
-    # For specialist role, validate assigned_lifecycle_stage
+    specialist_stages: List[str] = []
+    # For specialist role, validate lifecycle stage assignment(s)
     if role_update.role == ProjectRole.SPECIALIST:
-        if not role_update.assigned_lifecycle_stage:
-            raise HTTPException(status_code=400, detail="Specialist role requires an assigned lifecycle stage")
+        specialist_stages = _normalize_specialist_lifecycle_stages(
+            role_update.assigned_lifecycle_stage,
+            role_update.assigned_lifecycle_stages,
+        )
+        if not specialist_stages:
+            raise HTTPException(status_code=400, detail="Specialist role requires at least one assigned lifecycle stage")
+
         lifecycle_stages = _safe_json_list(db_project.lifecycle_stages) + _safe_json_list(db_project.custom_lifecycle_stages)
-        if role_update.assigned_lifecycle_stage not in lifecycle_stages:
-            raise HTTPException(status_code=400, detail="Invalid lifecycle stage for this project")
-        # Check that no more than 5 specialists are assigned to this lifecycle stage
-        stage_specialist_count = db.query(ProjectMember).filter(
-            ProjectMember.project_id == project_id,
-            ProjectMember.role == ProjectRole.SPECIALIST,
-            ProjectMember.assigned_lifecycle_stage == role_update.assigned_lifecycle_stage,
-            ProjectMember.user_id != user_id
-        ).count()
-        if stage_specialist_count >= MAX_MEMBERS_PER_NON_ADMIN_ROLE:
+        invalid_stages = [stage for stage in specialist_stages if stage not in lifecycle_stages]
+        if invalid_stages:
             raise HTTPException(
                 status_code=400,
-                detail=f"Specialist limit for lifecycle stage '{role_update.assigned_lifecycle_stage}' reached (max {MAX_MEMBERS_PER_NON_ADMIN_ROLE})"
+                detail=f"Invalid lifecycle stage for this project: {', '.join(invalid_stages)}"
             )
+        _validate_specialist_stage_capacity(
+            db,
+            project_id,
+            specialist_stages,
+            exclude_user_id=user_id,
+        )
+
     old_role = member.role.value
     member.role = role_update.role
-    member.assigned_lifecycle_stage = role_update.assigned_lifecycle_stage if role_update.role == ProjectRole.SPECIALIST else None
+    member.assigned_lifecycle_stage = (
+        _encode_assigned_lifecycle_stages(specialist_stages)
+        if role_update.role == ProjectRole.SPECIALIST
+        else None
+    )
     db.commit()
     db.refresh(member)
 
@@ -1294,7 +1401,8 @@ async def update_project_member_role(
         project_id=member.project_id,
         user_id=member.user_id,
         role=member.role.value,
-        assigned_lifecycle_stage=member.assigned_lifecycle_stage,
+        assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
+        assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
         joined_at=member.joined_at,
         user_email=member_user.email if member_user else "",
         user_first_name=member_user.first_name if member_user else "",
@@ -1435,7 +1543,8 @@ async def get_project_members(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
-                assigned_lifecycle_stage=member.assigned_lifecycle_stage,
+                assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
+                assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
                 user_email=user.email,
                 user_first_name=user.first_name,
@@ -1508,6 +1617,7 @@ async def get_my_project_role(
     # Determine user's role in this project
     user_role = None
     assigned_lifecycle_stage = None
+    assigned_lifecycle_stages = []
     if current_user.role == UserRole.SYS_ADMIN:
         # Sys admin is always admin in every project
         user_role = "admin"
@@ -1523,7 +1633,8 @@ async def get_my_project_role(
             ).first()
             if member:
                 user_role = member.role.value
-                assigned_lifecycle_stage = member.assigned_lifecycle_stage
+                assigned_lifecycle_stages = _get_member_assigned_lifecycle_stages(member)
+                assigned_lifecycle_stage = assigned_lifecycle_stages[0] if assigned_lifecycle_stages else None
 
     # Deserialize lifecycle stages
     def safe_json_load(data):
@@ -1542,6 +1653,7 @@ async def get_my_project_role(
         "user_id": current_user.id,
         "user_role": user_role,
         "assigned_lifecycle_stage": assigned_lifecycle_stage,
+        "assigned_lifecycle_stages": assigned_lifecycle_stages,
         "user_name": f"{current_user.first_name} {current_user.last_name}",
         "project_name": db_project.name,
         "lifecycle_stages": lifecycle_stages_data,

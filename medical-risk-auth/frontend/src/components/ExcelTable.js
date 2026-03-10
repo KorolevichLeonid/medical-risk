@@ -5,6 +5,23 @@ import BatchRiskEvaluation from './BatchRiskEvaluation';
 import API_BASE_URL from '../config';
 
 const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
+  const MIN_ZOOM = 60;
+  const MAX_ZOOM = 150;
+  const ZOOM_STEP = 5;
+  const REOPENED_SECOND_EVAL_COLUMNS = [
+    'residual_risk_level',
+    'residual_probability',
+    'residual_risk_score',
+    'risk_level_2',
+    'comment_2'
+  ];
+  const SECOND_EVAL_HINT_FIELD_MAP = {
+    residual_risk_level: 'previous_residual_risk_level',
+    residual_probability: 'previous_residual_probability',
+    residual_risk_score: 'previous_residual_risk_score',
+    risk_level_2: 'previous_risk_level_2',
+    comment_2: 'previous_comment_2'
+  };
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -24,12 +41,31 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [userRole, setUserRole] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
   const [loadingRole, setLoadingRole] = useState(true);
-  const [assignedLifecycleStage, setAssignedLifecycleStage] = useState(null);
+  const [assignedLifecycleStages, setAssignedLifecycleStages] = useState([]);
   
   // Состояние для оценки рисков
   const [showBatchEvaluation, setShowBatchEvaluation] = useState(false);
   const [risksToEvaluate, setRisksToEvaluate] = useState([]);
   const [dataBeforeChanges, setDataBeforeChanges] = useState(null); // Snapshot данных при последнем сохранении
+  const [zoomPercent, setZoomPercent] = useState(100);
+
+  const normalizeLifecycleStages = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed.filter(Boolean) : [trimmed];
+        } catch (error) {
+          return [trimmed];
+        }
+      }
+      return [trimmed];
+    }
+    return [];
+  };
 
   // Глобальное отслеживание изменений по всем листам
   const [allSheetsChanges, setAllSheetsChanges] = useState(() => {
@@ -122,13 +158,14 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   
   const sheets = [...baseSheets, ...customSheets];
 
-  // Проверка, является ли лист автоматически управляемым из Risk Analysis
-  const isAutoManagedSheet = () => {
-    // Для стандартных этапов жизненного цикла листы управляются из Risk Analysis
-    return ['operation', 'maintenance', 'storage', 'transport', 'disposal'].includes(activeSheet) ||
-           lifecycleStages.includes(activeSheet) ||
-           customLifecycleStages.includes(activeSheet);
+  const isAutoManagedSheetId = (sheetId) => {
+    return ['operation', 'maintenance', 'storage', 'transport', 'disposal'].includes(sheetId) ||
+      lifecycleStages.includes(sheetId) ||
+      customLifecycleStages.includes(sheetId);
   };
+
+  // Проверка, является ли лист автоматически управляемым из Risk Analysis
+  const isAutoManagedSheet = () => isAutoManagedSheetId(activeSheet);
 
   const getScoreValues = (levels = []) => {
     const values = levels
@@ -151,6 +188,39 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     () => getScoreValues(probabilityLevels),
     [probabilityLevels]
   );
+
+  const applyRiskBenefitSelectionOnSave = (rowDataOnly) => {
+    const normalizedRiskBenefit = String(rowDataOnly.risk_benefit_analysis || '').trim().toLowerCase();
+
+    if (normalizedRiskBenefit === 'нет') {
+      REOPENED_SECOND_EVAL_COLUMNS.forEach((field) => {
+        const hintField = SECOND_EVAL_HINT_FIELD_MAP[field];
+        if (!hintField) return;
+        const currentValue = rowDataOnly[field];
+        const existingHint = rowDataOnly[hintField];
+        if (String(currentValue || '').trim() !== '') {
+          rowDataOnly[hintField] = currentValue;
+        } else if (String(existingHint || '').trim() !== '') {
+          rowDataOnly[hintField] = existingHint;
+        } else {
+          rowDataOnly[hintField] = '';
+        }
+      });
+      rowDataOnly.risk_benefit_analysis = 'Ожидание ответа';
+      rowDataOnly.risk_status = 'pending_second';
+      rowDataOnly.locked_after_second = false;
+      rowDataOnly.second_evaluation_done = false;
+      rowDataOnly.residual_risk_level = '';
+      rowDataOnly.residual_probability = '';
+      rowDataOnly.residual_risk_score = '';
+      rowDataOnly.risk_level_2 = '';
+      rowDataOnly.comment_2 = '';
+    } else if (normalizedRiskBenefit === 'ожидание ответа') {
+      rowDataOnly.risk_benefit_analysis = 'Ожидание ответа';
+      rowDataOnly.risk_status = 'pending_benefit';
+      rowDataOnly.locked_after_second = true;
+    }
+  };
 
   const showAllowedScoresAlert = (columnKey, allowedValues) => {
     if (!allowedValues.length) return;
@@ -230,15 +300,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     if (columnKey === 'risk_benefit_analysis') {
       if (!canUseRiskBenefitColumn()) return true;
       if (!row.first_evaluation_done) return true;
+      // Во время повторного цикла оценки (pending_second) поле полностью заблокировано.
+      if (row.risk_status === 'pending_second') return true;
 
       const riskBenefitValue = String(row.risk_benefit_analysis || '').trim().toLowerCase();
-      // В pending_second держим ячейку закрытой только пока она пустая.
-      // Если пользователь уже выбрал "Да"/"Нет", разрешаем быстро переключить значение.
-      if (row.risk_status === 'pending_second' && !['да', 'нет'].includes(riskBenefitValue)) {
-        return true;
-      }
       const isKnownState = ['да', 'нет', 'ожидание ответа'].includes(riskBenefitValue);
-      if (!isKnownState && !['pending_benefit', 'closed', 'fully_closed'].includes(row.risk_status)) {
+      if (!isKnownState && !['pending_second', 'pending_benefit', 'closed', 'fully_closed'].includes(row.risk_status)) {
         return true;
       }
     }
@@ -280,6 +347,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
     // Новые риски доступны только после закрытия риска
     if (columnKey === 'new_risks') {
+      // Специалист по ЖЦ никогда не редактирует этот столбец.
+      if (userRole === 'specialist') {
+        return true;
+      }
       if (isManagerAlwaysEditableField(columnKey)) {
         return false;
       }
@@ -405,7 +476,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       // Для обычных листов - простая структура
       return (
         <tr>
-          <th className="row-number-header">№</th>
+          <th className="row-number-header"></th>
           {columns.map(column => (
             <th 
               key={column.key} 
@@ -447,7 +518,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const rows = [[], [], []]; // 3 уровня заголовков
 
     // Первый ряд - верхний уровень
-    rows[0].push(<th key="number-0" className="row-number-header" rowSpan={3}>№</th>);
+    rows[0].push(<th key="number-0" className="row-number-header" rowSpan={3}></th>);
     
     columnStructure.forEach((col, index) => {
       if (col.rowspan) {
@@ -460,7 +531,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
             rowSpan={col.rowspan}
           >
             <div className="column-header-content" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {isAutoManagedSheet() && ['hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'].includes(col.key) && <span title="Столбец управляется из Risk Analysis">🔒</span>}
               {col.label}
             </div>
           </th>
@@ -523,11 +593,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         });
       }
     });
-
-    // Добавляем пустую ячейку в конце каждого ряда
-    rows[0].push(<th key="empty-0"></th>);
-    rows[1].push(<th key="empty-1"></th>);
-    rows[2].push(<th key="empty-2"></th>);
 
     return rows.map((rowCells, rowIndex) => (
       <tr key={`header-row-${rowIndex}`}>
@@ -692,7 +757,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   const getRowHeight = (rowIndex) => {
     const heightKey = `${activeSheet}_${rowIndex}`;
-    return rowHeights[heightKey] || '40px';
+    return rowHeights[heightKey] || null;
   };
 
   const handleColumnResizeStart = (columnKey, e) => {
@@ -707,7 +772,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     e.preventDefault();
     const heightKey = `${activeSheet}_${rowIndex}`;
     const heightValue = rowHeights[heightKey];
-    const startHeight = heightValue ? parseInt(heightValue) : 40;
+    const parsedHeight = heightValue ? parseInt(heightValue, 10) : NaN;
+    const rowElement = e.currentTarget?.closest('tr');
+    const fallbackHeight = rowElement?.offsetHeight || 40;
+    const startHeight = Number.isFinite(parsedHeight) ? parsedHeight : fallbackHeight;
     setResizing({ type: 'row', key: rowIndex, startY: e.clientY, startHeight });
   };
 
@@ -868,14 +936,19 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         }
 
         setUserRole(roleData.user_role);
-        const assignedStage = roleData.assigned_lifecycle_stage || null;
-        setAssignedLifecycleStage(assignedStage);
+        const stagesFromApi = normalizeLifecycleStages(roleData.assigned_lifecycle_stages);
+        const resolvedStages =
+          stagesFromApi.length > 0
+            ? stagesFromApi
+            : normalizeLifecycleStages(roleData.assigned_lifecycle_stage);
+        const primaryAssignedStage = resolvedStages[0] || null;
+        setAssignedLifecycleStages(resolvedStages);
         setLifecycleStages(roleData.lifecycle_stages || []);
         setCustomLifecycleStages(roleData.custom_lifecycle_stages || []);
         
         // Специалист автоматически переключается на свой лист ЖЦ
-        if (roleData.user_role === 'specialist' && assignedStage && activeSheet !== assignedStage) {
-          setActiveSheet(assignedStage);
+        if (roleData.user_role === 'specialist' && primaryAssignedStage && activeSheet !== primaryAssignedStage) {
+          setActiveSheet(primaryAssignedStage);
         }
 
         // Получаем информацию о проекте для получения порога риска и уровней
@@ -1062,29 +1135,38 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     if (columnKey === 'risk_benefit_analysis') {
       const normalizedValue = String(value || '').trim().toLowerCase();
       if (normalizedValue === 'да') {
+        REOPENED_SECOND_EVAL_COLUMNS.forEach((field) => {
+          const hintField = SECOND_EVAL_HINT_FIELD_MAP[field];
+          if (!hintField) return;
+          if (String(newData[rowIndex][field] || '').trim() === '' && String(newData[rowIndex][hintField] || '').trim() !== '') {
+            newData[rowIndex][field] = newData[rowIndex][hintField];
+          }
+        });
         newData[rowIndex].risk_benefit_analysis = 'Да';
         newData[rowIndex].risk_status = 'closed';
         newData[rowIndex].locked_after_second = true;
+        if (
+          String(newData[rowIndex].residual_risk_level || '').trim() !== '' &&
+          String(newData[rowIndex].residual_probability || '').trim() !== '' &&
+          String(newData[rowIndex].residual_risk_score || '').trim() !== ''
+        ) {
+          newData[rowIndex].second_evaluation_done = true;
+        }
       } else if (normalizedValue === 'нет') {
+        // До сохранения только фиксируем выбор "Нет", без блокировки и очистки.
         newData[rowIndex].risk_benefit_analysis = 'Нет';
-        // Повторный цикл вторичной оценки.
-        newData[rowIndex].risk_status = 'pending_second';
-        newData[rowIndex].locked_after_second = false;
-        newData[rowIndex].second_evaluation_done = false;
-        // Очищаем вторичные оценки, чтобы этап проходился заново.
-        newData[rowIndex].residual_risk_level = '';
-        newData[rowIndex].residual_probability = '';
-        newData[rowIndex].residual_risk_score = '';
-        newData[rowIndex].risk_level_2 = '';
-        newData[rowIndex].comment_2 = '';
       } else if (normalizedValue === 'ожидание ответа') {
+        // До сохранения просто фиксируем отображаемое значение.
         newData[rowIndex].risk_benefit_analysis = 'Ожидание ответа';
-        newData[rowIndex].risk_status = 'pending_benefit';
-        newData[rowIndex].locked_after_second = true;
       } else {
         newData[rowIndex].risk_benefit_analysis = '';
-        newData[rowIndex].risk_status = 'pending_second';
-        newData[rowIndex].locked_after_second = false;
+      }
+    }
+
+    if (REOPENED_SECOND_EVAL_COLUMNS.includes(columnKey) && String(value || '').trim() !== '') {
+      const hintField = SECOND_EVAL_HINT_FIELD_MAP[columnKey];
+      if (hintField) {
+        newData[rowIndex][hintField] = '';
       }
     }
 
@@ -1411,6 +1493,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       delete rowDataOnly.isNew;
       delete rowDataOnly.cell_colors;
 
+      if (isAutoManagedSheetId(sheetId)) {
+        applyRiskBenefitSelectionOnSave(rowDataOnly);
+      }
+
       // Получаем цвета ячеек для конкретной строки
       const cellColorsForRow = {};
       Object.entries(cellColors)
@@ -1466,6 +1552,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         delete rowDataOnly.id;
         delete rowDataOnly.isNew;
         delete rowDataOnly.cell_colors;
+
+        if (isAutoManagedSheet()) {
+          applyRiskBenefitSelectionOnSave(rowDataOnly);
+        }
 
         // Получаем цвета ячеек для конкретной строки
         const cellColorsForRow = {};
@@ -1730,14 +1820,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     }
 
     // Столбцы вероятности — assess_probability
-    // Руководитель команды может оценивать вероятность только после оценки тяжести от доктора
+    // Руководитель команды и продукт-менеджер могут оценивать вероятность только после оценки тяжести от доктора
     const probabilityColumns = ['probability_score', 'residual_probability'];
     if (probabilityColumns.includes(columnKey)) {
-      if (!userPermissions.includes('assess_probability')) {
+      const canAssessProbability = userPermissions.includes('assess_probability') || userRole === 'manager';
+      if (!canAssessProbability) {
         return false;
       }
-      // Для руководителя команды проверяем наличие соответствующей оценки тяжести
-      if (userRole === 'risk_assessment_team_leader' && row) {
+      // Для руководителя команды и продукт-менеджера проверяем наличие соответствующей оценки тяжести
+      if ((userRole === 'risk_assessment_team_leader' || userRole === 'manager') && row) {
         if (columnKey === 'probability_score') {
           // Для первичной вероятности нужна первичная оценка тяжести
           const hasSeverity = row.severity_score && row.severity_score.toString().trim() !== '';
@@ -1760,22 +1851,23 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   };
 
   // Получить стиль для ячейки в зависимости от прав доступа
-  const getCellStyle = (columnKey, cellColor, row = null) => {
+  const getCellStyle = (columnKey, row = null) => {
     const canEdit = canEditColumn(columnKey, row);
 
     if (!canEdit) {
-      // Недоступные для редактирования ячейки выделяем серым
       return {
-        backgroundColor: '#f5f5f5',
-        color: '#999',
+        backgroundColor: 'transparent',
+        color: '#000000',
         cursor: 'not-allowed',
-        opacity: 0.7
+        opacity: 1
       };
     }
 
-    // Цвет фона теперь управляется только через cellColors state
     return {
-      backgroundColor: 'transparent'
+      backgroundColor: 'transparent',
+      color: '#000000',
+      cursor: 'text',
+      opacity: 1
     };
   };
 
@@ -1972,18 +2064,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     let value = row[column.key] || '';
     const cellColor = getCellColor(rowIndex, column.key);
     const canEdit = canEditColumn(column.key, row);
-    const cellStyle = getCellStyle(column.key, cellColor, row);
+    const cellStyle = getCellStyle(column.key, row);
     const isLocked = isCellLocked(rowIndex, column.key);
+    const isVisuallyLocked = isLocked || !canEdit;
     const handleCellClick = (e) => {
       e.stopPropagation();
-      if (isLocked) {
-        return;
-      }
-      // Для руководителя команды блокируем клик по столбцам вероятности, если нет соответствующей оценки тяжести
-      if (userRole === 'risk_assessment_team_leader' && !canEdit) {
+      // Для руководителя команды и продукт-менеджера объясняем блокировку вероятности, если нет оценки тяжести
+      if ((userRole === 'risk_assessment_team_leader' || userRole === 'manager') && !canEdit) {
         const probabilityColumns = ['probability_score', 'residual_probability'];
         if (probabilityColumns.includes(column.key)) {
-          // Показываем сообщение, почему нельзя редактировать
           if (column.key === 'probability_score' && (!row.severity_score || row.severity_score.toString().trim() === '')) {
             alert('Необходимо сначала получить оценку тяжести от доктора в столбце "Тяжесть вреда, балл"');
             return;
@@ -1992,8 +2081,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
             return;
           }
         }
+      }
+
+      if (isVisuallyLocked) {
         return;
       }
+
       if (!isEditing && canEdit) {
         handleCellDoubleClick(rowIndex, column.key);
       }
@@ -2030,9 +2123,13 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     // Проверяем, является ли ячейка измененной
     const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
     const isModified = modifiedCells.has(cellKey);
-
-    // Определяем стиль для всей ячейки
-    const cellBackgroundStyle = cellColor && cellColor !== '#FFFFFF' ? { backgroundColor: cellColor } : {};
+    const hintField = SECOND_EVAL_HINT_FIELD_MAP[column.key];
+    const hintValue = hintField ? row[hintField] : '';
+    const shouldShowReopenedHint =
+      REOPENED_SECOND_EVAL_COLUMNS.includes(column.key) &&
+      !isEditing &&
+      String(value || '').trim() === '' &&
+      String(hintValue || '').trim() !== '';
 
     const scoreColumns = ['severity_score', 'probability_score', 'residual_risk_level', 'residual_probability'];
     const isScoreColumn = scoreColumns.includes(column.key);
@@ -2046,12 +2143,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           height: '100%',
           width: '100%',
           position: 'relative',
-          backgroundColor: isLocked ? '#f0f0f0' : 'transparent',
-          cursor: isLocked ? 'not-allowed' : canEdit ? 'text' : 'not-allowed'
+          backgroundColor: isVisuallyLocked ? '#e5e7eb' : '#ffffff',
+          cursor: isVisuallyLocked ? 'not-allowed' : 'text'
         }}
         onClick={handleCellClick}
       >
-        {isEditing && canEdit && !isLocked ? (
+        {isEditing && canEdit && !isVisuallyLocked ? (
           column.key === 'risk_benefit_analysis' ? (
             <select
               className="excel-cell-input"
@@ -2068,10 +2165,9 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                 zIndex: 2
               }}
             >
-              <option value="">—</option>
-              {String(value || '').trim().toLowerCase() === 'ожидание ответа' && (
-                <option value="Ожидание ответа">Ожидание ответа</option>
-              )}
+              <option value="Ожидание ответа">
+                Ожидание ответа
+              </option>
               <option value="Да">Да</option>
               <option value="Нет">Нет</option>
             </select>
@@ -2133,9 +2229,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
               position: 'relative',
               zIndex: 2
             }}
-            title={isLocked ? 'Эта ячейка управляется из Risk Analysis' : ''}
+            title={isVisuallyLocked ? 'Эта ячейка недоступна для редактирования' : ''}
           >
             {value || ''}
+            {shouldShowReopenedHint && (
+              <span className="excel-cell-ghost-hint">{hintValue}</span>
+            )}
           </div>
         )}
       </div>
@@ -2154,6 +2253,20 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       </div>
     );
   }
+
+  const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+
+  const handleZoomChange = (nextZoom) => {
+    setZoomPercent(clampZoom(nextZoom));
+  };
+
+  const handleTableWheel = (event) => {
+    // Trackpad pinch in Chromium emits Ctrl+wheel (same behavior as Excel/Sheets).
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? -1 : 1;
+    handleZoomChange(zoomPercent + direction * ZOOM_STEP);
+  };
 
   return (
     <div className="excel-table-modal">
@@ -2246,8 +2359,8 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
         {/* Вкладки листов */}
         <div className="excel-tabs">
-          {(userRole === 'specialist' && assignedLifecycleStage 
-            ? sheets.filter(sheet => sheet.id === assignedLifecycleStage || sheet.id === 'sheet7')
+          {(userRole === 'specialist'
+            ? sheets.filter(sheet => assignedLifecycleStages.includes(sheet.id) || sheet.id === 'sheet7')
             : sheets
           ).map(sheet => {
             const sheetChanges = allSheetsChanges[sheet.id]?.size || 0;
@@ -2322,13 +2435,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
 
         {/* Таблица */}
-        <div className="excel-table-scroll">
+        <div className="excel-table-scroll" onWheel={handleTableWheel}>
+          <div className="excel-table-zoom-content" style={{ zoom: `${zoomPercent}%` }}>
           <table className="excel-table">
             <thead>
-              {/* Ряд с буквами столбцов */}
-              <tr className="column-letters-row">
+              {/* Технический ряд управления столбцами.
+                  Для листов рисков остается в DOM, но скрывается стилями. */}
+              <tr className={`column-letters-row ${isAutoManagedSheet() ? 'hidden-for-risk' : ''}`}>
                 <th className="row-number-header"></th>
-                {columns.map((column, index) => (
+                {columns.map((column) => (
                   <th 
                     key={`letter-${column.key}`} 
                     className={`column-letter ${showDeleteColumn === column.key ? 'show-delete' : ''}`}
@@ -2356,19 +2471,19 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                     />
                   </th>
                 ))}
-                <th className="add-column-cell">
-                  {isAutoManagedSheet() ? (
-                    <div style={{ padding: '8px' }}></div>
-                  ) : canAddElements() ? (
-                    <button className="add-column-btn" onClick={handleAddNewColumn} title="Добавить столбец">
-                      ➕
-                    </button>
-                  ) : (
-                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '12px' }}>
-                      Нет прав
-                    </div>
-                  )}
-                </th>
+                {!isAutoManagedSheet() && (
+                  <th className="add-column-cell">
+                    {canAddElements() ? (
+                      <button className="add-column-btn" onClick={handleAddNewColumn} title="Добавить столбец">
+                        ➕
+                      </button>
+                    ) : (
+                      <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '12px' }}>
+                        Нет прав
+                      </div>
+                    )}
+                  </th>
+                )}
               </tr>
 
               {/* Иерархические заголовки столбцов */}
@@ -2376,7 +2491,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
             </thead>
             <tbody>
               {data.map((row, rowIndex) => (
-                <tr key={rowIndex} style={{ height: getRowHeight(rowIndex) }}>
+                <tr key={rowIndex} style={getRowHeight(rowIndex) ? { height: getRowHeight(rowIndex) } : undefined}>
                   <td 
                     className={`row-number-cell ${showDeleteRow === rowIndex ? 'show-delete' : ''}`}
                     style={{ position: 'relative' }}
@@ -2433,8 +2548,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                   </td>
                   {columns.map(column => {
                     const cellKey = `${activeSheet}_${rowIndex}_${column.key}`;
-                    const cellColor = cellColors[cellKey];
-                    const cellBgColor = cellColor && cellColor !== '#FFFFFF' ? cellColor : 'transparent';
                     const isModified = modifiedCells.has(cellKey);
 
                     return (
@@ -2443,41 +2556,68 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
                         className={`editable ${isModified ? 'modified-cell' : ''}`}
                         style={{
                           width: getColumnWidth(column.key),
-                          minWidth: '60px',
-                          backgroundColor: cellBgColor
+                          minWidth: '60px'
                         }}
                       >
-                        <div className="excel-cell-wrapper">
-                          {renderCell(row, column, rowIndex)}
-                        </div>
+                        {renderCell(row, column, rowIndex)}
                       </td>
                     );
                   })}
-                  <td></td>
+                  {!isAutoManagedSheet() && <td></td>}
                 </tr>
               ))}
-              {/* Строка с кнопкой добавления */}
-              <tr>
-                <td className="add-row-cell">
-                  {isAutoManagedSheet() ? (
-                    <div style={{ padding: '8px' }}></div>
-                  ) : canAddElements() ? (
-                    <button className="add-row-btn-icon" onClick={handleAddNewRow} title="Добавить строку">
-                      ➕
-                    </button>
-                  ) : (
-                    <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '12px' }}>
-                      Нет прав
-                    </div>
-                  )}
-                </td>
-                {columns.map(column => (
-                  <td key={`add-${column.key}`}></td>
-                ))}
-                <td></td>
-              </tr>
+              {/* Строка с кнопкой добавления — только для неавтоматических листов */}
+              {!isAutoManagedSheet() && (
+                <tr>
+                  <td className="add-row-cell">
+                    {canAddElements() ? (
+                      <button className="add-row-btn-icon" onClick={handleAddNewRow} title="Добавить строку">
+                        ➕
+                      </button>
+                    ) : (
+                      <div style={{ padding: '8px', textAlign: 'center', color: '#999', fontSize: '12px' }}>
+                        Нет прав
+                      </div>
+                    )}
+                  </td>
+                  {columns.map(column => (
+                    <td key={`add-${column.key}`}></td>
+                  ))}
+                  <td></td>
+                </tr>
+              )}
             </tbody>
           </table>
+          </div>
+          <div className="excel-zoom-controls">
+            <button
+              type="button"
+              className="excel-zoom-btn"
+              onClick={() => handleZoomChange(zoomPercent - ZOOM_STEP)}
+              aria-label="Уменьшить масштаб таблицы"
+            >
+              -
+            </button>
+            <input
+              type="range"
+              min={MIN_ZOOM}
+              max={MAX_ZOOM}
+              step={ZOOM_STEP}
+              value={zoomPercent}
+              onChange={(e) => handleZoomChange(Number(e.target.value))}
+              className="excel-zoom-slider"
+              aria-label="Масштаб таблицы"
+            />
+            <button
+              type="button"
+              className="excel-zoom-btn"
+              onClick={() => handleZoomChange(zoomPercent + ZOOM_STEP)}
+              aria-label="Увеличить масштаб таблицы"
+            >
+              +
+            </button>
+            <span className="excel-zoom-value">{zoomPercent}%</span>
+          </div>
         </div>
       </div>
       

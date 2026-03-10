@@ -823,6 +823,24 @@
   border-left: 3px solid #e2e8f0;
 }
 
+.lifecycle-stage-checkbox-list {
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.lifecycle-stage-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  color: #111827;
+  font-size: 14px;
+}
+
 .modal-actions {
   display: flex;
   gap: 15px;

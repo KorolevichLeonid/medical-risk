@@ -14,14 +14,47 @@ const ProjectView = () => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedRole, setSelectedRole] = useState('specialist');
-  const [selectedLifecycleStage, setSelectedLifecycleStage] = useState('');
+  const [selectedLifecycleStages, setSelectedLifecycleStages] = useState([]);
   const [addingMember, setAddingMember] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showRiskTable, setShowRiskTable] = useState(false);
   const [showEditMemberRole, setShowEditMemberRole] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState(null);
   const [roleToEdit, setRoleToEdit] = useState('specialist');
-  const [lifecycleStageToEdit, setLifecycleStageToEdit] = useState('');
+  const [lifecycleStagesToEdit, setLifecycleStagesToEdit] = useState([]);
+
+  const normalizeLifecycleStages = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed.filter(Boolean) : [trimmed];
+        } catch (error) {
+          return [trimmed];
+        }
+      }
+      return [trimmed];
+    }
+    return [];
+  };
+
+  const getMemberLifecycleStages = (member) => {
+    const stages = normalizeLifecycleStages(member?.assigned_lifecycle_stages);
+    if (stages.length > 0) return stages;
+    return normalizeLifecycleStages(member?.assigned_lifecycle_stage);
+  };
+
+  const toggleStageInList = (stage, setter) => {
+    if (!stage) return;
+    setter(prev =>
+      prev.includes(stage)
+        ? prev.filter(item => item !== stage)
+        : [...prev, stage]
+    );
+  };
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -137,6 +170,7 @@ const ProjectView = () => {
               id: member.user_id,
               name: `${member.user_first_name} ${member.user_last_name}`,
               role: member.role,
+              assigned_lifecycle_stages: getMemberLifecycleStages(member),
               assigned_lifecycle_stage: member.assigned_lifecycle_stage || null,
               email: member.user_email,
               avatar: '/api/placeholder/40/40'
@@ -182,14 +216,26 @@ const ProjectView = () => {
     if (!showAddMember) return;
     if (isLimitedProjectAdmin()) {
       setSelectedRole('manager');
-      setSelectedLifecycleStage('');
+      setSelectedLifecycleStages([]);
       return;
     }
     if (isProductManager()) {
       setSelectedRole('specialist');
-      setSelectedLifecycleStage('');
+      setSelectedLifecycleStages([]);
     }
   }, [showAddMember]);
+
+  useEffect(() => {
+    const className = 'hide-floating-shortcuts';
+    if (showRiskTable) {
+      document.body.classList.add(className);
+    } else {
+      document.body.classList.remove(className);
+    }
+    return () => {
+      document.body.classList.remove(className);
+    };
+  }, [showRiskTable]);
 
   const loadCurrentUser = () => {
     const userData = localStorage.getItem('user');
@@ -329,7 +375,7 @@ const ProjectView = () => {
     return colors[level] || '#9A9B9F';
   };
 
-  const getProjectRoleBadge = (role, assignedLifecycleStage) => {
+  const getProjectRoleBadge = (role, assignedLifecycleStages = []) => {
     const roleConfig = {
       admin: { label: 'АДМИНИСТРАТОР', className: 'role-admin' },
       manager: { label: 'ПРОДУКТ-МЕНЕДЖЕР', className: 'role-manager' },
@@ -339,8 +385,9 @@ const ProjectView = () => {
     };
 
     const config = roleConfig[role] || { label: role?.toUpperCase() || 'UNKNOWN', className: 'role-unknown' };
-    const displayLabel = role === 'specialist' && assignedLifecycleStage 
-      ? `${config.label}: ${assignedLifecycleStage}` 
+    const specialistStages = normalizeLifecycleStages(assignedLifecycleStages);
+    const displayLabel = role === 'specialist' && specialistStages.length > 0
+      ? `${config.label}: ${specialistStages.join(', ')}`
       : config.label;
     return <span className={`role-badge ${config.className}`} title={displayLabel}>{displayLabel}</span>;
   };
@@ -363,8 +410,8 @@ const ProjectView = () => {
         return;
       }
     }
-    if (selectedRole === 'specialist' && !selectedLifecycleStage) {
-      alert('Для роли "Специалист" необходимо выбрать этап жизненного цикла');
+    if (selectedRole === 'specialist' && selectedLifecycleStages.length === 0) {
+      alert('Для роли "Специалист" необходимо выбрать минимум один этап жизненного цикла');
       return;
     }
     
@@ -378,7 +425,8 @@ const ProjectView = () => {
         role: selectedRole
       };
       if (selectedRole === 'specialist') {
-        body.assigned_lifecycle_stage = selectedLifecycleStage;
+        body.assigned_lifecycle_stages = selectedLifecycleStages;
+        body.assigned_lifecycle_stage = selectedLifecycleStages[0];
       }
 
       if (isAdminLimited) {
@@ -400,7 +448,7 @@ const ProjectView = () => {
         setShowAddMember(false);
         setSelectedUser('');
         setSelectedRole('specialist');
-        setSelectedLifecycleStage('');
+        setSelectedLifecycleStages([]);
       } else {
         const errData = await response.json().catch(() => ({}));
         alert(errData.detail || 'Не удалось добавить участника');
@@ -413,7 +461,7 @@ const ProjectView = () => {
       setShowAddMember(false);
       setSelectedUser('');
       setSelectedRole('specialist');
-      setSelectedLifecycleStage('');
+      setSelectedLifecycleStages([]);
     }
   };
 
@@ -470,8 +518,8 @@ const ProjectView = () => {
       alert('Администратор проекта может назначить только продукт-менеджера');
       return;
     }
-    if (roleToEdit === 'specialist' && !lifecycleStageToEdit) {
-      alert('Для роли "Специалист" необходимо выбрать этап жизненного цикла');
+    if (roleToEdit === 'specialist' && lifecycleStagesToEdit.length === 0) {
+      alert('Для роли "Специалист" необходимо выбрать минимум один этап жизненного цикла');
       return;
     }
 
@@ -479,7 +527,8 @@ const ProjectView = () => {
       const token = localStorage.getItem('token');
       const body = { role: roleToEdit };
       if (roleToEdit === 'specialist') {
-        body.assigned_lifecycle_stage = lifecycleStageToEdit;
+        body.assigned_lifecycle_stages = lifecycleStagesToEdit;
+        body.assigned_lifecycle_stage = lifecycleStagesToEdit[0];
       }
       const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members/${memberToEdit.id}`, {
         method: 'PUT',
@@ -527,12 +576,14 @@ const ProjectView = () => {
     );
   }
 
-  const lifecycleStages = formatList([
+  const availableLifecycleStages = [
     ...new Set([
       ...(project.lifecycleStages || []),
       ...(project.customLifecycleStages || [])
     ])
-  ]);
+  ];
+
+  const lifecycleStages = formatList(availableLifecycleStages);
 
   const hazardCategories = formatList([
     ...new Set([
@@ -564,7 +615,7 @@ const ProjectView = () => {
               className="btn btn-secondary"
               onClick={() => {
                 setSelectedRole('manager');
-                setSelectedLifecycleStage('');
+                setSelectedLifecycleStages([]);
                 setShowAddMember(true);
               }}
               style={{ marginRight: '8px' }}
@@ -578,7 +629,7 @@ const ProjectView = () => {
               onClick={() => setShowRiskTable(true)}
               style={{ marginRight: '8px' }}
             >
-              📊 Risk Management Table
+              Risk Management Table
             </button>
           )}
           {!isLimitedProjectAdmin() && (
@@ -587,7 +638,7 @@ const ProjectView = () => {
               onClick={() => navigate(`/project/${project.id}/documents`)}
               style={{ marginRight: '8px' }}
             >
-              📄 View Document
+              View Document
             </button>
           )}
           <Link to={`/project/${project.id}/risks`} className="btn btn-primary">
@@ -696,7 +747,7 @@ const ProjectView = () => {
                 </div>
                 <div className="member-info">
                   <div className="member-name">{member.name}</div>
-                  <div className="member-role">{getProjectRoleBadge(member.role, member.assigned_lifecycle_stage)}</div>
+                  <div className="member-role">{getProjectRoleBadge(member.role, member.assigned_lifecycle_stages)}</div>
                   <div className="member-email">{member.email}</div>
                 </div>
                 <div className="member-actions">
@@ -706,6 +757,7 @@ const ProjectView = () => {
                       onClick={() => {
                         setMemberToEdit(member);
                         setRoleToEdit(member.role);
+                        setLifecycleStagesToEdit(getMemberLifecycleStages(member));
                         setShowEditMemberRole(true);
                       }}
                       title="Edit member role"
@@ -732,7 +784,7 @@ const ProjectView = () => {
               className="add-member-btn"
               onClick={() => {
                 setSelectedRole(isProductManager() ? 'specialist' : 'manager');
-                setSelectedLifecycleStage('');
+                setSelectedLifecycleStages([]);
                 setShowAddMember(true);
               }}
             >
@@ -806,7 +858,7 @@ const ProjectView = () => {
                 <label>Роль в проекте</label>
                 <select
                   value={selectedRole}
-                  onChange={(e) => { setSelectedRole(e.target.value); setSelectedLifecycleStage(''); }}
+                  onChange={(e) => { setSelectedRole(e.target.value); setSelectedLifecycleStages([]); }}
                   className="form-select"
                   disabled={isLimitedProjectAdmin()}
                 >
@@ -831,22 +883,24 @@ const ProjectView = () => {
                   {selectedRole === 'manager' && 'Заполняет проект, управляет участниками и рисками, создаёт отчёты'}
                   {selectedRole === 'risk_assessment_team_leader' && 'Работает с рисками на всех этапах и оценивает вероятность'}
                   {selectedRole === 'doctor' && 'Работает с рисками на всех этапах и оценивает тяжесть вреда'}
-                  {selectedRole === 'specialist' && 'Создаёт/редактирует риски только в своём этапе жизненного цикла'}
+                  {selectedRole === 'specialist' && 'Создаёт/редактирует риски только в назначенных этапах жизненного цикла'}
                 </small>
               </div>
               {selectedRole === 'specialist' && (
                 <div className="form-group">
-                  <label>Этап жизненного цикла</label>
-                  <select
-                    value={selectedLifecycleStage}
-                    onChange={(e) => setSelectedLifecycleStage(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">Выберите этап...</option>
-                    {[...(project.lifecycleStages || []), ...(project.customLifecycleStages || [])].map(stage => (
-                      <option key={stage} value={stage}>{stage}</option>
+                  <label>Этапы жизненного цикла</label>
+                  <div className="lifecycle-stage-checkbox-list">
+                    {availableLifecycleStages.map(stage => (
+                      <label key={stage} className="lifecycle-stage-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedLifecycleStages.includes(stage)}
+                          onChange={() => toggleStageInList(stage, setSelectedLifecycleStages)}
+                        />
+                        <span>{stage}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
               )}
             </div>
@@ -895,7 +949,7 @@ const ProjectView = () => {
                 <label>Роль в проекте</label>
                 <select
                   value={roleToEdit}
-                  onChange={(e) => { setRoleToEdit(e.target.value); setLifecycleStageToEdit(''); }}
+                  onChange={(e) => { setRoleToEdit(e.target.value); setLifecycleStagesToEdit([]); }}
                   className="form-select"
                 >
                   {isProductManager() ? (
@@ -916,17 +970,19 @@ const ProjectView = () => {
               </div>
               {roleToEdit === 'specialist' && (
                 <div className="form-group">
-                  <label>Этап жизненного цикла</label>
-                  <select
-                    value={lifecycleStageToEdit}
-                    onChange={(e) => setLifecycleStageToEdit(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">Выберите этап...</option>
-                    {[...(project.lifecycleStages || []), ...(project.customLifecycleStages || [])].map(stage => (
-                      <option key={stage} value={stage}>{stage}</option>
+                  <label>Этапы жизненного цикла</label>
+                  <div className="lifecycle-stage-checkbox-list">
+                    {availableLifecycleStages.map(stage => (
+                      <label key={stage} className="lifecycle-stage-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={lifecycleStagesToEdit.includes(stage)}
+                          onChange={() => toggleStageInList(stage, setLifecycleStagesToEdit)}
+                        />
+                        <span>{stage}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
               )}
             </div>
@@ -969,17 +1025,19 @@ const ProjectView = () => {
       )}
 
       {/* Floating return button like Personal Account */}
-      <button
-        className={`floating-return visible`}
-        onClick={() => {
-          const content = document.querySelector('.content-body');
-          if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
-          else window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        aria-label="Return to top"
-      >
-        ↑
-      </button>
+      {!showRiskTable && (
+        <button
+          className={`floating-return visible`}
+          onClick={() => {
+            const content = document.querySelector('.content-body');
+            if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+            else window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          aria-label="Return to top"
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 };

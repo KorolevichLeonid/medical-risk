@@ -1,10 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ExcelTable from '../components/ExcelTable';
 
 const ProjectTable = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const className = 'hide-floating-shortcuts';
+    document.body.classList.add(className);
+    return () => {
+      document.body.classList.remove(className);
+    };
+  }, []);
 
   const handleClose = () => {
     navigate(`/project/${id}`);

@@ -81,3 +81,29 @@ medical-risk/
 2. Убедитесь, что все сервисы запущены
 3. Проверьте, что база данных создана и подключена
 4. Проверьте переменные окружения в настройках сервисов
+
+## Обновления БД и совместимость
+
+- Для роли `specialist` поддерживается назначение нескольких этапов ЖЦ.
+- Поле `project_members.assigned_lifecycle_stage` теперь используется как:
+  - одно значение (legacy),
+  - или JSON-массив строк (новый формат).
+- При запуске backend через `start.sh` выполняется `python -m app.init_db`, который:
+  - добавляет `assigned_lifecycle_stage`, если его нет;
+  - на PostgreSQL автоматически переводит тип колонки в `TEXT` (с `VARCHAR(255)`), чтобы корректно хранить JSON-массивы.
+
+## Pre-push checklist
+
+Перед `git push` рекомендуется выполнить:
+
+```bash
+# backend
+cd medical-risk-auth/backend
+python -m py_compile app/init_db.py app/models/project.py app/routers/projects.py app/routers/risk_analyses.py app/routers/risk_tables.py app/routers/permissions.py app/schemas/project.py
+
+# frontend
+cd ../frontend
+npm run build
+```
+
+Если используете локальную SQLite-базу для dev-окружения, включите изменения в `medical-risk-auth/medical_risk.db` в коммит.

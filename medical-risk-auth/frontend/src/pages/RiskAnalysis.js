@@ -25,7 +25,7 @@ const RiskAnalysis = () => {
   const [selectedRisk, setSelectedRisk] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [userProjectRole, setUserProjectRole] = useState(null);
-  const [assignedLifecycleStage, setAssignedLifecycleStage] = useState(null);
+  const [assignedLifecycleStages, setAssignedLifecycleStages] = useState([]);
   const [newRisk, setNewRisk] = useState({
     lifecycleStage: '',
     hazardName: '',
@@ -73,6 +73,24 @@ const RiskAnalysis = () => {
     }
   };
 
+  const normalizeLifecycleStages = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed.filter(Boolean) : [trimmed];
+        } catch (error) {
+          return [trimmed];
+        }
+      }
+      return [trimmed];
+    }
+    return [];
+  };
+
   const loadUserProjectRole = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -86,15 +104,21 @@ const RiskAnalysis = () => {
         const roleData = await response.json();
         console.log('Loaded user project role:', roleData);
         setUserProjectRole(roleData.user_role);
-        setAssignedLifecycleStage(roleData.assigned_lifecycle_stage || null);
+        const stagesFromApi = normalizeLifecycleStages(roleData.assigned_lifecycle_stages);
+        setAssignedLifecycleStages(
+          stagesFromApi.length > 0
+            ? stagesFromApi
+            : normalizeLifecycleStages(roleData.assigned_lifecycle_stage)
+        );
       } else {
         console.error('Failed to load user project role - status:', response.status);
         setUserProjectRole(null);
-        setAssignedLifecycleStage(null);
+        setAssignedLifecycleStages([]);
       }
     } catch (error) {
       console.error('Failed to load user project role:', error);
       setUserProjectRole(null);
+      setAssignedLifecycleStages([]);
     }
   };
 
@@ -139,7 +163,20 @@ const RiskAnalysis = () => {
 
   useEffect(() => {
     filterRisks();
-  }, [risks, filterSeverity, filterCategory, searchTerm]);
+  }, [risks, filterSeverity, filterCategory, searchTerm, userProjectRole, assignedLifecycleStages]);
+
+  useEffect(() => {
+    if (userProjectRole !== 'specialist' || assignedLifecycleStages.length === 0) {
+      return;
+    }
+
+    setNewRisk(prev => ({
+      ...prev,
+      lifecycleStage: assignedLifecycleStages.includes(prev.lifecycleStage)
+        ? prev.lifecycleStage
+        : assignedLifecycleStages[0]
+    }));
+  }, [userProjectRole, assignedLifecycleStages]);
 
   const loadProjectAndRisks = async () => {
     setLoading(true);
@@ -260,9 +297,9 @@ const RiskAnalysis = () => {
   const filterRisks = () => {
     let filtered = risks;
     
-    // Специалист видит только риски своего жизненного цикла
-    if (userProjectRole === 'specialist' && assignedLifecycleStage) {
-      filtered = filtered.filter(risk => risk.lifecycleStage === assignedLifecycleStage);
+    // Специалист видит только риски назначенных этапов жизненного цикла
+    if (userProjectRole === 'specialist') {
+      filtered = filtered.filter(risk => assignedLifecycleStages.includes(risk.lifecycleStage));
     }
     
     if (filterSeverity !== 'all') {
@@ -289,10 +326,7 @@ const RiskAnalysis = () => {
 
   const getRiskLevel = (score) => {
     const threshold = Number(riskThreshold) || 10;
-    const mediumCutoff = Math.max(1, Math.ceil(threshold / 2));
-
     if (score >= threshold) return { level: 'high', color: '#FF4444' };
-    if (score >= mediumCutoff) return { level: 'medium', color: '#FF8800' };
     return { level: 'low', color: '#00AA44' };
   };
 
@@ -641,7 +675,7 @@ const RiskAnalysis = () => {
                 navigate(`/project/${id}?openRiskTable=true&sheet=first`);
               }}
             >
-              📊 Risk Management Table
+              Risk Management Table
             </button>
           )}
           {canAddRisks() && (
@@ -810,7 +844,6 @@ const RiskAnalysis = () => {
           >
             <option value="all">All Risk Levels</option>
             <option value="high">High Risk</option>
-            <option value="medium">Medium Risk</option>
             <option value="low">Low Risk</option>
           </select>
 
@@ -1001,12 +1034,18 @@ const RiskAnalysis = () => {
                     value={newRisk.lifecycleStage}
                     onChange={(e) => setNewRisk({...newRisk, lifecycleStage: e.target.value})}
                     required
-                    disabled={userProjectRole === 'specialist' && assignedLifecycleStage !== null}
+                    disabled={userProjectRole === 'specialist' && assignedLifecycleStages.length <= 1}
                   >
-                    {userProjectRole === 'specialist' && assignedLifecycleStage ? (
-                      <option value={assignedLifecycleStage}>
-                        {assignedLifecycleStage.charAt(0).toUpperCase() + assignedLifecycleStage.slice(1)}
-                      </option>
+                    {userProjectRole === 'specialist' ? (
+                      assignedLifecycleStages.length > 0 ? (
+                        assignedLifecycleStages.map(stage => (
+                          <option key={stage} value={stage}>
+                            {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">Нет назначенных этапов ЖЦ</option>
+                      )
                     ) : (
                       lifecycleStages.map(stage => (
                         <option key={stage} value={stage}>

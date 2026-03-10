@@ -2,6 +2,7 @@
 Risk analyses router
 """
 from typing import List
+import json
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,26 @@ from ..routers.projects import get_project, check_project_access
 from ..core.logging import log_risk_created, log_risk_updated, log_risk_deleted
 
 router = APIRouter()
+
+
+def _decode_assigned_lifecycle_stages(raw_value) -> List[str]:
+    if not raw_value:
+        return []
+    if isinstance(raw_value, list):
+        return [str(stage).strip() for stage in raw_value if str(stage).strip()]
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        if not value:
+            return []
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return [str(stage).strip() for stage in parsed if str(stage).strip()]
+            except json.JSONDecodeError:
+                pass
+        return [value]
+    return []
 
 
 async def sync_risk_to_table(db: Session, risk_factor: RiskFactor, project_id: int):
@@ -297,14 +318,14 @@ def check_risk_edit_permission(project: Project, user: User, db: Session):
 
 
 def get_specialist_lifecycle_stage(user: User, project_id: int, db: Session):
-    """Get the lifecycle stage assigned to a specialist. Returns None if user is not a specialist."""
+    """Get lifecycle stages assigned to specialist, or None for non-specialist."""
     member = db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id,
         ProjectMember.user_id == user.id,
         ProjectMember.role == ProjectRole.SPECIALIST
     ).first()
     if member:
-        return member.assigned_lifecycle_stage
+        return _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
     return None
 
 
@@ -324,8 +345,8 @@ def check_specialist_lifecycle_access(user: User, project_id: int, lifecycle_sta
         return False
     if member.role != ProjectRole.SPECIALIST:
         return True  # Non-specialists have access to all stages
-    # Specialist can only access their assigned lifecycle stage
-    return member.assigned_lifecycle_stage == lifecycle_stage
+    # Specialist can only access assigned lifecycle stages
+    return lifecycle_stage in _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
 
 
 @router.get("/project/{project_id}", response_model=RiskAnalysisResponse)
@@ -797,15 +818,15 @@ async def get_project_risk_factors(
     if not analysis:
         return []
     
-    # For specialist role: filter to only their assigned lifecycle stage
-    specialist_stage = get_specialist_lifecycle_stage(current_user, project_id, db)
+    # For specialist role: filter to only assigned lifecycle stages
+    specialist_stages = get_specialist_lifecycle_stage(current_user, project_id, db)
     
     # Get risk status from risk tables for each risk factor
     risk_factors_with_status = []
     
     for factor in analysis.risk_factors:
-        # If specialist, skip factors from other lifecycle stages
-        if specialist_stage and factor.lifecycle_stage != specialist_stage:
+        # If specialist, skip factors from unassigned lifecycle stages
+        if specialist_stages is not None and factor.lifecycle_stage not in specialist_stages:
             continue
         factor_dict = {
             "id": factor.id,

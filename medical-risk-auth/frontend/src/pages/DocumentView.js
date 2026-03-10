@@ -399,14 +399,14 @@ const DocumentView = () => {
             className="btn btn-secondary"
             onClick={() => setShowVersionHistory(!showVersionHistory)}
           >
-            📋 Version History ({versions.length})
+            Version History ({versions.length})
           </button>
           <button 
             className="btn btn-primary"
             onClick={handleGenerateDocument}
             disabled={generating}
           >
-            {generating ? '⏳ Generating...' : '🔄 Generate New Version'}
+            {generating ? 'Generating...' : 'Generate New Version'}
           </button>
         </div>
       </div>
@@ -510,7 +510,7 @@ const DocumentView = () => {
               onClick={handleGenerateDocument}
               disabled={generating}
             >
-              {generating ? '⏳ Generating...' : '🔄 Generate First Version'}
+              {generating ? 'Generating...' : 'Generate First Version'}
             </button>
           </div>
         )}
