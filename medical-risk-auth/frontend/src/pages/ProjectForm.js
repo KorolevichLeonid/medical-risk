@@ -523,12 +523,7 @@ const HAZARD_CATEGORY_MAPPING = {
 const calculateActiveHazardCategories = (hazardQuestions, customHazards = []) => {
   const activeCategories = new Set();
   
-  // Добавляем всегда активные категории
-  HAZARD_CATEGORY_MAPPING.always_active.forEach(category => {
-    activeCategories.add(category);
-  });
-  
-  // Проверяем каждую категорию
+  // Используем новое сопоставление категорий опасностей
   Object.entries(HAZARD_CATEGORY_MAPPING).forEach(([key, value]) => {
     if (key === 'always_active') return; // Пропускаем always_active
     
@@ -538,6 +533,13 @@ const calculateActiveHazardCategories = (hazardQuestions, customHazards = []) =>
     const hasPositiveAnswer = questions.some(questionKey => hazardQuestions[questionKey] === true);
     
     if (hasPositiveAnswer) {
+      activeCategories.add(category);
+    }
+  });
+  
+  // Всегда добавляем обязательные категории
+  HAZARD_CATEGORY_MAPPING.always_active.forEach(category => {
+    if (!activeCategories.has(category)) {
       activeCategories.add(category);
     }
   });
@@ -630,12 +632,80 @@ const normalizeLevelsWithScores = (levels = []) => {
     return null;
   };
 
-  const normalizeLifecycleStages = (stages = []) => {
-    const mapped = (Array.isArray(stages) ? stages : []).map((stage) =>
-      stage === 'operation' ? 'Эксплуатация' : stage
-    );
-    return [...new Set(mapped)];
-  };
+  // Lifecycle stage mapping object
+const LIFECYCLE_STAGE_MAPPING = {
+  'design_development': 'Проектирование и разработку',
+  'procurement': 'Закупка и входной контроль компонентов и материалов',
+  'production': 'Производство и сборка',
+  'packaging': 'Упаковка и маркировка',
+  'installation': 'Монтаж',
+  'sterilization': 'Стерилизация',
+  'testing': 'Испытания и выпуск продукции',
+  'storage': 'Хранение',
+  'transportation': 'Транспортировка и дистрибуция',
+  'commissioning': 'Установка и ввод в эксплуатацию',
+  'operation': 'Эксплуатация',
+  'maintenance': 'Техническое обслуживание и сервис',
+  'decommissioning': 'Демонтаж и вывод из эксплуатации',
+  'disposal': 'Утилизация и уничтожение изделия или его компонентов',
+  'other': 'Другие'
+};
+
+// Reverse mapping for converting display names back to keys
+const REVERSE_LIFECYCLE_STAGE_MAPPING = {};
+Object.entries(LIFECYCLE_STAGE_MAPPING).forEach(([key, value]) => {
+  REVERSE_LIFECYCLE_STAGE_MAPPING[value] = key;
+});
+
+/**
+ * Normalize lifecycle stages for frontend form compatibility.
+ * Converts stored display names back to keys for form state.
+ */
+const normalizeLifecycleStages = (stages) => {
+  if (!stages) return [];
+  
+  // Handle array format
+  if (Array.isArray(stages)) {
+    return stages.map(stage => {
+      if (typeof stage === 'string') {
+        // Try to convert display name to key
+        const key = REVERSE_LIFECYCLE_STAGE_MAPPING[stage.trim()];
+        if (key) return key;
+        // If not found in mapping, keep as is (for custom stages)
+        return stage.trim();
+      }
+      return stage;
+    });
+  }
+  
+  // Handle string format (legacy)
+  if (typeof stages === 'string') {
+    try {
+      const parsed = JSON.parse(stages);
+      if (Array.isArray(parsed)) {
+        return normalizeLifecycleStages(parsed);
+      }
+    } catch (error) {
+      // For single string, try to convert if it's a display name
+      const key = REVERSE_LIFECYCLE_STAGE_MAPPING[stages.trim()];
+      if (key) return [key];
+      return [stages.trim()];
+    }
+  }
+  
+  return [];
+};
+
+/**
+ * Keep lifecycle stage keys for backend storage.
+ * Canonical format is key-based values (e.g., "procurement"),
+ * and display labels are resolved only in UI/document layers.
+ */
+const prepareLifecycleStageKeysForSave = (stages = []) => {
+  return (Array.isArray(stages) ? stages : [])
+    .map((stage) => (typeof stage === 'string' ? stage.trim() : ''))
+    .filter(Boolean);
+};
 
 const ProjectForm = () => {
   const { id } = useParams();
@@ -657,10 +727,17 @@ const ProjectForm = () => {
     intendedUse: '',
     operatingEnvironment: '',
 
-    // Технические характеристики
-    technicalSpecs: '',
-    regulatoryRequirements: '',
-    standards: '',
+          // Технические характеристики, связанные с безопасностью
+          technicalSpecs: '',
+          regulatoryRequirements: '',
+          standards: '',
+          
+          // Новые поля для 14971 стандарта
+          indications: '',
+          contraindications: '',
+          targetGroup: '',
+          warnings: '',
+          disposal: '',
 
 
     // Уровень риска (доп./не доп.)
@@ -857,6 +934,12 @@ const ProjectForm = () => {
           regulatoryRequirements: projectData.regulatory_requirements || '',
           standards: projectData.standards || '',
           acceptableRiskLevel: projectData.acceptable_risk_level || 10,
+          // Новые поля для 14971 стандарта
+          indications: projectData.indications || '',
+          contraindications: projectData.contraindications || '',
+          targetGroup: projectData.target_group || '',
+          warnings: projectData.warnings || '',
+          disposal: projectData.disposal || '',
           riskMatrix: projectData.risk_matrix || null,
           severityLevels: normalizeLevelsWithScores(projectData.severity_levels || [
             { level: 1, score: 1, name: "Незначительный", description: "Приводит к неудобству или временному дискомфорту" },
@@ -991,26 +1074,26 @@ const ProjectForm = () => {
     }));
   };
 
-  const handleLifecycleCheckboxChange = (e, stage) => {
+  const handleLifecycleCheckboxChange = (e, stageKey) => {
     const { checked } = e.target;
-    if (checked && stage === 'other') {
+    if (checked && stageKey === 'other') {
       setFormData(prev => ({
         ...prev,
-        lifecycleStages: [...prev.lifecycleStages, stage],
+        lifecycleStages: [...prev.lifecycleStages, stageKey],
         customLifecycleStages: prev.customLifecycleStages.length === 0 ? [''] : prev.customLifecycleStages
       }));
-    } else if (!checked && stage === 'other') {
+    } else if (!checked && stageKey === 'other') {
       setFormData(prev => ({
         ...prev,
-        lifecycleStages: prev.lifecycleStages.filter(s => s !== stage),
+        lifecycleStages: prev.lifecycleStages.filter(s => s !== stageKey),
         customLifecycleStages: []
       }));
     } else {
       setFormData(prev => ({
         ...prev,
         lifecycleStages: checked
-          ? [...prev.lifecycleStages, stage]
-          : prev.lifecycleStages.filter(s => s !== stage)
+          ? [...prev.lifecycleStages, stageKey]
+          : prev.lifecycleStages.filter(s => s !== stageKey)
       }));
     }
   };
@@ -1096,113 +1179,6 @@ const ProjectForm = () => {
     });
   };
 
-  // Функция для определения выбранных категорий опасностей на основе чеклиста
-  const calculateSelectedHazardCategories = (hazardQuestions) => {
-    const categories = [];
-    
-    // Маппинг вопросов к категориям опасностей
-    const questionToCategoryMap = {
-      // Биосовместимость
-      bodyContact: 'Опасности, связанные с биосовместимостью',
-      materialContact: 'Опасности, связанные с биосовместимостью',
-      implantableDevice: 'Опасности, связанные с биосовместимостью',
-      substanceRelease: 'Опасности, связанные с биосовместимостью',
-      sensitization: 'Опасности, связанные с биосовместимостью',
-      implantable: 'Опасности, связанные с биосовместимостью',
-      
-      // Безопасность данных и систем
-      containsSoftware: 'Опасности, связанные с безопасностью данных и систем',
-      dataExchange: 'Опасности, связанные с безопасностью данных и систем',
-      wireless: 'Опасности, связанные с безопасностью данных и систем',
-      personalData: 'Опасности, связанные с безопасностью данных и систем',
-      userInterface: 'Опасности, связанные с безопасностью данных и систем',
-      software: 'Опасности, связанные с безопасностью данных и систем',
-      
-      // Электричество
-      activeDevice: 'Опасности, связанные с электричеством',
-      powerConnection: 'Опасности, связанные с электричеством',
-      electricalContacts: 'Опасности, связанные с электричеством',
-      active: 'Опасности, связанные с электричеством',
-      
-      // Движущиеся части
-      movingElements: 'Опасности, связанные с движущимися частями',
-      movingRisk: 'Опасности, связанные с движущимися частями',
-      
-      // Излучение
-      emitsEnergy: 'Опасности, связанные с излучением',
-      opticalSystems: 'Опасности, связанные с излучением',
-      
-      // Удобство использования (ВСЕГДА активна)
-      specialTraining: 'Опасности, связанные с удобством использования (usability)',
-      specialNeeds: 'Опасности, связанные с удобством использования (usability)',
-      interfaceError: 'Опасности, связанные с удобством использования (usability)',
-      alarms: 'Опасности, связанные с удобством использования (usability)',
-      
-      // Микробиологические факторы
-      isSterile: 'Опасности, связанные с микробиологическими факторами',
-      reusable: 'Опасности, связанные с микробиологическими факторами',
-      biologicalContact: 'Опасности, связанные с микробиологическими факторами',
-      sterile: 'Опасности, связанные с микробиологическими факторами',
-      disposable: 'Опасности, связанные с микробиологическими факторами',
-      
-      // Химические вещества
-      chemicalSubstances: 'Опасности, связанные с химическими веществами',
-      chemicalRelease: 'Опасности, связанные с химическими веществами',
-      chemicalSterilization: 'Опасности, связанные с химическими веществами',
-      
-      // Ткани животного происхождения
-      animalMaterials: 'Опасности, связанные с тканями животного происхождения',
-      
-      // Наноматериалы
-      nanomaterials: 'Опасности, связанные с наноматериалами',
-      
-      // Фармацевтические субстанции
-      pharmaceutical: 'Опасности, связанные с фармацевтическими субстанциями',
-      
-      // Воздействие окружающей среды
-      environmentalSensitivity: 'Опасности, связанные с воздействием окружающей среды',
-      environmentalImpact: 'Опасности, связанные с воздействием окружающей среды',
-      
-      // Механические факторы
-      mechanicalLoad: 'Опасности, связанные с механическими факторами, физические',
-      destructionRisk: 'Опасности, связанные с механическими факторами, физические',
-      
-      // Термические воздействия
-      heating: 'Опасности, связанные с термическими воздействиями',
-      surfaceContact: 'Опасности, связанные с термическими воздействиями',
-      
-      // Клиническое применение
-    clinicalUse: 'Опасности клинического применения',
-    clinicalError: 'Опасности клинического применения'
-    };
-    
-    // Обходим все вопросы и добавляем соответствующие категории
-    for (const [question, isChecked] of Object.entries(hazardQuestions)) {
-      if (isChecked && questionToCategoryMap[question]) {
-        const category = questionToCategoryMap[question];
-        // Добавляем только уникальные категории
-        if (!categories.includes(category)) {
-          categories.push(category);
-        }
-      }
-    }
-    
-    // Всегда добавляем обязательные категории
-    const alwaysIncluded = [
-      'Опасности, связанные с удобством использования (usability)',
-      'Опасности, связанные с надежностью, отказом конструкции или функций изделия',
-      'Опасности клинического применения',
-      'Другие'
-    ];
-    
-    alwaysIncluded.forEach(category => {
-      if (!categories.includes(category)) {
-        categories.push(category);
-      }
-    });
-    
-    return categories;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1230,6 +1206,11 @@ const ProjectForm = () => {
           { key: 'technicalSpecs', label: 'Технические характеристики' },
           { key: 'regulatoryRequirements', label: 'Нормативные требования' },
           { key: 'standards', label: 'Применимые стандарты' },
+          { key: 'indications', label: 'Показания' },
+          { key: 'contraindications', label: 'Противопоказания' },
+          { key: 'targetGroup', label: 'Целевая группа' },
+          { key: 'warnings', label: 'Предупреждения' },
+          { key: 'disposal', label: 'Утилизация' }
         ];
         requiredEditFields.forEach(({ key, label }) => {
           const value = formData[key];
@@ -1266,17 +1247,28 @@ const ProjectForm = () => {
       
       let requestBody = {
         name: formData.name.trim(),
+        // Include technical specification fields for both creation and editing
+        indications: formData.indications,
+        contraindications: formData.contraindications,
+        target_group: formData.targetGroup,
+        warnings: formData.warnings,
+        disposal: formData.disposal
       };
 
       if (isEditMode) {
-        // Вычисляем выбранные категории опасностей на основе чеклиста
-        const selectedHazardCategories = calculateSelectedHazardCategories(formData.hazardQuestions);
-        console.log('Selected Hazard Categories:', selectedHazardCategories);
-
         const normalizedThreshold = clampRiskThreshold(
           parseInt(formData.riskThreshold),
           formData.severityLevels,
           formData.probabilityLevels
+        );
+
+        // Сохраняем canonical-ключи этапов (без преобразования в display-строки)
+        const lifecycleStagesForSave = prepareLifecycleStageKeysForSave(formData.lifecycleStages);
+
+        // Пересчитываем активные категории опасностей на основе текущих hazardQuestions
+        const activeHazardCategoriesForSave = calculateActiveHazardCategories(
+          formData.hazardQuestions,
+          formData.customHazards
         );
 
         requestBody = {
@@ -1293,15 +1285,27 @@ const ProjectForm = () => {
           regulatory_requirements: formData.regulatoryRequirements,
           standards: formData.standards,
           status: formData.status,
-          lifecycle_stages: formData.lifecycleStages,
+          lifecycle_stages: lifecycleStagesForSave,
           custom_lifecycle_stages: formData.customLifecycleStages,
           hazard_questions: formData.hazardQuestions,
           hazard_checklist_answers: formData.hazardChecklistAnswers,
-          active_hazard_categories: formData.activeHazardCategories,
+          active_hazard_categories: activeHazardCategoriesForSave,
           custom_hazard: formData.customHazards.join('\n'),
           severity_levels: formData.severityLevels,
           probability_levels: formData.probabilityLevels,
-          risk_threshold: normalizedThreshold
+          risk_threshold: normalizedThreshold,
+          // Новые поля для 14971 стандарта
+          indications: formData.indications,
+          contraindications: formData.contraindications,
+          target_group: formData.targetGroup,
+          warnings: formData.warnings,
+          disposal: formData.disposal
+        };
+      } else {
+        // Для создания проекта добавляем hazard_questions
+        requestBody = {
+          ...requestBody,
+          hazard_questions: formData.hazardQuestions
         };
       }
 
@@ -1585,7 +1589,7 @@ const ProjectForm = () => {
           <h2>Технические характеристики</h2>
 
           <div className="form-group">
-            <label htmlFor="technicalSpecs">Технические характеристики</label>
+            <label htmlFor="technicalSpecs">Технические характеристики*</label>
             <textarea
               id="technicalSpecs"
               name="technicalSpecs"
@@ -1619,6 +1623,72 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Соответствующие отраслевые стандарты (ISO, IEC и т.д.)"
               rows="2"
+              required={isEditMode}
+            />
+          </div>
+
+          {/* Новые поля для 14971 стандарта */}
+          <div className="form-group">
+            <label htmlFor="indications">Показания</label>
+            <textarea
+              id="indications"
+              name="indications"
+              value={formData.indications}
+              onChange={handleInputChange}
+              placeholder="Описание показаний к применению медицинского устройства"
+              rows="3"
+              required={isEditMode}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="contraindications">Противопоказания</label>
+            <textarea
+              id="contraindications"
+              name="contraindications"
+              value={formData.contraindications}
+              onChange={handleInputChange}
+              placeholder="Описание противопоказаний к применению"
+              rows="3"
+              required={isEditMode}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="targetGroup">Целевая группа</label>
+            <textarea
+              id="targetGroup"
+              name="targetGroup"
+              value={formData.targetGroup}
+              onChange={handleInputChange}
+              placeholder="Описание целевой группы пациентов"
+              rows="3"
+              required={isEditMode}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="warnings">Предупреждения</label>
+            <textarea
+              id="warnings"
+              name="warnings"
+              value={formData.warnings}
+              onChange={handleInputChange}
+              placeholder="Описание предупреждений и мер предосторожности"
+              rows="3"
+              required={isEditMode}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="disposal">Утилизация</label>
+            <textarea
+              id="disposal"
+              name="disposal"
+              value={formData.disposal}
+              onChange={handleInputChange}
+              placeholder="Описание требований к утилизации устройства"
+              rows="3"
               required={isEditMode}
             />
           </div>
@@ -1762,9 +1832,9 @@ const ProjectForm = () => {
               <label className="checkbox-label">
                 <input
                   type="checkbox"
-                  name="operation_russian"
-                  checked={formData.lifecycleStages.includes('Эксплуатация')}
-                  onChange={(e) => handleLifecycleCheckboxChange(e, 'Эксплуатация')}
+                  name="operation"
+                  checked={formData.lifecycleStages.includes('operation')}
+                  onChange={(e) => handleLifecycleCheckboxChange(e, 'operation')}
                 />
                 Эксплуатация
               </label>

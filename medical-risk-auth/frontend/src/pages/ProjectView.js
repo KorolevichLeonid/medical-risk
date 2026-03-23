@@ -4,6 +4,24 @@ import './ProjectView.css';
 import ExcelTable from '../components/ExcelTable';
 import API_BASE_URL from '../config';
 
+const LIFECYCLE_STAGE_LABELS = {
+  design_development: 'Проектирование и разработка',
+  procurement: 'Закупка и входной контроль компонентов и материалов',
+  production: 'Производство и сборка',
+  packaging: 'Упаковка и маркировка',
+  installation: 'Монтаж',
+  sterilization: 'Стерилизация',
+  testing: 'Испытания и выпуск продукции',
+  storage: 'Хранение',
+  transportation: 'Транспортировка и дистрибуция',
+  commissioning: 'Установка и ввод в эксплуатацию',
+  operation: 'Эксплуатация',
+  maintenance: 'Техническое обслуживание и сервис',
+  decommissioning: 'Демонтаж и вывод из эксплуатации',
+  disposal: 'Утилизация и уничтожение изделия или его компонентов',
+  other: 'Другие'
+};
+
 const ProjectView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -97,6 +115,13 @@ const ProjectView = () => {
             lastUpdated: projectData.updated_at || projectData.created_at,
             ownerId: projectData.owner_id,
             
+            // Новые поля для 14971 стандарта
+            indications: projectData.indications || '',
+            contraindications: projectData.contraindications || '',
+            targetGroup: projectData.target_group || '',
+            warnings: projectData.warnings || '',
+            disposal: projectData.disposal || '',
+            
             // Device Information
             deviceInfo: {
               name: projectData.device_name || 'N/A',
@@ -115,6 +140,7 @@ const ProjectView = () => {
 
             lifecycleStages: projectData.lifecycle_stages || [],
             customLifecycleStages: projectData.custom_lifecycle_stages || [],
+            hazardQuestions: projectData.hazard_questions || {},
             activeHazardCategories: parseJsonArray(projectData.active_hazard_categories),
             customHazards: projectData.custom_hazard
               ? projectData.custom_hazard.split('\n').map(line => line.trim()).filter(line => line)
@@ -327,6 +353,12 @@ const ProjectView = () => {
     return items.join(', ');
   };
 
+  const formatLifecycleStageForDisplay = (stage) => {
+    if (!stage || typeof stage !== 'string') return '';
+    const normalized = stage.trim();
+    return LIFECYCLE_STAGE_LABELS[normalized] || normalized;
+  };
+
   const isProjectOwner = () => {
     if (!currentUser || !project) return false;
     return currentUser.id === project.ownerId;
@@ -387,9 +419,123 @@ const ProjectView = () => {
     const config = roleConfig[role] || { label: role?.toUpperCase() || 'UNKNOWN', className: 'role-unknown' };
     const specialistStages = normalizeLifecycleStages(assignedLifecycleStages);
     const displayLabel = role === 'specialist' && specialistStages.length > 0
-      ? `${config.label}: ${specialistStages.join(', ')}`
+      ? `${config.label}: ${specialistStages.map(formatLifecycleStageForDisplay).join(', ')}`
       : config.label;
     return <span className={`role-badge ${config.className}`} title={displayLabel}>{displayLabel}</span>;
+  };
+
+  /**
+   * Calculate active hazard categories based on hazard questions.
+   * This mirrors the backend logic for consistency.
+   */
+  const calculateActiveHazardCategoriesFromQuestions = (hazardQuestionsJson) => {
+    if (!hazardQuestionsJson) {
+      return [];
+    }
+    
+    let hazardQuestions;
+    try {
+      hazardQuestions = typeof hazardQuestionsJson === 'string' 
+        ? JSON.parse(hazardQuestionsJson) 
+        : hazardQuestionsJson;
+    } catch (error) {
+      console.error('Failed to parse hazard questions:', error);
+      return [];
+    }
+
+    // Always active categories
+    const activeCategories = new Set([
+      'Опасности, связанные с удобством использования (usability)',
+      'Опасности, связанные с надежностью, отказом конструкции или функций изделия',
+      'Опасности клинического применения',
+      'Другие'
+    ]);
+    
+    // Mapping questions to categories
+    const questionToCategoryMap = {
+      // Биосовместимость
+      'bodyContact': 'Опасности, связанные с биосовместимостью',
+      'materialContact': 'Опасности, связанные с биосовместимостью',
+      'implantableDevice': 'Опасности, связанные с биосовместимостью',
+      'substanceRelease': 'Опасности, связанные с биосовместимостью',
+      'sensitization': 'Опасности, связанные с биосовместимостью',
+      'implantable': 'Опасности, связанные с биосовместимостью',
+      
+      // Безопасность данных и систем
+      'containsSoftware': 'Опасности, связанные с безопасностью данных и систем',
+      'dataExchange': 'Опасности, связанные с безопасностью данных и систем',
+      'wireless': 'Опасности, связанные с безопасностью данных и систем',
+      'personalData': 'Опасности, связанные с безопасностью данных и систем',
+      'userInterface': 'Опасности, связанные с безопасностью данных и систем',
+      'software': 'Опасности, связанные с безопасностью данных и систем',
+      
+      // Электричество
+      'activeDevice': 'Опасности, связанные с электричеством',
+      'powerConnection': 'Опасности, связанные с электричеством',
+      'electricalContacts': 'Опасности, связанные с электричеством',
+      'active': 'Опасности, связанные с электричеством',
+      
+      // Движущиеся части
+      'movingElements': 'Опасности, связанные с движущимися частями',
+      'movingRisk': 'Опасности, связанные с движущимися частями',
+      
+      // Излучение
+      'emitsEnergy': 'Опасности, связанные с излучением',
+      'opticalSystems': 'Опасности, связанные с излучением',
+      
+      // Удобство использования (всегда активна)
+      'specialTraining': 'Опасности, связанные с удобством использования (usability)',
+      'specialNeeds': 'Опасности, связанные с удобством использования (usability)',
+      'interfaceError': 'Опасности, связанные с удобством использования (usability)',
+      'alarms': 'Опасности, связанные с удобством использования (usability)',
+      
+      // Микробиологические факторы
+      'isSterile': 'Опасности, связанные с микробиологическими факторами',
+      'reusable': 'Опасности, связанные с микробиологическими факторами',
+      'biologicalContact': 'Опасности, связанные с микробиологическими факторами',
+      'sterile': 'Опасности, связанные с микробиологическими факторами',
+      'disposable': 'Опасности, связанные с микробиологическими факторами',
+      
+      // Химические вещества
+      'chemicalSubstances': 'Опасности, связанные с химическими веществами',
+      'chemicalRelease': 'Опасности, связанные с химическими веществами',
+      'chemicalSterilization': 'Опасности, связанные с химическими веществами',
+      
+      // Ткани животного происхождения
+      'animalMaterials': 'Опасности, связанные с тканями животного происхождения',
+      
+      // Наноматериалы
+      'nanomaterials': 'Опасности, связанные с наноматериалами',
+      
+      // Фармацевтические субстанции
+      'pharmaceutical': 'Опасности, связанные с фармацевтическими субстанциями',
+      
+      // Воздействие окружающей среды
+      'environmentalSensitivity': 'Опасности, связанные с воздействием окружающей среды',
+      'environmentalImpact': 'Опасности, связанные с воздействием окружающей среды',
+      
+      // Механические факторы
+      'mechanicalLoad': 'Опасности, связанные с механическими факторами, физические',
+      'destructionRisk': 'Опасности, связанные с механическими факторами, физические',
+      
+      // Термические воздействия
+      'heating': 'Опасности, связанные с термическими воздействиями',
+      'surfaceContact': 'Опасности, связанные с термическими воздействиями',
+      
+      // Клиническое применение (всегда активна)
+      'clinicalUse': 'Опасности клинического применения',
+      'clinicalError': 'Опасности клинического применения'
+    };
+    
+    // Check each question and add corresponding categories
+    Object.entries(hazardQuestions).forEach(([question, is_checked]) => {
+      if (is_checked && question in questionToCategoryMap) {
+        const category = questionToCategoryMap[question];
+        activeCategories.add(category);
+      }
+    });
+    
+    return Array.from(activeCategories);
   };
 
   const handleAddMember = async () => {
@@ -576,21 +722,29 @@ const ProjectView = () => {
     );
   }
 
-  const availableLifecycleStages = [
+  const availableLifecycleStageValues = [
     ...new Set([
       ...(project.lifecycleStages || []),
       ...(project.customLifecycleStages || [])
     ])
   ];
 
+  const availableLifecycleStages = availableLifecycleStageValues
+    .filter(stage => stage && stage !== 'other' && stage !== 'Другие')
+    .map(formatLifecycleStageForDisplay)
+    .filter(stage => stage !== 'Другие')
+    .filter(Boolean);
+
   const lifecycleStages = formatList(availableLifecycleStages);
 
   const hazardCategories = formatList([
     ...new Set([
       ...(project.activeHazardCategories || []),
-      ...(project.customHazards || [])
+      ...(project.customHazards || []),
+      // Always also derive from checklist answers to avoid partial/legacy stored categories
+      ...calculateActiveHazardCategoriesFromQuestions(project.hazardQuestions)
     ])
-  ]);
+  ].filter(category => category && category !== 'Другие'));
 
   return (
     <div className="project-view">
@@ -710,6 +864,28 @@ const ProjectView = () => {
             <div className="info-item">
               <label>Применимые стандарты:</label>
               <span>{project.standards}</span>
+            </div>
+            
+            {/* Новые поля для 14971 стандарта */}
+            <div className="info-item">
+              <label>Показания:</label>
+              <span>{project.indications || 'N/A'}</span>
+            </div>
+            <div className="info-item">
+              <label>Противопоказания:</label>
+              <span>{project.contraindications || 'N/A'}</span>
+            </div>
+            <div className="info-item">
+              <label>Целевая группа:</label>
+              <span>{project.targetGroup || 'N/A'}</span>
+            </div>
+            <div className="info-item">
+              <label>Предупреждения:</label>
+              <span>{project.warnings || 'N/A'}</span>
+            </div>
+            <div className="info-item">
+              <label>Утилизация:</label>
+              <span>{project.disposal || 'N/A'}</span>
             </div>
           </div>
         </div>
@@ -890,14 +1066,14 @@ const ProjectView = () => {
                 <div className="form-group">
                   <label>Этапы жизненного цикла</label>
                   <div className="lifecycle-stage-checkbox-list">
-                    {availableLifecycleStages.map(stage => (
+                    {availableLifecycleStageValues.map(stage => (
                       <label key={stage} className="lifecycle-stage-checkbox-item">
                         <input
                           type="checkbox"
                           checked={selectedLifecycleStages.includes(stage)}
                           onChange={() => toggleStageInList(stage, setSelectedLifecycleStages)}
                         />
-                        <span>{stage}</span>
+                        <span>{formatLifecycleStageForDisplay(stage)}</span>
                       </label>
                     ))}
                   </div>
@@ -972,14 +1148,14 @@ const ProjectView = () => {
                 <div className="form-group">
                   <label>Этапы жизненного цикла</label>
                   <div className="lifecycle-stage-checkbox-list">
-                    {availableLifecycleStages.map(stage => (
+                    {availableLifecycleStageValues.map(stage => (
                       <label key={stage} className="lifecycle-stage-checkbox-item">
                         <input
                           type="checkbox"
                           checked={lifecycleStagesToEdit.includes(stage)}
                           onChange={() => toggleStageInList(stage, setLifecycleStagesToEdit)}
                         />
-                        <span>{stage}</span>
+                        <span>{formatLifecycleStageForDisplay(stage)}</span>
                       </label>
                     ))}
                   </div>

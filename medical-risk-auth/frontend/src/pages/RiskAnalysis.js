@@ -223,15 +223,78 @@ const RiskAnalysis = () => {
         
         // Load active hazard categories from project
         const hazardCategories = [];
+        console.log('=== LOADING PROJECT DATA ===');
+        console.log('Raw projectData.active_hazard_categories:', projectData.active_hazard_categories);
+        console.log('Type of projectData.active_hazard_categories:', typeof projectData.active_hazard_categories);
+        console.log('Full projectData object keys:', Object.keys(projectData));
+        console.log('Full projectData object:', projectData);
+        
+        // Проверяем все возможные источники категорий опасностей
+        let categoriesSource = null;
+        
         if (projectData.active_hazard_categories) {
-          if (Array.isArray(projectData.active_hazard_categories)) {
-            hazardCategories.push(...projectData.active_hazard_categories);
-          } else if (typeof projectData.active_hazard_categories === 'string') {
-            hazardCategories.push(...JSON.parse(projectData.active_hazard_categories));
+          categoriesSource = projectData.active_hazard_categories;
+          console.log('Using active_hazard_categories field');
+        } else if (projectData.hazard_categories) {
+          categoriesSource = projectData.hazard_categories;
+          console.log('Using hazard_categories field (fallback)');
+        } else if (projectData.hazardQuestions) {
+          // Пытаемся извлечь категории из hazardQuestions
+          const questions = projectData.hazardQuestions;
+          const extractedCategories = [];
+          
+          // Проверяем все возможные поля с категориями
+          const categoryFields = [
+            'hazardCategories', 'activeHazardCategories', 'selectedHazardCategories',
+            'hazard_categories', 'active_hazard_categories', 'selected_hazard_categories'
+          ];
+          
+          for (const field of categoryFields) {
+            if (questions[field]) {
+              categoriesSource = questions[field];
+              console.log(`Using ${field} from hazardQuestions`);
+              break;
+            }
+          }
+          
+          if (!categoriesSource) {
+            console.log('No hazard categories found in hazardQuestions');
           }
         }
-        setSelectedHazardCategories(hazardCategories);
-        console.log('Loaded active hazard categories from project:', hazardCategories);
+        
+        if (categoriesSource) {
+          console.log('Categories source type:', typeof categoriesSource);
+          console.log('Categories source value:', categoriesSource);
+          
+          if (Array.isArray(categoriesSource)) {
+            hazardCategories.push(...categoriesSource);
+            console.log('Parsed as array:', categoriesSource);
+          } else if (typeof categoriesSource === 'string') {
+            try {
+              const parsed = JSON.parse(categoriesSource);
+              hazardCategories.push(...parsed);
+              console.log('Parsed from string:', parsed);
+            } catch (error) {
+              console.error('Failed to parse categories source:', error);
+              // Fallback: try to parse as single string
+              hazardCategories.push(categoriesSource);
+            }
+          } else {
+            console.log('Unexpected type for categories source:', typeof categoriesSource);
+            // Fallback: treat as single category
+            hazardCategories.push(String(categoriesSource));
+          }
+        } else {
+          console.log('No hazard categories found in project data');
+        }
+        
+        // Фильтрация пустых значений и исключение категории "Другие"
+        const filteredCategories = hazardCategories.filter(cat => cat && cat.trim() && cat.trim() !== 'Другие');
+        
+        setSelectedHazardCategories(filteredCategories);
+        console.log('Final hazardCategories array:', filteredCategories);
+        console.log('Full project data:', projectData);
+        console.log('=== END LOADING PROJECT DATA ===');
         
         // Set default lifecycle stage and hazard category for new risk
         if (stages.length > 0) {

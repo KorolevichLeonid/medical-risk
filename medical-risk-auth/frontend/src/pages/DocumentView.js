@@ -280,10 +280,19 @@ const DocumentView = () => {
         return;
       }
 
-      console.log(`Loading preview for project ${id}, version ${versionId}`);
-      
+      const selected = versions.find((v) => v.id === versionId) || selectedVersion;
+      const isCurrentVersion = Boolean(selected?.is_current);
+
+      const previewUrl = isCurrentVersion
+        ? `${API_BASE_URL}/api/documents/projects/${id}/preview-live?version_id=${versionId}`
+        : `${API_BASE_URL}/api/documents/projects/${id}/versions/${versionId}/preview`;
+
+      console.log(
+        `Loading ${isCurrentVersion ? 'live' : 'snapshot'} preview for project ${id}, version ${versionId}`
+      );
+
       const response = await fetch(
-        `${API_BASE_URL}/api/documents/projects/${id}/versions/${versionId}/preview`,
+        previewUrl,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

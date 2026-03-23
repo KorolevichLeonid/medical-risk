@@ -94,9 +94,16 @@ class Project(Base):
     safety_characteristics = Column(Text, nullable=True)
     
     # Technical specifications
-    technical_specs = Column(Text, nullable=True)
+    technical_specs = Column(Text, nullable=True)  # Now represents "Technical characteristics related to safety"
     regulatory_requirements = Column(Text, nullable=True)
     standards = Column(Text, nullable=True)
+    
+    # New fields for 14971 standard requirements
+    indications = Column(Text, nullable=True)  # Показания
+    contraindications = Column(Text, nullable=True)  # Противопоказания
+    target_group = Column(Text, nullable=True)  # Целевая группа
+    warnings = Column(Text, nullable=True)  # Предупреждения
+    disposal = Column(Text, nullable=True)  # Утилизация
     
     # Risk assessment parameters
     contact_type = Column(String, default="no_contact")
@@ -114,12 +121,63 @@ class Project(Base):
     # Hazard questions and configurations
     hazard_questions = Column(Text, nullable=True)  # JSON string of hazard questions object
     custom_hazard = Column(Text, nullable=True)  # Custom hazard descriptions
+    hazard_checklist_answers = Column(Text, nullable=True)  # JSON string of hazard checklist answers
+    active_hazard_categories = Column(Text, nullable=True)  # JSON string of active hazard categories
 
-    # Hazard checklist answers (new for storing detailed checklist responses)
-    hazard_checklist_answers = Column(Text, nullable=True)  # JSON string of detailed answers to checklist questions
-    
-    # Active hazard categories (determined by checklist answers)
-    active_hazard_categories = Column(Text, nullable=True)  # JSON array of active hazard category names
+    @property
+    def lifecycle_stages_list(self):
+        """Property to get lifecycle_stages as a list"""
+        if not self.lifecycle_stages:
+            return []
+        try:
+            import json
+            return json.loads(self.lifecycle_stages)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @property
+    def custom_lifecycle_stages_list(self):
+        """Property to get custom_lifecycle_stages as a list"""
+        if not self.custom_lifecycle_stages:
+            return []
+        try:
+            import json
+            return json.loads(self.custom_lifecycle_stages)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @property
+    def hazard_questions_dict(self):
+        """Property to get hazard_questions as a dict"""
+        if not self.hazard_questions:
+            return {}
+        try:
+            import json
+            return json.loads(self.hazard_questions)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    @property
+    def hazard_checklist_answers_dict(self):
+        """Property to get hazard_checklist_answers as a dict"""
+        if not self.hazard_checklist_answers:
+            return {}
+        try:
+            import json
+            return json.loads(self.hazard_checklist_answers)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    @property
+    def active_hazard_categories_list(self):
+        """Property to get active_hazard_categories as a list"""
+        if not self.active_hazard_categories:
+            return []
+        try:
+            import json
+            return json.loads(self.active_hazard_categories)
+        except (json.JSONDecodeError, TypeError):
+            return []
 
     # Risk severity levels configuration
     severity_levels = Column(Text, nullable=True)  # JSON array of severity levels: [{level: 1, score: 1, name: "...", description: "..."}]

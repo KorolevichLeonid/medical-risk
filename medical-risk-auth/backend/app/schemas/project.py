@@ -29,9 +29,16 @@ class ProjectBase(BaseModel):
     key_performance_characteristics: Optional[str] = None
     safety_characteristics: Optional[str] = None
 
-    technical_specs: Optional[str] = None
+    technical_specs: Optional[str] = None  # Technical characteristics related to safety
     regulatory_requirements: Optional[str] = None
     standards: Optional[str] = None
+    
+    # New fields for 14971 standard requirements
+    indications: Optional[str] = None  # Показания
+    contraindications: Optional[str] = None  # Противопоказания
+    target_group: Optional[str] = None  # Целевая группа
+    warnings: Optional[str] = None  # Предупреждения
+    disposal: Optional[str] = None  # Утилизация
     contact_type: Optional[str] = "no_contact"
     duration: Optional[str] = "temporary"
     invasiveness: Optional[str] = "non_invasive"
@@ -44,8 +51,6 @@ class ProjectBase(BaseModel):
     # Hazard questions and checklist answers
     hazard_questions: Optional[dict] = None
     custom_hazard: Optional[str] = None
-    hazard_checklist_answers: Optional[dict] = None  # New field for storing checklist answers
-    active_hazard_categories: Optional[list] = None  # Active hazard categories determined by checklist
 
     # Risk severity levels configuration
     severity_levels: Optional[list] = None  # Array of severity levels: [{level: 1, name: "...", description: "..."}]
@@ -56,6 +61,8 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     """Schema for creating a new project"""
     status: Optional[ProjectStatus] = ProjectStatus.DRAFT
+    hazard_checklist_answers: Optional[dict] = None
+    active_hazard_categories: Optional[list] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -85,6 +92,14 @@ class ProjectUpdate(BaseModel):
     technical_specs: Optional[str] = None
     regulatory_requirements: Optional[str] = None
     standards: Optional[str] = None
+    
+    # New fields for 14971 standard requirements
+    indications: Optional[str] = None  # Показания
+    contraindications: Optional[str] = None  # Противопоказания
+    target_group: Optional[str] = None  # Целевая группа
+    warnings: Optional[str] = None  # Предупреждения
+    disposal: Optional[str] = None  # Утилизация
+    
     contact_type: Optional[str] = None
     duration: Optional[str] = None
     invasiveness: Optional[str] = None
@@ -93,8 +108,6 @@ class ProjectUpdate(BaseModel):
     custom_lifecycle_stages: Optional[list] = None
     hazard_questions: Optional[dict] = None
     custom_hazard: Optional[str] = None
-    hazard_checklist_answers: Optional[dict] = None
-    active_hazard_categories: Optional[list] = None
     severity_levels: Optional[list] = None
     probability_levels: Optional[list] = None
     risk_threshold: Optional[int] = None
@@ -173,6 +186,9 @@ class ProjectResponse(ProjectBase):
     # Related data
     members: List[ProjectMemberResponse] = []
     versions: List[ProjectVersionResponse] = []
+    
+    # Active hazard categories calculated from hazard questions
+    active_hazard_categories: List[str] = []
 
     class Config:
         from_attributes = True

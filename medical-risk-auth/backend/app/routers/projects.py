@@ -71,7 +71,9 @@ def _extract_hazard_category_text(risk: RiskFactor) -> str:
 
 def _calculate_coverage_progress(db: Session, project: Project) -> float:
     lifecycle_stages = _safe_json_list(project.lifecycle_stages) + _safe_json_list(project.custom_lifecycle_stages)
-    hazard_categories = _safe_json_list(project.active_hazard_categories)
+    
+    # Calculate active hazard categories from hazard_questions
+    hazard_categories = _calculate_active_hazard_categories_from_questions(project.hazard_questions)
 
     if not lifecycle_stages or not hazard_categories:
         return 0.0
@@ -144,6 +146,216 @@ def _calculate_coverage_progress(db: Session, project: Project) -> float:
 
     coverage_percentage = round((len(covered) / total_required) * 100)
     return float(coverage_percentage)
+
+
+def _calculate_active_hazard_categories_from_questions(hazard_questions_json):
+    """
+    Calculate active hazard categories based on hazard questions.
+    This mirrors the frontend logic for consistency.
+    """
+    if not hazard_questions_json:
+        return []
+    
+    try:
+        hazard_questions = json.loads(hazard_questions_json) if isinstance(hazard_questions_json, str) else hazard_questions_json
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+    # Always active categories
+    active_categories = {
+        'Опасности, связанные с удобством использования (usability)',
+        'Опасности, связанные с надежностью, отказом конструкции или функций изделия',
+        'Опасности клинического применения',
+        'Другие'
+    }
+    
+    # Mapping questions to categories
+    question_to_category_map = {
+        # Биосовместимость
+        'bodyContact': 'Опасности, связанные с биосовместимостью',
+        'materialContact': 'Опасности, связанные с биосовместимостью',
+        'implantableDevice': 'Опасности, связанные с биосовместимостью',
+        'substanceRelease': 'Опасности, связанные с биосовместимостью',
+        'sensitization': 'Опасности, связанные с биосовместимостью',
+        'implantable': 'Опасности, связанные с биосовместимостью',
+        
+        # Безопасность данных и систем
+        'containsSoftware': 'Опасности, связанные с безопасностью данных и систем',
+        'dataExchange': 'Опасности, связанные с безопасностью данных и систем',
+        'wireless': 'Опасности, связанные с безопасностью данных и систем',
+        'personalData': 'Опасности, связанные с безопасностью данных и систем',
+        'userInterface': 'Опасности, связанные с безопасностью данных и систем',
+        'software': 'Опасности, связанные с безопасностью данных и систем',
+        
+        # Электричество
+        'activeDevice': 'Опасности, связанные с электричеством',
+        'powerConnection': 'Опасности, связанные с электричеством',
+        'electricalContacts': 'Опасности, связанные с электричеством',
+        'active': 'Опасности, связанные с электричеством',
+        
+        # Движущиеся части
+        'movingElements': 'Опасности, связанные с движущимися частями',
+        'movingRisk': 'Опасности, связанные с движущимися частями',
+        
+        # Излучение
+        'emitsEnergy': 'Опасности, связанные с излучением',
+        'opticalSystems': 'Опасности, связанные с излучением',
+        
+        # Удобство использования (всегда активна)
+        'specialTraining': 'Опасности, связанные с удобством использования (usability)',
+        'specialNeeds': 'Опасности, связанные с удобством использования (usability)',
+        'interfaceError': 'Опасности, связанные с удобством использования (usability)',
+        'alarms': 'Опасности, связанные с удобством использования (usability)',
+        
+        # Микробиологические факторы
+        'isSterile': 'Опасности, связанные с микробиологическими факторами',
+        'reusable': 'Опасности, связанные с микробиологическими факторами',
+        'biologicalContact': 'Опасности, связанные с микробиологическими факторами',
+        'sterile': 'Опасности, связанные с микробиологическими факторами',
+        'disposable': 'Опасности, связанные с микробиологическими факторами',
+        
+        # Химические вещества
+        'chemicalSubstances': 'Опасности, связанные с химическими веществами',
+        'chemicalRelease': 'Опасности, связанные с химическими веществами',
+        'chemicalSterilization': 'Опасности, связанные с химическими веществами',
+        
+        # Ткани животного происхождения
+        'animalMaterials': 'Опасности, связанные с тканями животного происхождения',
+        
+        # Наноматериалы
+        'nanomaterials': 'Опасности, связанные с наноматериалами',
+        
+        # Фармацевтические субстанции
+        'pharmaceutical': 'Опасности, связанные с фармацевтическими субстанциями',
+        
+        # Воздействие окружающей среды
+        'environmentalSensitivity': 'Опасности, связанные с воздействием окружающей среды',
+        'environmentalImpact': 'Опасности, связанные с воздействием окружающей среды',
+        
+        # Механические факторы
+        'mechanicalLoad': 'Опасности, связанные с механическими факторами, физические',
+        'destructionRisk': 'Опасности, связанные с механическими факторами, физические',
+        
+        # Термические воздействия
+        'heating': 'Опасности, связанные с термическими воздействиями',
+        'surfaceContact': 'Опасности, связанные с термическими воздействиями',
+        
+        # Клиническое применение (всегда активна)
+        'clinicalUse': 'Опасности клинического применения',
+        'clinicalError': 'Опасности клинического применения'
+    }
+    
+    # Check each question and add corresponding categories
+    for question, is_checked in hazard_questions.items():
+        if is_checked and question in question_to_category_map:
+            category = question_to_category_map[question]
+            active_categories.add(category)
+    
+    return list(active_categories)
+
+# Lifecycle stage mapping for converting between keys and display names
+LIFECYCLE_STAGE_MAPPING = {
+    'design_development': 'Проектирование и разработку',
+    'procurement': 'Закупка и входной контроль компонентов и материалов',
+    'production': 'Производство и сборка',
+    'packaging': 'Упаковка и маркировка',
+    'installation': 'Монтаж',
+    'sterilization': 'Стерилизация',
+    'testing': 'Испытания и выпуск продукции',
+    'storage': 'Хранение',
+    'transportation': 'Транспортировка и дистрибуция',
+    'commissioning': 'Установка и ввод в эксплуатацию',
+    'operation': 'Эксплуатация',
+    'maintenance': 'Техническое обслуживание и сервис',
+    'decommissioning': 'Демонтаж и вывод из эксплуатации',
+    'disposal': 'Утилизация и уничтожение изделия или его компонентов',
+    'other': 'Другие'
+}
+
+# Reverse mapping for converting display names back to keys
+REVERSE_LIFECYCLE_STAGE_MAPPING = {v: k for k, v in LIFECYCLE_STAGE_MAPPING.items()}
+# Backward-compatible aliases for legacy stored labels
+REVERSE_LIFECYCLE_STAGE_MAPPING['Проектирование и разработка'] = 'design_development'
+
+def _normalize_lifecycle_stages_for_frontend(stages):
+    """
+    Convert stored display names back to keys for frontend form compatibility.
+    Handles both single stage and array formats.
+    """
+    if not stages:
+        return []
+    
+    # Handle array format
+    if isinstance(stages, list):
+        result = []
+        for stage in stages:
+            if isinstance(stage, str):
+                # Try to convert display name to key
+                key = REVERSE_LIFECYCLE_STAGE_MAPPING.get(stage.strip())
+                if key:
+                    result.append(key)
+                else:
+                    # If not found in mapping, keep as is (for custom stages)
+                    result.append(stage.strip())
+        return result
+    
+    # Handle string format (legacy)
+    if isinstance(stages, str):
+        try:
+            parsed = json.loads(stages)
+            if isinstance(parsed, list):
+                return _normalize_lifecycle_stages_for_frontend(parsed)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        # For single string, try to convert if it's a display name
+        key = REVERSE_LIFECYCLE_STAGE_MAPPING.get(stages.strip())
+        if key:
+            return [key]
+        else:
+            return [stages.strip()]
+    
+    return []
+
+def _normalize_lifecycle_stages_for_backend(stages):
+    """
+    Convert frontend keys to display names for backend storage.
+    """
+    if not stages:
+        return []
+    
+    result = []
+    for stage in stages:
+        if isinstance(stage, str):
+            # Convert key to display name if it exists in mapping
+            display_name = LIFECYCLE_STAGE_MAPPING.get(stage.strip())
+            if display_name:
+                result.append(display_name)
+            else:
+                # If not found in mapping, keep as is (for custom stages)
+                result.append(stage.strip())
+    
+    return result
+
+
+def _normalize_lifecycle_stage_keys(stages):
+    """
+    Normalize lifecycle stages to canonical key format for DB storage.
+    Accepts both keys and legacy display names.
+    """
+    if not stages:
+        return []
+
+    normalized = []
+    for stage in stages:
+        if not isinstance(stage, str):
+            continue
+        value = stage.strip()
+        if not value:
+            continue
+        key = REVERSE_LIFECYCLE_STAGE_MAPPING.get(value, value)
+        if key not in normalized:
+            normalized.append(key)
+    return normalized
 
 router = APIRouter()
 MAX_MEMBERS_PER_NON_ADMIN_ROLE = 5
@@ -472,6 +684,12 @@ async def create_project(
     """Create a new project (all users can create projects)"""
     # All users can create projects
     
+    # Calculate active hazard categories from hazard questions if not provided
+    active_hazard_categories = project.active_hazard_categories
+    if not active_hazard_categories and project.hazard_questions:
+        active_hazard_categories = _calculate_active_hazard_categories_from_questions(project.hazard_questions)
+        print(f"[DEBUG] Project creation: Calculated active_hazard_categories: {active_hazard_categories}")
+    
     db_project = Project(
         name=project.name,
         description=project.description,
@@ -486,6 +704,12 @@ async def create_project(
         technical_specs=project.technical_specs,
         regulatory_requirements=project.regulatory_requirements,
         standards=project.standards,
+        # New fields for 14971 standard requirements
+        indications=project.indications,
+        contraindications=project.contraindications,
+        target_group=project.target_group,
+        warnings=project.warnings,
+        disposal=project.disposal,
         contact_type=project.contact_type,
         duration=project.duration,
         invasiveness=project.invasiveness,
@@ -493,12 +717,12 @@ async def create_project(
         # New project is always created as a blank draft awaiting product manager assignment.
         status=ProjectStatus.DRAFT,
         owner_id=current_user.id,
-        lifecycle_stages=json.dumps(project.lifecycle_stages) if project.lifecycle_stages else None,
-        custom_lifecycle_stages=json.dumps(project.custom_lifecycle_stages) if project.custom_lifecycle_stages else None,
+        lifecycle_stages=json.dumps(_normalize_lifecycle_stage_keys(project.lifecycle_stages)) if project.lifecycle_stages else None,
+        custom_lifecycle_stages=json.dumps([str(s).strip() for s in (project.custom_lifecycle_stages or []) if str(s).strip()]) if project.custom_lifecycle_stages else None,
         hazard_questions=json.dumps(project.hazard_questions) if project.hazard_questions else None,
         custom_hazard=project.custom_hazard,
         hazard_checklist_answers=json.dumps(project.hazard_checklist_answers) if project.hazard_checklist_answers else None,
-        active_hazard_categories=json.dumps(project.active_hazard_categories) if project.active_hazard_categories else None,
+        active_hazard_categories=json.dumps(active_hazard_categories) if active_hazard_categories else None,
         severity_levels=json.dumps(project.severity_levels) if project.severity_levels else None,
         probability_levels=json.dumps(project.probability_levels or DEFAULT_PROBABILITY_LEVELS),
         risk_threshold=project.risk_threshold if project.risk_threshold else 10
@@ -602,10 +826,27 @@ async def create_project(
     lifecycle_stages_data = safe_json_load(db_project.lifecycle_stages)
     custom_lifecycle_stages_data = safe_json_load(db_project.custom_lifecycle_stages)
     hazard_questions_data = safe_json_load(db_project.hazard_questions)
-    hazard_checklist_answers_data = safe_json_load(db_project.hazard_checklist_answers)
-    active_hazard_categories_data = safe_json_load(db_project.active_hazard_categories)
     severity_levels_data = safe_json_load(db_project.severity_levels)
     probability_levels_data = safe_json_load(db_project.probability_levels)
+    
+    # Debug logging for active_hazard_categories
+    print(f"[DEBUG] Project {db_project.id} active_hazard_categories raw: {db_project.active_hazard_categories}")
+    print(f"[DEBUG] Project {db_project.id} active_hazard_categories type: {type(db_project.active_hazard_categories)}")
+    
+    # Calculate active hazard categories from questions if not stored
+    active_hazard_categories_data = None
+    if db_project.active_hazard_categories:
+        try:
+            active_hazard_categories_data = safe_json_load(db_project.active_hazard_categories)
+            print(f"[DEBUG] Project {db_project.id} parsed active_hazard_categories: {active_hazard_categories_data}")
+        except Exception as e:
+            print(f"[DEBUG] Failed to parse active_hazard_categories: {e}")
+            # Fallback to calculating from questions
+            active_hazard_categories_data = _calculate_active_hazard_categories_from_questions(db_project.hazard_questions)
+    else:
+        # Calculate from questions if not stored
+        active_hazard_categories_data = _calculate_active_hazard_categories_from_questions(db_project.hazard_questions)
+        print(f"[DEBUG] Project {db_project.id} calculated active_hazard_categories from questions: {active_hazard_categories_data}")
 
     # Create response manually to avoid ORM serialization issues
     response_data = ProjectResponse(
@@ -631,11 +872,15 @@ async def create_project(
         duration=db_project.duration,
         invasiveness=db_project.invasiveness,
         energy_source=db_project.energy_source,
+        indications=db_project.indications,
+        contraindications=db_project.contraindications,
+        target_group=db_project.target_group,
+        warnings=db_project.warnings,
+        disposal=db_project.disposal,
         lifecycle_stages=lifecycle_stages_data,
         custom_lifecycle_stages=custom_lifecycle_stages_data,
         hazard_questions=hazard_questions_data,
         custom_hazard=db_project.custom_hazard,
-        hazard_checklist_answers=hazard_checklist_answers_data,
         active_hazard_categories=active_hazard_categories_data,
         severity_levels=severity_levels_data,
         probability_levels=probability_levels_data,
@@ -723,13 +968,30 @@ async def read_project(
             ))
     
     # Deserialize JSON fields
-    lifecycle_stages_data = json.loads(db_project.lifecycle_stages) if db_project.lifecycle_stages else None
+    lifecycle_stages_data = _normalize_lifecycle_stages_for_frontend(db_project.lifecycle_stages)
     custom_lifecycle_stages_data = json.loads(db_project.custom_lifecycle_stages) if db_project.custom_lifecycle_stages else None
     hazard_questions_data = json.loads(db_project.hazard_questions) if db_project.hazard_questions else None
-    hazard_checklist_answers_data = json.loads(db_project.hazard_checklist_answers) if db_project.hazard_checklist_answers else None
-    active_hazard_categories_data = json.loads(db_project.active_hazard_categories) if db_project.active_hazard_categories else None
     severity_levels_data = json.loads(db_project.severity_levels) if db_project.severity_levels else None
     probability_levels_data = json.loads(db_project.probability_levels) if db_project.probability_levels else None
+
+    # Load active hazard categories from stored data
+    active_hazard_categories_data = None
+    print(f"[DEBUG] Project {db_project.id} raw hazard_questions: {db_project.hazard_questions}")
+    print(f"[DEBUG] Project {db_project.id} raw active_hazard_categories: {db_project.active_hazard_categories}")
+    
+    if db_project.active_hazard_categories:
+        try:
+            active_hazard_categories_data = json.loads(db_project.active_hazard_categories)
+            print(f"[DEBUG] Project {db_project.id} parsed active_hazard_categories: {active_hazard_categories_data}")
+        except Exception as e:
+            print(f"[DEBUG] Failed to parse active_hazard_categories: {e}")
+            # Fallback to calculating from questions (for backward compatibility with old projects)
+            active_hazard_categories_data = _calculate_active_hazard_categories_from_questions(db_project.hazard_questions)
+            print(f"[DEBUG] Project {db_project.id} fallback calculated active_hazard_categories: {active_hazard_categories_data}")
+    else:
+        # Calculate from questions if not stored (for backward compatibility with old projects)
+        active_hazard_categories_data = _calculate_active_hazard_categories_from_questions(db_project.hazard_questions)
+        print(f"[DEBUG] Project {db_project.id} calculated active_hazard_categories from questions: {active_hazard_categories_data}")
 
     # Create response manually to avoid ORM serialization issues
     response_data = ProjectResponse(
@@ -755,11 +1017,15 @@ async def read_project(
         duration=db_project.duration,
         invasiveness=db_project.invasiveness,
         energy_source=db_project.energy_source,
+        indications=db_project.indications,
+        contraindications=db_project.contraindications,
+        target_group=db_project.target_group,
+        warnings=db_project.warnings,
+        disposal=db_project.disposal,
         lifecycle_stages=lifecycle_stages_data,
         custom_lifecycle_stages=custom_lifecycle_stages_data,
         hazard_questions=hazard_questions_data,
         custom_hazard=db_project.custom_hazard,
-        hazard_checklist_answers=hazard_checklist_answers_data,
         active_hazard_categories=active_hazard_categories_data,
         severity_levels=severity_levels_data,
         probability_levels=probability_levels_data,
@@ -808,9 +1074,13 @@ async def update_project(
     update_data = project_update.dict(exclude_unset=True)
     # Handle JSON serialization for specific fields
     if 'lifecycle_stages' in update_data:
-        update_data['lifecycle_stages'] = json.dumps(update_data['lifecycle_stages']) if update_data['lifecycle_stages'] else None
+        update_data['lifecycle_stages'] = json.dumps(
+            _normalize_lifecycle_stage_keys(update_data['lifecycle_stages'])
+        ) if update_data['lifecycle_stages'] else None
     if 'custom_lifecycle_stages' in update_data:
-        update_data['custom_lifecycle_stages'] = json.dumps(update_data['custom_lifecycle_stages']) if update_data['custom_lifecycle_stages'] else None
+        update_data['custom_lifecycle_stages'] = json.dumps(
+            [str(s).strip() for s in (update_data['custom_lifecycle_stages'] or []) if str(s).strip()]
+        ) if update_data['custom_lifecycle_stages'] else None
     if 'hazard_questions' in update_data:
         update_data['hazard_questions'] = json.dumps(update_data['hazard_questions']) if update_data['hazard_questions'] else None
     if 'hazard_checklist_answers' in update_data:
@@ -821,6 +1091,30 @@ async def update_project(
         update_data['severity_levels'] = json.dumps(update_data['severity_levels']) if update_data['severity_levels'] else None
     if 'probability_levels' in update_data:
         update_data['probability_levels'] = json.dumps(update_data['probability_levels']) if update_data['probability_levels'] else None
+    
+    # Handle new technical specification fields for 14971 standard
+    # These fields are simple text fields, no JSON serialization needed
+    for field in ['indications', 'contraindications', 'target_group', 'warnings', 'disposal']:
+        if field in update_data:
+            # The field is already in the correct format (string), just ensure it's properly handled
+            setattr(db_project, field, update_data[field])
+            # Remove from update_data to avoid double assignment below
+            del update_data[field]
+
+    # Calculate active hazard categories from hazard questions if not provided in update
+    if 'active_hazard_categories' not in update_data and 'hazard_questions' in update_data:
+        calculated_categories = _calculate_active_hazard_categories_from_questions(update_data['hazard_questions'])
+        print(f"[DEBUG] Project update: Calculated active_hazard_categories from updated hazard_questions: {calculated_categories}")
+        update_data['active_hazard_categories'] = json.dumps(calculated_categories) if calculated_categories else None
+    elif 'hazard_questions' in update_data and 'active_hazard_categories' in update_data:
+        # If both are provided, ensure active_hazard_categories is properly serialized
+        if update_data['active_hazard_categories']:
+            update_data['active_hazard_categories'] = json.dumps(update_data['active_hazard_categories'])
+        else:
+            # If active_hazard_categories is empty but hazard_questions exist, recalculate
+            calculated_categories = _calculate_active_hazard_categories_from_questions(update_data['hazard_questions'])
+            print(f"[DEBUG] Project update: Recalculated active_hazard_categories: {calculated_categories}")
+            update_data['active_hazard_categories'] = json.dumps(calculated_categories) if calculated_categories else None
 
     for field, value in update_data.items():
         setattr(db_project, field, value)
@@ -935,10 +1229,23 @@ async def update_project(
     lifecycle_stages_data = safe_json_load(db_project.lifecycle_stages)
     custom_lifecycle_stages_data = safe_json_load(db_project.custom_lifecycle_stages)
     hazard_questions_data = safe_json_load(db_project.hazard_questions)
-    hazard_checklist_answers_data = safe_json_load(db_project.hazard_checklist_answers)
-    active_hazard_categories_data = safe_json_load(db_project.active_hazard_categories)
     severity_levels_data = safe_json_load(db_project.severity_levels)
     probability_levels_data = safe_json_load(db_project.probability_levels)
+
+    # Calculate active hazard categories from questions if not stored
+    active_hazard_categories_data = None
+    if db_project.active_hazard_categories:
+        try:
+            active_hazard_categories_data = safe_json_load(db_project.active_hazard_categories)
+            print(f"[DEBUG] Project {db_project.id} parsed active_hazard_categories: {active_hazard_categories_data}")
+        except Exception as e:
+            print(f"[DEBUG] Failed to parse active_hazard_categories: {e}")
+            # Fallback to calculating from questions
+            active_hazard_categories_data = _calculate_active_hazard_categories_from_questions(db_project.hazard_questions)
+    else:
+        # Calculate from questions if not stored
+        active_hazard_categories_data = _calculate_active_hazard_categories_from_questions(db_project.hazard_questions)
+        print(f"[DEBUG] Project {db_project.id} calculated active_hazard_categories from questions: {active_hazard_categories_data}")
 
     # Create response data
     response_data = ProjectResponse(
@@ -962,11 +1269,15 @@ async def update_project(
         duration=db_project.duration,
         invasiveness=db_project.invasiveness,
         energy_source=db_project.energy_source,
+        indications=db_project.indications,
+        contraindications=db_project.contraindications,
+        target_group=db_project.target_group,
+        warnings=db_project.warnings,
+        disposal=db_project.disposal,
         lifecycle_stages=lifecycle_stages_data,
         custom_lifecycle_stages=custom_lifecycle_stages_data,
         hazard_questions=hazard_questions_data,
         custom_hazard=db_project.custom_hazard,
-        hazard_checklist_answers=hazard_checklist_answers_data,
         active_hazard_categories=active_hazard_categories_data,
         severity_levels=severity_levels_data,
         probability_levels=probability_levels_data,
