@@ -2,7 +2,7 @@
 
 .changelog-history-container {
     min-height: 100vh;
-    background-color: #BFBFBF;
+    background-color: #F0FBFF;
     padding: 40px;
     font-family: 'Inter', sans-serif;
 }
@@ -130,7 +130,7 @@
     height: 16px;
     background-color: #FC7171;
     border-radius: 50%;
-    border: 3px solid #BFBFBF;
+    border: 3px solid #F0FBFF;
     box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
 }
 

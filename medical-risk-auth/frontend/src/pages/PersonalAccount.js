@@ -5,47 +5,22 @@ import './PersonalAccount.css';
 
 const PersonalAccount = () => {
   const [user, setUser] = useState(null);
-  const [showReturn, setShowReturn] = useState(false);
-  const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [projectsCount, setProjectsCount] = useState(0);
+  const [activeDays, setActiveDays] = useState('---');
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    email: '',
-    phone: '',
-    department: '',
-    position: '',
-    language: 'en',
-    timezone: 'UTC',
-    notifications: {
-      email: true,
-      browser: true,
-      mobile: false
-    }
   });
 
   useEffect(() => {
     loadUserData();
-    loadStatistics();
-
-    const content = document.querySelector('.content-body');
-    const onScroll = () => {
-      const scrollTop = content ? content.scrollTop : (window.pageYOffset || document.documentElement.scrollTop);
-      setShowReturn(scrollTop > 100);
-    };
-    (content || window).addEventListener('scroll', onScroll);
-    onScroll();
-    return () => (content || window).removeEventListener('scroll', onScroll);
+    loadProjectsCount();
+    loadActiveDays();
   }, []);
-
-  const scrollToTop = () => {
-    const content = document.querySelector('.content-body');
-    if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
-    else window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const loadUserData = async () => {
     setLoading(true);
@@ -70,30 +45,15 @@ const PersonalAccount = () => {
           department: userData.department || '',
           position: userData.position || '',
           role: userData.role,
-          language: userData.language || 'en',
-          timezone: userData.timezone || 'UTC',
           avatar: userData.avatar_url || '/api/placeholder/120/120',
           joinDate: userData.created_at,
           lastLogin: userData.last_login,
-          notifications: {
-            email: userData.email_notifications !== false,
-            browser: userData.browser_notifications !== false,
-            mobile: userData.mobile_notifications !== false
-          },
-          recentActivity: []
         };
 
         setUser(user);
         setFormData({
           firstName: user.firstName,
           lastName: user.lastName,
-          email: user.email,
-          phone: user.phone,
-          department: user.department,
-          position: user.position,
-          language: user.language,
-          timezone: user.timezone,
-          notifications: user.notifications
         });
       } else {
         console.error('Failed to load user data:', response.status);
@@ -105,45 +65,57 @@ const PersonalAccount = () => {
     }
   };
 
-  const loadStatistics = async () => {
+  const loadProjectsCount = async () => {
     try {
       const token = localStorage.getItem('token');
-
-      const response = await fetch(`${API_BASE_URL}/api/users/me/statistics`, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
       if (response.ok) {
-        const statsData = await response.json();
-        setStatistics(statsData);
-      } else {
-        console.error('Failed to load statistics:', response.status);
+        const projects = await response.json();
+        setProjectsCount(projects.length);
       }
     } catch (error) {
-      console.error('Failed to load statistics:', error);
+      console.error('Failed to load projects count:', error);
+    }
+  };
+
+  const loadActiveDays = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        // Рассчитываем активные дни на основе даты создания аккаунта
+        if (userData.created_at) {
+          const joinDate = new Date(userData.created_at);
+          const today = new Date();
+          const activeDaysCount = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
+          setActiveDays(activeDaysCount);
+        } else {
+          setActiveDays('---');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load active days:', error);
+      setActiveDays('---');
     }
   };
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-
-    if (name.startsWith('notifications.')) {
-      const notificationKey = name.split('.')[1];
-      setFormData(prev => ({
-        ...prev,
-        notifications: {
-          ...prev.notifications,
-          [notificationKey]: checked
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      }));
-    }
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -160,15 +132,6 @@ const PersonalAccount = () => {
         body: JSON.stringify({
           first_name: formData.firstName,
           last_name: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          department: formData.department,
-          position: formData.position,
-          language: formData.language,
-          timezone: formData.timezone,
-          email_notifications: formData.notifications.email,
-          browser_notifications: formData.notifications.browser,
-          mobile_notifications: formData.notifications.mobile
         })
       });
 
@@ -176,7 +139,6 @@ const PersonalAccount = () => {
         const updatedUser = await response.json();
         localStorage.setItem('user', JSON.stringify(updatedUser));
         loadUserData();
-        loadStatistics();
         setIsEditing(false);
         alert('Profile updated successfully!');
       } else {
@@ -189,28 +151,13 @@ const PersonalAccount = () => {
     }
   };
 
-
-
-
-
-
-
-
-  const getRoleBadge = (role) => {
-    const roleConfig = {
-      SYS_ADMIN: { label: 'System Admin', className: 'role-sys-admin' },
-      USER: { label: 'User', className: 'role-user' },
-    };
-    const config = roleConfig[role] || { label: 'User', className: 'role-user' };
-    return <span className={`role-badge ${config.className}`}>{config.label}</span>;
+  const handleNavigateToProjects = () => {
+    navigate('/dashboard');
   };
 
-  const getRoleDescription = (role) => {
-    if (role === 'SYS_ADMIN') {
-      return 'Полный доступ к управлению системой, пользователями и всеми проектами';
-    } else {
-      return 'Доступ к своим проектам с возможностью участия в качестве администратора, врача или менеджера проекта';
-    }
+  const handlePlaceholderAction = () => {
+    // Заглушка для остальных навигаций
+    console.log('Placeholder action');
   };
 
   if (loading) {
@@ -226,52 +173,54 @@ const PersonalAccount = () => {
 
   return (
     <div className="personal-account">
-      {/* Profile Header */}
-      <div className="profile-header">
-        <div className="profile-left">
-          <h2 className="greeting-title">Personal account</h2>
-          <div className="profile-info">
-          <div className={`profile-avatar ${(!user.avatar || String(user.avatar).includes('/api/placeholder')) ? 'default-avatar' : ''}`}>
-            {(!user.avatar || String(user.avatar).includes('/api/placeholder')) ? (
-              <div className="avatar-circle"><div className="avatar-person"></div></div>
-            ) : (
-              <img src={user.avatar} alt={`${user.firstName} ${user.lastName}`} />
-            )}
-            <button className="avatar-edit-btn">📷</button>
-          </div>
-          <div className="profile-details">
-            <h1>{user.firstName} {user.lastName}</h1>
-            <p className="profile-email">{user.email}</p>
-            <div className="profile-meta">
-              <div className="role-info">
-                {getRoleBadge(user.role)}
-              </div>
-              <span className="profile-department">{user.department}</span>
-            </div>
-          </div>
-          </div>
-        </div>
-        
-      </div>
-
-      <div className="account-content">
-        <div className="profile-edit-top">
-          <button
-            className="btn btn-primary"
-            onClick={() => setIsEditing(!isEditing)}
+      {/* Верхняя секция - Шапка профиля */}
+      <div className="profile-header-section">
+        <div className="profile-avatar">
+          {user.avatar && user.avatar !== '/api/placeholder/50/50' && user.avatar !== '/api/placeholder/40/40' ? (
+            <img
+              src={user.avatar}
+              alt={`${user.firstName} ${user.lastName}`}
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+          ) : null}
+          <div
+            className="avatar-circle"
+            style={{
+              display: (!user.avatar || user.avatar === '/api/placeholder/50/50' || user.avatar === '/api/placeholder/40/40') ? 'flex' : 'none',
+              backgroundColor: '#8b9dc3',
+              borderRadius: '50%',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '48px',
+              fontWeight: '600',
+              border: '4px solid #8b9dc3'
+            }}
           >
-            {isEditing ? 'Cancel' : 'Edit Profile'}
-          </button>
+            {user.firstName && user.lastName ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase() : 'U'}
+          </div>
         </div>
-        {/* Personal Information */}
-        <div className="info-section">
-          <h2>Personal Information</h2>
-          
+        <div className="profile-info-card">
+          {!isEditing && (
+            <div className="profile-edit-header">
+              <button
+                className="edit-button"
+                onClick={() => setIsEditing(!isEditing)}
+                title="Редактировать"
+              >
+                ✏️
+              </button>
+            </div>
+          )}
+
           {isEditing ? (
-            <form onSubmit={handleSubmit} className="profile-form">
+            <form onSubmit={handleSubmit} className="profile-edit-form">
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="firstName">First Name</label>
+                  <label htmlFor="firstName">Имя</label>
                   <input
                     type="text"
                     id="firstName"
@@ -281,9 +230,9 @@ const PersonalAccount = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="form-group">
-                  <label htmlFor="lastName">Last Name</label>
+                  <label htmlFor="lastName">Фамилия</label>
                   <input
                     type="text"
                     id="lastName"
@@ -295,270 +244,124 @@ const PersonalAccount = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="email">Email</label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="phone">Phone</label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="department">Department</label>
-                  <input
-                    type="text"
-                    id="department"
-                    name="department"
-                    value={formData.department}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="position">Position</label>
-                  <input
-                    type="text"
-                    id="position"
-                    name="position"
-                    value={formData.position}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="language">Language</label>
-                  <select
-                    id="language"
-                    name="language"
-                    value={formData.language}
-                    onChange={handleInputChange}
-                  >
-                    <option value="en">English</option>
-                    <option value="ru">Russian</option>
-                    <option value="de">German</option>
-                    <option value="fr">French</option>
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="timezone">Timezone</label>
-                  <select
-                    id="timezone"
-                    name="timezone"
-                    value={formData.timezone}
-                    onChange={handleInputChange}
-                  >
-                    <option value="UTC">UTC</option>
-                    <option value="EST">Eastern Time</option>
-                    <option value="PST">Pacific Time</option>
-                    <option value="CET">Central European Time</option>
-                    <option value="MSK">Moscow Time</option>
-                  </select>
-                </div>
-              </div>
-
               <div className="form-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setIsEditing(false)}
-                >
-                  Cancel
-                </button>
                 <button type="submit" className="btn btn-primary">
-                  Save Changes
+                  Сохранить
                 </button>
               </div>
             </form>
           ) : (
-            <div className="info-display">
-              <div className="info-grid">
-                <div className="info-item">
-                  <label>First Name:</label>
-                  <span>{user.firstName}</span>
-                </div>
-                <div className="info-item">
-                  <label>Last Name:</label>
-                  <span>{user.lastName}</span>
-                </div>
-                <div className="info-item">
-                  <label>Email:</label>
-                  <span>{user.email}</span>
-                </div>
-                <div className="info-item">
-                  <label>Phone:</label>
-                  <span>{user.phone || 'Not provided'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Department:</label>
-                  <span>{user.department}</span>
-                </div>
-                <div className="info-item">
-                  <label>Position:</label>
-                  <span>{user.position}</span>
-                </div>
-                <div className="info-item">
-                  <label>Language:</label>
-                  <span>{user.language === 'en' ? 'English' : user.language}</span>
-                </div>
-                <div className="info-item">
-                  <label>Timezone:</label>
-                  <span>{user.timezone}</span>
-                </div>
+            <div className="profile-info-display">
+              <div className="profile-name">
+                {user.firstName} {user.lastName}
+              </div>
+              <div className="profile-birth-date">---</div>
+              <div className="profile-position-department">
+                <span className="position">---</span>
+                <span className="department">---</span>
               </div>
             </div>
           )}
         </div>
-
-        {/* Account Statistics */}
-        <div className="stats-section">
-          <h2>Account Statistics</h2>
-          {statistics ? (
-            <div className="stats-grid">
-              {user.role === 'SYS_ADMIN' ? (
-                // Sys Admin Statistics
-                <>
-                  <div className="stat-card clickable" onClick={() => navigate('/dashboard')}>
-                    <div className="stat-icon">📊</div>
-                    <div className="stat-info">
-                      <div className="stat-number">{statistics.total_projects}</div>
-                      <div className="stat-label">Total Projects</div>
-                    </div>
-                  </div>
-                  <div className="stat-card clickable" onClick={() => navigate('/roles')}>
-                    <div className="stat-icon">👥</div>
-                    <div className="stat-info">
-                      <div className="stat-number">{statistics.total_users}</div>
-                      <div className="stat-label">Total Users</div>
-                    </div>
-                  </div>
-                  <div className="stat-card clickable" onClick={() => navigate('/dashboard')}>
-                    <div className="stat-icon">🚀</div>
-                    <div className="stat-info">
-                      <div className="stat-number">{statistics.active_projects}</div>
-                      <div className="stat-label">Active Projects</div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                // User Statistics
-                <>
-                  <div className="stat-card clickable" onClick={() => navigate('/dashboard')}>
-                    <div className="stat-icon">📊</div>
-                    <div className="stat-info">
-                      <div className="stat-number">{statistics.user_projects}</div>
-                      <div className="stat-label">My Projects</div>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-icon">📅</div>
-                    <div className="stat-info">
-                      <div className="stat-number">{Math.floor((new Date() - new Date(user.joinDate)) / (1000 * 60 * 60 * 24))}</div>
-                      <div className="stat-label">Days Active</div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="loading-state">
-              <div className="loading-spinner"></div>
-              <p>Loading statistics...</p>
-            </div>
-          )}
-        </div>
-
-        {/* Notification Settings */}
-        <div className="notifications-section">
-          <h2>Notification Preferences</h2>
-          
-          {isEditing ? (
-            <div className="notification-settings">
-              <label className="notification-item">
-                <input
-                  type="checkbox"
-                  name="notifications.email"
-                  checked={formData.notifications.email}
-                  onChange={handleInputChange}
-                />
-                <span>Email Notifications</span>
-                <small>Receive updates via email</small>
-              </label>
-              
-              <label className="notification-item">
-                <input
-                  type="checkbox"
-                  name="notifications.browser"
-                  checked={formData.notifications.browser}
-                  onChange={handleInputChange}
-                />
-                <span>Browser Notifications</span>
-                <small>Show notifications in browser</small>
-              </label>
-              
-              <label className="notification-item">
-                <input
-                  type="checkbox"
-                  name="notifications.mobile"
-                  checked={formData.notifications.mobile}
-                  onChange={handleInputChange}
-                />
-                <span>Mobile Notifications</span>
-                <small>Push notifications to mobile device</small>
-              </label>
-            </div>
-          ) : (
-            <div className="notification-display">
-              <div className="notification-status">
-                <span className={`status ${user.notifications.email ? 'enabled' : 'disabled'}`}>
-                  Email: {user.notifications.email ? 'Enabled' : 'Disabled'}
-                </span>
-                <span className={`status ${user.notifications.browser ? 'enabled' : 'disabled'}`}>
-                  Browser: {user.notifications.browser ? 'Enabled' : 'Disabled'}
-                </span>
-                <span className={`status ${user.notifications.mobile ? 'enabled' : 'disabled'}`}>
-                  Mobile: {user.notifications.mobile ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Recent Activity removed as requested */}
       </div>
 
-      {/* Floating return button inside Personal Account */}
-      <button
-        className={`floating-return ${showReturn ? 'visible' : ''}`}
-        onClick={scrollToTop}
-        aria-label="Return to top"
-      >
-        ↑
-      </button>
+      {/* Средняя секция - Контакты и безопасность */}
+      <div className="profile-middle-section">
+        {/* Левая колонка - Контакты и связь */}
+        <div className="contacts-column">
+          <h3 className="column-title">Контакты и связь</h3>
+
+          <div className="contact-field">
+            <div className="field-label">Email основной</div>
+            <div className="field-value">{user.email}</div>
+          </div>
+
+          <div className="contact-field">
+            <div className="field-label">Email дополнительный</div>
+            <div className="field-value">---</div>
+          </div>
+
+          <div className="contact-field">
+            <div className="field-label">Номер телефона</div>
+            <div className="field-value">---</div>
+          </div>
+
+          <div className="contact-field">
+            <div className="field-label">LinkedIn</div>
+            <div className="field-value">---</div>
+          </div>
+        </div>
+
+        {/* Правая колонка - Безопасность и доступ */}
+        <div className="security-column">
+          <h3 className="column-title">Безопасность и доступ</h3>
+
+          <div className="security-field">
+            <div className="field-content">
+              <div className="field-label">Изменение пароля</div>
+              <div className="field-value">Последний раз изменен 3 месяца назад</div>
+            </div>
+            <button className="action-button">Изменить</button>
+          </div>
+
+          <div className="security-field">
+            <div className="field-content">
+              <div className="field-label">Двухфакторная аутентификация</div>
+              <div className="field-value">Выкл.</div>
+            </div>
+            <button className="action-button primary">Подключить</button>
+          </div>
+
+          <div className="security-field">
+            <div className="field-content">
+              <div className="field-label">Список доверенных IP</div>
+              <div className="field-value">White list</div>
+            </div>
+            <button className="action-button secondary">
+              <span className="gear-icon">⚙️</span> Управление
+            </button>
+          </div>
+
+          <div className="security-field">
+            <div className="field-content">
+              <div className="field-label">История входов</div>
+              <div className="field-value">Последний вход: сегодня в 7:21, Минск</div>
+            </div>
+            <button className="action-button">Посмотреть все</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Нижняя секция - Инструкция по использованию */}
+      <div className="profile-bottom-section">
+        <div className="instructions-grid">
+          <div className="instruction-item" onClick={handleNavigateToProjects}>
+            <div className="instruction-icon">📊</div>
+            <div className="instruction-count">{projectsCount}</div>
+            <div className="instruction-label">Мои проекты</div>
+          </div>
+
+          <div className="instruction-item" onClick={handlePlaceholderAction}>
+            <div className="instruction-icon">👤</div>
+            <div className="instruction-count">---</div>
+            <div className="instruction-label">Мои роли</div>
+          </div>
+
+          <div className="instruction-item" onClick={handlePlaceholderAction}>
+            <div className="instruction-icon">👥</div>
+            <div className="instruction-count">---</div>
+            <div className="instruction-label">Команда</div>
+          </div>
+
+          <div className="instruction-item" onClick={handlePlaceholderAction}>
+            <div className="instruction-icon">📅</div>
+            <div className="instruction-count">{activeDays}</div>
+            <div className="instruction-label">Активные дни</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-  
 };
-
 
 export default PersonalAccount;

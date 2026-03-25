@@ -21,6 +21,13 @@ const DocumentView = () => {
     loadProjectData();
     loadCurrentDocument();
     loadVersionHistory();
+
+    // Hide sidebar for documents page
+    const className = 'hide-floating-shortcuts';
+    document.body.classList.add(className);
+    return () => {
+      document.body.classList.remove(className);
+    };
   }, [id]);
 
   useEffect(() => {
