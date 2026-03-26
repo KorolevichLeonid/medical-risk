@@ -15,10 +15,11 @@ if __name__ == "__main__":
     init_database()
 
     # Run the application
+    is_dev = os.getenv("ENVIRONMENT", "production") == "development"
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
+        reload=is_dev,
         log_level="info"
     )

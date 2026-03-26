@@ -26,15 +26,11 @@ function App() {
   const isAuthenticated = useIsAuthenticated();
 
   useEffect(() => {
-    // Handle redirect response after login
-    instance.handleRedirectPromise().then((response) => {
-      if (response) {
-        console.log('Login successful:', response);
-      }
-    }).catch((error) => {
-      console.error('Login error:', error);
-    });
-  }, [instance]);
+    // MSAL React automatically handles redirect response via MsalProvider
+    if (accounts && accounts.length > 0) {
+      console.log('Login successful - user already authenticated');
+    }
+  }, [accounts]);
 
   const PublicPageWrapper = ({ children }) => (
     <>
