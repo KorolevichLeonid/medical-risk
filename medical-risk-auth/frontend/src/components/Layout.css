@@ -334,7 +334,7 @@ body.hide-floating-shortcuts .layout {
   width: 254px;
   height: 20px;
   left: 24px;
-  top: 580px;
+  bottom: 140px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -376,7 +376,7 @@ body.hide-floating-shortcuts .layout {
   width: 254px;
   height: 20px;
   left: 24px;
-  top: 615px;
+  bottom: 110px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -418,7 +418,7 @@ body.hide-floating-shortcuts .layout {
   width: 254px;
   height: 20px;
   left: 24px;
-  top: 650px;
+  bottom: 80px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -470,7 +470,7 @@ body.hide-floating-shortcuts .layout {
 }
 
 .menu-item.notifications-section.expanded {
-  top: 440px;
+  top: 400px;
 }
 
 .menu-item.notifications-section:hover {
@@ -519,7 +519,7 @@ body.hide-floating-shortcuts .layout {
 }
 
 .menu-item.messenger-section.expanded {
-  top: 470px;
+  top: 430px;
 }
 
 .menu-item.messenger-section:hover {
@@ -567,7 +567,7 @@ body.hide-floating-shortcuts .layout {
 }
 
 .menu-item.documents-section.expanded {
-  top: 500px;
+  top: 460px;
 }
 
 .menu-item.documents-section:hover {
@@ -615,7 +615,7 @@ body.hide-floating-shortcuts .layout {
 }
 
 .menu-item.standards-section.expanded {
-  top: 530px;
+  top: 490px;
 }
 
 .menu-item.standards-section:hover {
@@ -672,12 +672,16 @@ body.hide-floating-shortcuts .layout {
 /* Sidebar Logo */
 .sidebar-logo {
   position: absolute;
-  width: 200px;
+  width: 65%;
   height: auto;
+  max-height: 100px;
   left: 56px;
-  bottom: 10px;
+  bottom: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .sidebar-logo:hover {
@@ -689,9 +693,9 @@ body.hide-floating-shortcuts .layout {
   position: absolute;
   bottom: 10px;
   left: 5px;
-  width: 60px;
-  max-width: 60px;
+  width: 80%;
   height: auto;
+  max-height: 50px;
   margin: 0;
   padding: 5px;
 }
@@ -700,18 +704,35 @@ body.hide-floating-shortcuts .layout {
 .sidebar-toggle {
   position: absolute;
   bottom: 13px;
-  right: 5px;
+  right: 3px;
   background: transparent !important;
   border: none !important;
   border-color: transparent !important;
+  border-style: none !important;
+  border-width: 0 !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
   width: 16px;
   height: 16px;
   padding: 0;
   cursor: pointer;
   z-index: 1001;
-  outline: none;
+  outline: none !important;
+  outline-style: none !important;
+  outline-width: 0 !important;
   -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar-toggle:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.sidebar-toggle:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .sidebar-toggle:hover .sidebar-arrow-icon {
