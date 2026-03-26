@@ -1589,7 +1589,7 @@ const ProjectForm = () => {
           <h2>Технические характеристики</h2>
 
           <div className="form-group">
-            <label htmlFor="technicalSpecs">Технические характеристики*</label>
+            <label htmlFor="technicalSpecs">Технические характеристики</label>
             <textarea
               id="technicalSpecs"
               name="technicalSpecs"

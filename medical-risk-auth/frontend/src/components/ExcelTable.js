@@ -5,6 +5,30 @@ import BatchRiskEvaluation from './BatchRiskEvaluation';
 import API_BASE_URL from '../config';
 
 const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
+  // Lifecycle stage labels mapping
+  const LIFECYCLE_STAGE_LABELS = {
+    design_development: 'Проектирование и разработка',
+    procurement: 'Закупка и входной контроль компонентов и материалов',
+    production: 'Производство и сборка',
+    packaging: 'Упаковка и маркировка',
+    installation: 'Монтаж',
+    sterilization: 'Стерилизация',
+    testing: 'Испытания и выпуск продукции',
+    storage: 'Хранение',
+    transportation: 'Транспортировка и дистрибуция',
+    commissioning: 'Установка и ввод в эксплуатацию',
+    operation: 'Эксплуатация',
+    maintenance: 'Техническое обслуживание и сервис',
+    decommissioning: 'Демонтаж и вывод из эксплуатации',
+    disposal: 'Утилизация и уничтожение изделия или его компонентов',
+    other: 'Другие'
+  };
+
+  const formatLifecycleStageForDisplay = (stage) => {
+    if (!stage || typeof stage !== 'string') return '';
+    const normalized = stage.trim();
+    return LIFECYCLE_STAGE_LABELS[normalized] || normalized;
+  };
   const MIN_ZOOM = 60;
   const MAX_ZOOM = 150;
   const ZOOM_STEP = 5;
@@ -603,7 +627,19 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
 
   // Получить название листа (пользовательское или оригинальное)
   const getSheetName = (sheetId) => {
-    return customSheetNames[sheetId] || sheets.find(s => s.id === sheetId)?.name || sheetId;
+    // Сначала проверяем пользовательские названия
+    if (customSheetNames[sheetId]) {
+      return customSheetNames[sheetId];
+    }
+    
+    // Для этапов жизненного цикла используем русские названия
+    const lifecycleName = formatLifecycleStageForDisplay(sheetId);
+    if (lifecycleName && lifecycleName !== sheetId) {
+      return lifecycleName;
+    }
+    
+    // Для статических листов используем оригинальное имя
+    return sheets.find(s => s.id === sheetId)?.name || sheetId;
   };
 
   // Получить название столбца (пользовательское или оригинальное)

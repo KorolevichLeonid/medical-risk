@@ -389,9 +389,9 @@ const ProjectView = () => {
   const getStatusBadge = (status) => {
     const statusConfig = {
       draft: { label: 'Ожидание продукт-менеджера', className: 'status-draft' },
-      in_progress: { label: 'In Progress', className: 'status-progress' },
-      review: { label: 'Under Review', className: 'status-review' },
-      completed: { label: 'Completed', className: 'status-completed' }
+      in_progress: { label: 'В процессе', className: 'status-progress' },
+      review: { label: 'На рассмотрении', className: 'status-review' },
+      completed: { label: 'Завершено', className: 'status-completed' }
     };
     
     const config = statusConfig[status] || statusConfig.draft;
@@ -761,7 +761,7 @@ const ProjectView = () => {
         <div className="header-actions">
           {canEditProject() && (
             <Link to={`/project/${project.id}/edit`} className="btn btn-secondary">
-              Edit Project
+              Редактировать проект
             </Link>
           )}
           {isLimitedProjectAdmin() && canAddMembers() && (
@@ -783,7 +783,7 @@ const ProjectView = () => {
               onClick={() => setShowRiskTable(true)}
               style={{ marginRight: '8px' }}
             >
-              Risk Management Table
+              Таблица управления рисками
             </button>
           )}
           {!isLimitedProjectAdmin() && (
@@ -792,18 +792,18 @@ const ProjectView = () => {
               onClick={() => navigate(`/project/${project.id}/documents`)}
               style={{ marginRight: '8px' }}
             >
-              View Document
+              Просмотр документа
             </button>
           )}
           <Link to={`/project/${project.id}/risks`} className="btn btn-primary">
-            {canManageRisks() ? 'Manage Risk Analysis' : 'View Risk Analysis'}
+            {canManageRisks() ? 'Управление анализом рисков' : 'Просмотр анализа рисков'}
           </Link>
         </div>
       </div>
 
       {/* Progress Section */}
       <div className="progress-section">
-        <h3>Project Progress</h3>
+        <h3>Прогресс проекта</h3>
         <div className="progress-container">
           <div className="progress-bar">
             <div 
@@ -811,7 +811,7 @@ const ProjectView = () => {
               style={{ width: `${project.progress}%` }}
             ></div>
           </div>
-          <span className="progress-text">{project.progress}% Complete</span>
+          <span className="progress-text">{project.progress}% Завершено</span>
         </div>
       </div>
 
@@ -914,7 +914,7 @@ const ProjectView = () => {
 
         {/* Team Members */}
         <div className="team-section">
-          <h3>Project Team</h3>
+          <h3>Команда проекта</h3>
           <div className="team-list">
             {project.team.map(member => (
               <div key={member.id} className="team-member">
@@ -964,7 +964,7 @@ const ProjectView = () => {
                 setShowAddMember(true);
               }}
             >
-              {isLimitedProjectAdmin() ? '➕ Add Product Manager' : '➕ Add member'}
+              {isLimitedProjectAdmin() ? '➕ Добавить продукт-менеджера' : '➕ Добавить участника'}
             </button>
           )}
           {isProductManager() && !isProjectReadyForRoleManagement() && (
@@ -978,23 +978,23 @@ const ProjectView = () => {
       </div>
 
       {/* Metadata */}
-      <div className="metadata-section">
-        <div className="metadata-item">
-          <label>Created:</label>
-          <span>{new Date(project.createdDate).toLocaleDateString()}</span>
+        <div className="metadata-section">
+          <div className="metadata-item">
+            <label>Создано:</label>
+            <span>{new Date(project.createdDate).toLocaleDateString()}</span>
+          </div>
+          <div className="metadata-item">
+            <label>Последнее обновление:</label>
+            <span>{new Date(project.lastUpdated).toLocaleDateString()}</span>
+          </div>
         </div>
-        <div className="metadata-item">
-          <label>Last Updated:</label>
-          <span>{new Date(project.lastUpdated).toLocaleDateString()}</span>
-        </div>
-      </div>
 
       {/* Add Member Modal */}
       {showAddMember && (
         <div className="modal-overlay" onClick={() => setShowAddMember(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{isLimitedProjectAdmin() ? 'Назначить продукт-менеджера' : 'Add project member'}</h2>
+              <h2>{isLimitedProjectAdmin() ? 'Назначить продукт-менеджера' : 'Добавить участника проекта'}</h2>
               <button 
                 className="close-btn"
                 onClick={() => setShowAddMember(false)}
@@ -1005,13 +1005,13 @@ const ProjectView = () => {
             
             <div className="modal-body">
               <div className="form-group">
-                <label>Select user</label>
+                <label>Выберите пользователя</label>
                 <select
                   value={selectedUser}
                   onChange={(e) => setSelectedUser(e.target.value)}
                   className="form-select"
                 >
-                  <option value="">Select a user...</option>
+                  <option value="">Выберите пользователя...</option>
                   {availableUsers
                     .filter(user => {
                       if (isLimitedProjectAdmin()) {
@@ -1087,7 +1087,7 @@ const ProjectView = () => {
                 className="btn btn-secondary" 
                 onClick={() => setShowAddMember(false)}
               >
-                Cancel
+                Отмена
               </button>
               <button 
                 type="button" 
@@ -1095,7 +1095,7 @@ const ProjectView = () => {
                 onClick={handleAddMember}
                 disabled={!selectedUser || addingMember}
               >
-                {addingMember ? 'Adding...' : 'Add member'}
+                {addingMember ? 'Добавление...' : 'Добавить участника'}
               </button>
             </div>
           </div>
@@ -1107,7 +1107,7 @@ const ProjectView = () => {
         <div className="modal-overlay" onClick={() => setShowEditMemberRole(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Edit member role</h2>
+              <h2>Изменить роль участника</h2>
               <button
                 className="close-btn"
                 onClick={() => setShowEditMemberRole(false)}
@@ -1169,7 +1169,7 @@ const ProjectView = () => {
                 className="btn btn-secondary"
                 onClick={() => setShowEditMemberRole(false)}
               >
-                Cancel
+                Отмена
               </button>
               <button
                 type="button"
@@ -1177,7 +1177,7 @@ const ProjectView = () => {
                 onClick={handleUpdateMemberRole}
                 disabled={!roleToEdit}
               >
-                Update role
+                Обновить роль
               </button>
             </div>
           </div>

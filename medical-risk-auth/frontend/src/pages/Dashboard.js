@@ -102,9 +102,9 @@ const Dashboard = () => {
   const getStatusBadge = (status) => {
     const statusConfig = {
       draft: { label: 'Ожидание продукт-менеджера', className: 'status-draft' },
-      in_progress: { label: 'In Progress', className: 'status-progress' },
-      review: { label: 'Review', className: 'status-review' },
-      completed: { label: 'Completed', className: 'status-completed' }
+      in_progress: { label: 'В процессе', className: 'status-progress' },
+      review: { label: 'На проверке', className: 'status-review' },
+      completed: { label: 'Завершено', className: 'status-completed' }
     };
     
     const config = statusConfig[status] || statusConfig.draft;
@@ -189,11 +189,11 @@ const Dashboard = () => {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>Projects Dashboard</h1>
+        <h1>Проекты</h1>
         <p>
           {currentUser?.role === 'SYS_ADMIN' 
-            ? 'Manage all medical device risk analysis projects in the system'
-            : 'Manage your medical device risk analysis projects'
+            ? 'Управляйте всеми проектами анализа рисков медицинских изделий в системе'
+            : 'Управляйте своими проектами анализа рисков медицинских изделий'
           }
         </p>
       </div>
@@ -202,7 +202,7 @@ const Dashboard = () => {
         <div className="search-section">
           <input
             type="text"
-            placeholder="Search projects..."
+            placeholder="Поиск проектов..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -210,41 +210,41 @@ const Dashboard = () => {
         </div>
 
         <div className="filter-section">
-          <label htmlFor="status-filter">Filter by status:</label>
+          <label htmlFor="status-filter">Фильтр по статусу:</label>
           <select
             id="status-filter"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className="filter-select"
           >
-            <option value="all">All Projects</option>
-            <option value="draft">Draft</option>
-            <option value="in_progress">In Progress</option>
-            <option value="review">Review</option>
-            <option value="completed">Completed</option>
+            <option value="all">Все проекты</option>
+            <option value="draft">Черновик</option>
+            <option value="in_progress">В процессе</option>
+            <option value="review">На проверке</option>
+            <option value="completed">Завершено</option>
           </select>
         </div>
 
         {/* Role filter - only for regular users */}
         {currentUser?.role === 'USER' && (
           <div className="filter-section">
-            <label htmlFor="role-filter">Filter by my role:</label>
+            <label htmlFor="role-filter">Фильтр по моей роли:</label>
             <select
               id="role-filter"
               value={filterRole}
               onChange={(e) => setFilterRole(e.target.value)}
               className="filter-select"
             >
-              <option value="all">All Roles</option>
-              <option value="admin">Administrator</option>
-              <option value="manager">Product manager</option>
-              <option value="specialist">Specialist</option>
+              <option value="all">Все роли</option>
+              <option value="admin">Администратор</option>
+              <option value="manager">Продукт-менеджер</option>
+              <option value="specialist">Специалист</option>
             </select>
           </div>
         )}
 
         <div className="view-toggle">
-          <span className="view-toggle-label">View:</span>
+          <span className="view-toggle-label">Вид:</span>
           <div className="view-toggle-group" role="group" aria-label="Project view mode">
             <button
               type="button"
@@ -253,7 +253,7 @@ const Dashboard = () => {
               aria-pressed={viewMode === 'grid'}
             >
               <span className="view-toggle-icon">▦</span>
-              Cards
+              Карточки
             </button>
             <button
               type="button"
@@ -262,13 +262,13 @@ const Dashboard = () => {
               aria-pressed={viewMode === 'list'}
             >
               <span className="view-toggle-icon">≡</span>
-              List
+              Список
             </button>
           </div>
         </div>
 
         <Link to="/project/new" className="add-project-btn">
-          ➕ Create project
+          ➕ Создать проект
         </Link>
       </div>
 
@@ -276,15 +276,15 @@ const Dashboard = () => {
         {filteredProjects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📊</div>
-            <h3>No projects found</h3>
+            <h3>Проекты не найдены</h3>
             <p>
               {currentUser?.role === 'SYS_ADMIN'
-                ? 'No projects in the system yet. Users can create their first projects.'
-                : 'Create your first project to get started with risk analysis'
+                ? 'Проекты еще не созданы. Пользователи могут создать свои первые проекты.'
+                : 'Создайте свой первый проект для начала анализа рисков'
               }
             </p>
             <Link to="/project/new" className="btn btn-primary">
-              Create Project
+              Создать проект
             </Link>
           </div>
         ) : viewMode === 'list' ? (
@@ -301,7 +301,7 @@ const Dashboard = () => {
                 {project.userRole && getRoleBadge(project.userRole)}
               </div>
               <div className="project-row-team">
-                {project.memberCount + 1} members
+                {project.memberCount + 1} участников
               </div>
               <div className="project-row-progress">
                 {project.progress}%
@@ -315,7 +315,7 @@ const Dashboard = () => {
                       navigate(`/project/${project.id}/edit`);
                     }}
                   >
-                    Edit
+                    Редактировать
                   </button>
                 )}
                 <button
@@ -325,7 +325,7 @@ const Dashboard = () => {
                     navigate(`/project/${project.id}/risks`);
                   }}
                 >
-                  Risks
+                  Риски
                 </button>
                 {canDeleteProject(project) && (
                   <button
@@ -333,7 +333,7 @@ const Dashboard = () => {
                     onClick={(e) => handleDeleteProject(project.id, project.name, e)}
                     title="Delete project"
                   >
-                    Delete
+                    Удалить
                   </button>
                 )}
               </div>
@@ -367,19 +367,19 @@ const Dashboard = () => {
 
               <div className="project-details">
                 <div className="device-type">
-                  <span className="label">Device:</span>
+                  <span className="label">Устройство:</span>
                   <span className="value">{project.deviceType}</span>
                 </div>
                 
                 <div className="team-info">
-                  <span className="label">Team size:</span>
-                  <span className="value">{project.memberCount + 1} members</span>
+                  <span className="label">Размер команды:</span>
+                  <span className="value">{project.memberCount + 1} участников</span>
                 </div>
               </div>
 
               <div className="project-progress">
                 <div className="progress-header">
-                  <span>Progress</span>
+                  <span>Прогресс</span>
                   <span>{project.progress}%</span>
                 </div>
                 <div className="progress-bar">
@@ -392,7 +392,7 @@ const Dashboard = () => {
 
               <div className="project-footer">
                 <span className="last-updated">
-                  Updated: {new Date(project.lastUpdated).toLocaleDateString()}
+                  Обновлено: {new Date(project.lastUpdated).toLocaleDateString()}
                 </span>
                 <div className="project-actions">
                   {canEditProject(project) && (
@@ -403,7 +403,7 @@ const Dashboard = () => {
                         navigate(`/project/${project.id}/edit`);
                       }}
                     >
-                      Edit
+                      Редактировать
                     </button>
                   )}
                   <button
@@ -413,7 +413,7 @@ const Dashboard = () => {
                       navigate(`/project/${project.id}/risks`);
                     }}
                   >
-                    Risks
+                    Риски
                   </button>
                   {canDeleteProject(project) && (
                     <button
@@ -421,7 +421,7 @@ const Dashboard = () => {
                       onClick={(e) => handleDeleteProject(project.id, project.name, e)}
                       title="Delete project"
                     >
-                      Delete
+                      Удалить
                     </button>
                   )}
                 </div>

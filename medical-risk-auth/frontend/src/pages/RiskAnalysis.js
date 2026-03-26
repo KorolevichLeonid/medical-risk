@@ -6,6 +6,31 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import './RiskAnalysis.css';
 import API_BASE_URL from '../config';
 
+// Lifecycle stage labels mapping
+const LIFECYCLE_STAGE_LABELS = {
+  design_development: 'Проектирование и разработка',
+  procurement: 'Закупка и входной контроль компонентов и материалов',
+  production: 'Производство и сборка',
+  packaging: 'Упаковка и маркировка',
+  installation: 'Монтаж',
+  sterilization: 'Стерилизация',
+  testing: 'Испытания и выпуск продукции',
+  storage: 'Хранение',
+  transportation: 'Транспортировка и дистрибуция',
+  commissioning: 'Установка и ввод в эксплуатацию',
+  operation: 'Эксплуатация',
+  maintenance: 'Техническое обслуживание и сервис',
+  decommissioning: 'Демонтаж и вывод из эксплуатации',
+  disposal: 'Утилизация и уничтожение изделия или его компонентов',
+  other: 'Другие'
+};
+
+const formatLifecycleStageForDisplay = (stage) => {
+  if (!stage || typeof stage !== 'string') return '';
+  const normalized = stage.trim();
+  return LIFECYCLE_STAGE_LABELS[normalized] || normalized;
+};
+
 const RiskAnalysis = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -723,12 +748,12 @@ const RiskAnalysis = () => {
       {/* Header */}
       <div className="analysis-header">
         <div className="header-content">
-          <h1>Risk Analysis</h1>
-          <p>Project: {project?.name}</p>
+          <h1>Анализ рисков</h1>
+          <p>Проект: {project?.name}</p>
         </div>
         <div className="header-actions">
           <Link to={`/project/${id}`} className="btn btn-secondary">
-            Back to Project
+            Назад к проекту
           </Link>
           {canOpenRiskTable() && (
             <button
@@ -738,7 +763,7 @@ const RiskAnalysis = () => {
                 navigate(`/project/${id}?openRiskTable=true&sheet=first`);
               }}
             >
-              Risk Management Table
+              Таблица управления рисками
             </button>
           )}
           {canAddRisks() && (
@@ -746,7 +771,7 @@ const RiskAnalysis = () => {
               className="btn btn-primary"
               onClick={() => setShowAddRisk(true)}
             >
-              + Add Risk
+              + Добавить риск
             </button>
           )}
         </div>
@@ -756,25 +781,25 @@ const RiskAnalysis = () => {
       <div className="risk-summary">
         <div className="summary-card">
           <div className="summary-number">{risks.length}</div>
-          <div className="summary-label">Total Risks</div>
+          <div className="summary-label">Всего рисков</div>
         </div>
         <div className="summary-card high-risk">
           <div className="summary-number">
             {risks.filter(r => r.riskScore && getRiskLevel(r.riskScore).level === 'high').length}
           </div>
-          <div className="summary-label">High Risk</div>
+          <div className="summary-label">Высокий риск</div>
         </div>
         <div className="summary-card low-risk">
           <div className="summary-number">
             {risks.filter(r => r.riskScore && getRiskLevel(r.riskScore).level === 'low').length}
           </div>
-          <div className="summary-label">Low Risk</div>
+          <div className="summary-label">Низкий риск</div>
         </div>
         <div className="summary-card" style={{ backgroundColor: '#f5f5f5' }}>
           <div className="summary-number">
             {risks.filter(r => !r.riskScore).length}
           </div>
-          <div className="summary-label">Not Evaluated</div>
+          <div className="summary-label">Не оценено</div>
         </div>
       </div>
 
@@ -784,13 +809,13 @@ const RiskAnalysis = () => {
         return (
           <div className="coverage-matrix-section">
             <div className="coverage-header">
-              <h2>Risk Coverage Matrix</h2>
+              <h2>Матрица покрытия рисков</h2>
               <div className="coverage-stats">
                 <span className={`coverage-badge ${coverage.coveragePercentage === 100 ? 'complete' : coverage.coveragePercentage >= 50 ? 'partial' : 'low'}`}>
-                  {coverage.coveragePercentage}% Complete
+                  {coverage.coveragePercentage}% Завершено
                 </span>
                 <span className="coverage-info">
-                  {coverage.totalCovered} / {coverage.totalRequired} combinations covered
+                  {coverage.totalCovered} / {coverage.totalRequired} комбинаций покрыто
                 </span>
               </div>
             </div>
@@ -800,7 +825,7 @@ const RiskAnalysis = () => {
               <table className="coverage-matrix-table">
                 <thead>
                   <tr>
-                    <th className="matrix-corner">Lifecycle Stage / Hazard</th>
+                    <th className="matrix-corner">Этап жизненного цикла</th>
                     {selectedHazardCategories.map((hazard, idx) => (
                       <th key={idx} className="matrix-hazard-header">
                         <div className="hazard-header-content" title={hazard}>
@@ -814,7 +839,7 @@ const RiskAnalysis = () => {
                   {lifecycleStages.map((stage, stageIdx) => (
                     <tr key={stageIdx}>
                       <td className="matrix-stage-header" title={stage}>
-                        {stage}
+                        {formatLifecycleStageForDisplay(stage)}
                       </td>
                       {selectedHazardCategories.map((hazard, hazardIdx) => {
                         const cellData = coverage.matrix[stage]?.[hazard] || { total: 0 };
@@ -892,7 +917,7 @@ const RiskAnalysis = () => {
         <div className="search-section">
           <input
             type="text"
-            placeholder="Search risks..."
+            placeholder="Поиск рисков..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -905,9 +930,9 @@ const RiskAnalysis = () => {
             onChange={(e) => setFilterSeverity(e.target.value)}
             className="filter-select"
           >
-            <option value="all">All Risk Levels</option>
-            <option value="high">High Risk</option>
-            <option value="low">Low Risk</option>
+            <option value="all">Все уровни риска</option>
+            <option value="high">Высокий риск</option>
+            <option value="low">Низкий риск</option>
           </select>
 
           <select
@@ -915,11 +940,11 @@ const RiskAnalysis = () => {
             onChange={(e) => setFilterCategory(e.target.value)}
             className="filter-select"
           >
-            <option value="all">All Categories</option>
-            <option value="biological_chemical">Biological/Chemical</option>
-            <option value="operational_informational">Operational/Informational</option>
-            <option value="software">Software</option>
-            <option value="energy_functional">Energy/Functional</option>
+            <option value="all">Все категории</option>
+            <option value="biological_chemical">Биологические/Химические</option>
+            <option value="operational_informational">Операционные/Информационные</option>
+            <option value="software">Программное обеспечение</option>
+            <option value="energy_functional">Энергетические/Функциональные</option>
           </select>
         </div>
       </div>
@@ -931,15 +956,15 @@ const RiskAnalysis = () => {
         <table className="risk-table">
           <thead>
             <tr>
-              <th style={{ width: '50px', textAlign: 'center' }}>Status</th>
-              <th>Category</th>
-              <th>Lifecycle Stage</th>
-              <th>Hazard</th>
-              <th>Sequence of Events</th>
-              <th>Hazardous Situation</th>
-              <th>Harm</th>
-              <th>Risk Score</th>
-              <th>Actions</th>
+              <th style={{ width: '50px', textAlign: 'center' }}>Статус</th>
+              <th>Категория</th>
+              <th>Этап ЖЦ</th>
+              <th>Опасность</th>
+              <th>Последовательность событий</th>
+              <th>Опасная ситуация</th>
+              <th>Вред</th>
+              <th>Оценка риска</th>
+              <th>Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -974,10 +999,10 @@ const RiskAnalysis = () => {
                     </span>
                   </td>
                   <td className="category-cell">
-                    {risk.hazardCategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {risk.hazardCategory}
                   </td>
                   <td className="lifecycle-cell">
-                    {risk.lifecycleStage}
+                    {formatLifecycleStageForDisplay(risk.lifecycleStage)}
                   </td>
                   <td className="hazard-cell">
                     {risk.hazardName}
@@ -1001,7 +1026,7 @@ const RiskAnalysis = () => {
                       </span>
                     ) : (
                       <span className="not-evaluated" style={{ color: '#999', fontStyle: 'italic' }}>
-                        Not evaluated
+                        Не оценивалось
                       </span>
                     )}
                   </td>
@@ -1057,7 +1082,7 @@ const RiskAnalysis = () => {
         <div className="modal-overlay" onClick={() => setShowAddRisk(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add New Risk</h2>
+              <h2>Добавить новый риск</h2>
               <button 
                 className="close-btn"
                 onClick={() => setShowAddRisk(false)}
@@ -1092,7 +1117,7 @@ const RiskAnalysis = () => {
                 </div>
                 
                 <div className="form-group">
-                  <label>Lifecycle Stage</label>
+                  <label>Этап жизненного цикла</label>
                   <select
                     value={newRisk.lifecycleStage}
                     onChange={(e) => setNewRisk({...newRisk, lifecycleStage: e.target.value})}
@@ -1103,7 +1128,7 @@ const RiskAnalysis = () => {
                       assignedLifecycleStages.length > 0 ? (
                         assignedLifecycleStages.map(stage => (
                           <option key={stage} value={stage}>
-                            {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                            {formatLifecycleStageForDisplay(stage)}
                           </option>
                         ))
                       ) : (
@@ -1112,7 +1137,7 @@ const RiskAnalysis = () => {
                     ) : (
                       lifecycleStages.map(stage => (
                         <option key={stage} value={stage}>
-                          {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                          {formatLifecycleStageForDisplay(stage)}
                         </option>
                       ))
                     )}
@@ -1121,7 +1146,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Hazard Name</label>
+                <label>Название опасности</label>
                 <input
                   type="text"
                   value={newRisk.hazardName}
@@ -1131,7 +1156,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Sequence of Events</label>
+                <label>Последовательность событий</label>
                 <textarea
                   value={newRisk.sequenceOfEvents}
                   onChange={(e) => setNewRisk({...newRisk, sequenceOfEvents: e.target.value})}
@@ -1141,7 +1166,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Hazardous Situation</label>
+                <label>Опасная ситуация</label>
                 <textarea
                   value={newRisk.hazardousS}
                   onChange={(e) => setNewRisk({...newRisk, hazardousS: e.target.value})}
@@ -1151,7 +1176,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Harm</label>
+                <label>Вред</label>
                 <textarea
                   value={newRisk.harm}
                   onChange={(e) => setNewRisk({...newRisk, harm: e.target.value})}
@@ -1169,15 +1194,15 @@ const RiskAnalysis = () => {
                 fontSize: '14px',
                 color: '#1976D2'
               }}>
-                ℹ️ <strong>Note:</strong> Risk scores and control measures will be filled in the Risk Management Table after creating the risk.
+                ℹ️ <strong>Примечание:</strong> Оценки риска и меры управления будут заполнены в Таблице управления рисками после создания риска.
               </div>
 
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddRisk(false)}>
-                  Cancel
+                  Отмена
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Add Risk
+                  Добавить риск
                 </button>
               </div>
             </form>
@@ -1220,7 +1245,7 @@ const RiskAnalysis = () => {
                 </div>
                 
                 <div className="form-group">
-                  <label>Lifecycle Stage</label>
+                  <label>Этап жизненного цикла</label>
                   <select
                     value={selectedRisk.lifecycleStage}
                     onChange={(e) => setSelectedRisk({...selectedRisk, lifecycleStage: e.target.value})}
@@ -1228,7 +1253,7 @@ const RiskAnalysis = () => {
                   >
                     {lifecycleStages.map(stage => (
                       <option key={stage} value={stage}>
-                        {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                        {formatLifecycleStageForDisplay(stage)}
                       </option>
                     ))}
                   </select>
@@ -1236,7 +1261,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Hazard Name</label>
+                <label>Название опасности</label>
                 <input
                   type="text"
                   value={selectedRisk.hazardName}
@@ -1246,7 +1271,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Sequence of Events</label>
+                <label>Последовательность событий</label>
                 <textarea
                   value={selectedRisk.sequenceOfEvents}
                   onChange={(e) => setSelectedRisk({...selectedRisk, sequenceOfEvents: e.target.value})}
@@ -1256,7 +1281,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Hazardous Situation</label>
+                <label>Опасная ситуация</label>
                 <textarea
                   value={selectedRisk.hazardousS}
                   onChange={(e) => setSelectedRisk({...selectedRisk, hazardousS: e.target.value})}
@@ -1266,7 +1291,7 @@ const RiskAnalysis = () => {
               </div>
 
               <div className="form-group">
-                <label>Harm</label>
+                <label>Вред</label>
                 <textarea
                   value={selectedRisk.harm}
                   onChange={(e) => setSelectedRisk({...selectedRisk, harm: e.target.value})}
@@ -1284,12 +1309,12 @@ const RiskAnalysis = () => {
                 fontSize: '14px',
                 color: '#1976D2'
               }}>
-                ℹ️ <strong>Note:</strong> Risk scores and control measures are managed in the Risk Management Table.
+                ℹ️ <strong>Примечание:</strong> Оценки риска и меры управления управляются в Таблице управления рисками.
               </div>
 
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEditRisk(false)}>
-                  Cancel
+                  Отмена
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Update Risk
@@ -1316,27 +1341,27 @@ const RiskAnalysis = () => {
             
             <div className="risk-details">
               <div className="detail-row">
-                <label>Hazard Category:</label>
+                <label>Категория опасности:</label>
                 <span>{selectedRisk.hazardCategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
               </div>
               <div className="detail-row">
-                <label>Lifecycle Stage:</label>
+                <label>Этап жизненного цикла:</label>
                 <span>{selectedRisk.lifecycleStage}</span>
               </div>
               <div className="detail-row">
-                <label>Hazard Name:</label>
+                <label>Название опасности:</label>
                 <span>{selectedRisk.hazardName}</span>
               </div>
               <div className="detail-row">
-                <label>Sequence of Events:</label>
+                <label>Последовательность событий:</label>
                 <span>{selectedRisk.sequenceOfEvents}</span>
               </div>
               <div className="detail-row">
-                <label>Hazardous Situation:</label>
+                <label>Опасная ситуация:</label>
                 <span>{selectedRisk.hazardousS}</span>
               </div>
               <div className="detail-row">
-                <label>Harm:</label>
+                <label>Вред:</label>
                 <span>{selectedRisk.harm}</span>
               </div>
               
@@ -1355,7 +1380,7 @@ const RiskAnalysis = () => {
               )}
               {selectedRisk.riskScore && (
                 <div className="detail-row">
-                  <label>Risk Score (from Risk Table):</label>
+                  <label>Оценка риска (из таблицы рисков):</label>
                   <span className={`risk-score ${getRiskLevel(selectedRisk.riskScore).level}`}>
                     {selectedRisk.riskScore}
                   </span>
@@ -1371,11 +1396,11 @@ const RiskAnalysis = () => {
                   fontSize: '14px',
                   color: '#E65100'
                 }}>
-                  ⚠️ Risk scores not yet assigned. Please evaluate this risk in the Risk Management Table.
+                  ⚠️ Оценки риска еще не назначены. Пожалуйста, оцените этот риск в Таблице управления рисками.
                 </div>
               )}
               <div className="detail-row">
-                <label>Last Updated:</label>
+                <label>Последнее обновление:</label>
                 <span>{new Date(selectedRisk.lastUpdated).toLocaleString()}</span>
               </div>
             </div>

@@ -52,7 +52,7 @@ const SupportButton = () => {
         <div className="support-modal-overlay" onClick={handleCloseModal}>
           <div className="support-modal" onClick={(e) => e.stopPropagation()}>
             <div className="support-modal-header">
-              <h3>Contact Support</h3>
+              <h3>Связаться с поддержкой</h3>
               <button className="support-modal-close" onClick={handleCloseModal}>×</button>
             </div>
             <form onSubmit={handleSubmitSupport} className="support-modal-form">
@@ -69,18 +69,18 @@ const SupportButton = () => {
                     </div>
                     <div className="support-notification-note">
                       <span className="support-note-icon">📬</span>
-                      <span className="support-note-text">Response will come as notification in personal account</span>
+                      <span className="support-note-text">Ответ придет в виде уведомления в личном кабинете</span>
                     </div>
                   </div>
                 ) : (
                   <div className="support-email-field">
-                    <label htmlFor="support-email">Email for response:</label>
+                    <label htmlFor="support-email">Email для ответа:</label>
                     <input
                       id="support-email"
                       type="email"
                       value={supportEmail}
                       onChange={(e) => setSupportEmail(e.target.value)}
-                      placeholder="Enter your email address"
+                      placeholder="Введите ваш email адрес"
                       className="support-email-input"
                       required
                     />
@@ -88,12 +88,12 @@ const SupportButton = () => {
                 )}
                 
                 <div className="support-message-field">
-                  <label htmlFor="support-message">Describe your problem or question:</label>
+                  <label htmlFor="support-message">Опишите вашу проблему или вопрос:</label>
                   <textarea
                     id="support-message"
                     value={supportMessage}
                     onChange={(e) => setSupportMessage(e.target.value)}
-                    placeholder="Type your message here..."
+                    placeholder="Введите ваше сообщение здесь..."
                     className="support-textarea"
                     rows="4"
                     required
@@ -102,10 +102,10 @@ const SupportButton = () => {
               </div>
               <div className="support-modal-footer">
                 <button type="button" className="support-cancel-btn" onClick={handleCloseModal}>
-                  Cancel
+                  Отмена
                 </button>
                 <button type="submit" className="support-submit-btn">
-                  Send Message
+                  Отправить сообщение
                 </button>
               </div>
             </form>
