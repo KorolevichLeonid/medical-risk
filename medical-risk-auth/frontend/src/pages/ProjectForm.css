@@ -170,40 +170,41 @@
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  margin: 4px 0 0 0;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 2px 0 0 0;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  border: 1px solid #9A9B9F;
-  border-radius: 2px;
+  border: 2px solid #d1d5db;
+  border-radius: 5px;
   background-color: white;
   position: relative;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
   flex-shrink: 0;
 }
 
 .checkbox-label input[type="checkbox"]:hover {
-  border-color: #4A4A4A;
-  box-shadow: 0 0 0 1px rgba(74, 74, 74, 0.1);
+  border-color: #6b7280;
 }
 
 .checkbox-label input[type="checkbox"]:checked {
-  background: linear-gradient(135deg, #4A4A4A 0%, #131313 100%);
+  background-color: #131313;
   border-color: #131313;
 }
 
 .checkbox-label input[type="checkbox"]:checked::after {
-  content: '✓';
+  content: '';
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 6px;
-  font-weight: bold;
+  width: 4px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: translate(-50%, -60%) rotate(45deg);
 }
 
 .checkbox-text {
@@ -315,11 +316,14 @@
 .form-actions {
   display: flex;
   gap: 20px;
-  justify-content: flex-end;
-  padding: 30px;
+  justify-content: center;
+  padding: 20px 30px;
+  margin-top: 40px;
+  margin-bottom: 0;
+  position: sticky;
+  bottom: 0;
   background: transparent;
-  margin-top: 100px;
-  margin-bottom: 20px;
+  z-index: 10;
 }
 
 .btn {
@@ -528,11 +532,41 @@
 }
 
 .sub-question input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 2px 0 0 0;
   cursor: pointer;
-  margin-top: 2px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 2px solid #d1d5db;
+  border-radius: 5px;
+  background-color: #fff;
+  position: relative;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sub-question input[type="checkbox"]:hover {
+  border-color: #6b7280;
+}
+
+.sub-question input[type="checkbox"]:checked {
+  background-color: #131313;
+  border-color: #131313;
+}
+
+.sub-question input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: translate(-50%, -60%) rotate(45deg);
 }
 
 .sub-question span {

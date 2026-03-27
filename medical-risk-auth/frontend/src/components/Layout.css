@@ -5,7 +5,7 @@
   height: 100vh;
   background-color: #F0FBFF;
   font-family: 'Raleway', sans-serif;
-  transition: grid-template-columns 0.3s ease;
+  transition: grid-template-columns 0.7s ease;
 }
 
 .layout.sidebar-collapsed {
@@ -19,7 +19,30 @@
   background-color: #F0EECE;
   position: relative;
   box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
-  transition: width 0.3s ease;
+  transition: width 0.7s ease;
+  overflow: hidden;
+}
+
+/* Плавное появление/скрытие текста и элементов */
+/* При разворачивании: visibility мгновенно, opacity плавно — элементы сразу кликабельны */
+.sidebar .menu-item .menu-text,
+.sidebar .menu-item .projects-link,
+.sidebar .dropdown-arrow,
+.sidebar .user-profile-info {
+  transition: opacity 0.4s ease;
+  /* visibility не анимируем при показе — мгновенно становится visible */
+}
+
+.sidebar .menu-item {
+  transition: top 0.7s ease, bottom 0.7s ease, left 0.7s ease, width 0.7s ease;
+}
+
+.sidebar .menu-item .menu-icon {
+  transition: all 0.7s ease;
+}
+
+.sidebar-logo {
+  transition: all 0.7s ease !important;
 }
 
 .sidebar.collapsed {
@@ -158,6 +181,15 @@
   align-items: center;
   color: #000000;
   text-decoration: none;
+  outline: none;
+}
+
+.menu-item.projects-section .projects-link:focus,
+.menu-item.projects-section .projects-link:active,
+.dropdown-arrow:focus,
+.dropdown-arrow:active {
+  outline: none;
+  box-shadow: none;
 }
 
 .dropdown-arrow {
@@ -256,7 +288,11 @@ body.hide-floating-shortcuts .dropdown-arrow {
 }
 
 .layout.sidebar-collapsed .user-profile-info {
-  display: none;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  width: 0;
+  transition: opacity 0.4s ease, visibility 0s 0.4s, width 0s 0.4s;
 }
 
 /* Скрыть sidebar на страницах с модальными окнами */
@@ -410,6 +446,17 @@ body.hide-floating-shortcuts .layout {
   display: flex;
   align-items: center;
   color: #000000;
+  text-decoration: none;
+  outline: none;
+}
+
+.menu-item.changelog-section .menu-text:focus,
+.menu-item.changelog-section .menu-text:active,
+.menu-item.changelog-section .menu-text:visited {
+  outline: none;
+  box-shadow: none;
+  color: #000000;
+  text-decoration: none;
 }
 
 /* Настройки */
@@ -452,6 +499,54 @@ body.hide-floating-shortcuts .layout {
   display: flex;
   align-items: center;
   color: #000000;
+}
+
+/* Выход - под аватаром пользователя */
+.menu-item.logout-section {
+  position: absolute;
+  width: 254px;
+  height: 20px;
+  left: 24px;
+  top: 95px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.menu-item.logout-section:hover {
+  background-color: rgba(110, 110, 110, 0.1);
+  border-radius: 4px;
+}
+
+.menu-item.logout-section .menu-icon {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 0px;
+  top: 0px;
+}
+
+.menu-item.logout-section .menu-text {
+  position: absolute;
+  width: 214px;
+  height: 19px;
+  left: 40px;
+  top: 1px;
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 0px;
+  display: flex;
+  align-items: center;
+  color: #000000;
+}
+
+.layout.sidebar-collapsed .sidebar .menu-item.logout-section {
+  top: 88px;
+  bottom: auto;
+  width: 60px;
+  left: 20px;
 }
 
 /* Уведомления */
@@ -769,7 +864,7 @@ body.hide-floating-shortcuts .layout {
 .floating-return {
   position: fixed;
   bottom: 30px;
-  left: 30px;
+  left: 332px; /* правее развёрнутого сайдбара (312px + 20px) */
   background-color: rgba(217, 217, 217, 0.72);
   color: #131313;
   border: none;
@@ -795,6 +890,11 @@ body.hide-floating-shortcuts .layout {
   visibility: visible;
 }
 
+/* Сдвигаем кнопку при свёрнутом сайдбаре */
+#main-layout.sidebar-collapsed .floating-return {
+  left: 120px; /* правее свёрнутого сайдбара (100px + 20px) */
+}
+
 .floating-return:hover {
   transform: translateY(-2px);
 }
@@ -804,16 +904,26 @@ body.hide-floating-shortcuts .layout {
 }
 
 /* Collapsed Sidebar Styles */
+/* При сворачивании: сначала opacity → 0 (0.4s), потом visibility: hidden (после 0.4s задержки) */
 .layout.sidebar-collapsed .sidebar .menu-item .menu-text {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s 0.4s;
 }
 
 .layout.sidebar-collapsed .sidebar .menu-item .projects-link {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s 0.4s;
 }
 
 .layout.sidebar-collapsed .sidebar .dropdown-arrow {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s 0.4s;
 }
 
 .layout.sidebar-collapsed .sidebar .projects-dropdown {
@@ -846,93 +956,72 @@ body.hide-floating-shortcuts .layout {
   border-radius: 4px;
 }
 
-/* Reposition menu items for collapsed state */
+/* Search section в collapsed — показываем иконку как у других пунктов */
 .layout.sidebar-collapsed .sidebar .menu-item.search-section {
-  display: none !important;
-}
-
-/* Search icon for collapsed state */
-.layout.sidebar-collapsed .sidebar::before {
-  content: '';
-  position: absolute;
-  top: 90px;
-  left: 20px;
+  top: 120px;
   width: 60px;
-  height: 20px;
-  background-image: url('data:image/svg+xml,<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" fill="%236E6E6E"/></svg>');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 20px 20px;
-  cursor: pointer;
-  z-index: 10;
-}
-
-#main-layout.sidebar-collapsed .sidebar .menu-item.search-section .menu-icon {
-  position: relative !important;
-  left: 0 !important;
-  top: 0 !important;
-  margin: 0 auto !important;
-  width: 20px !important;
-  height: 20px !important;
-  transform: none !important;
-  display: block !important;
+  left: 20px;
+  display: flex !important;
 }
 
 .layout.sidebar-collapsed .sidebar .menu-item.home-section {
-  top: 120px;
+  top: 150px;
   width: 60px;
   left: 20px;
 }
 
 .layout.sidebar-collapsed .sidebar .menu-item.projects-section {
   position: absolute;
-  top: 150px;
+  top: 180px;
   width: 60px;
   left: 20px;
 }
 
 .layout.sidebar-collapsed .sidebar .menu-item.notifications-section {
-  top: 180px;
-  width: 60px;
-  left: 20px;
-  transition: none;
-}
-
-.layout.sidebar-collapsed .sidebar .menu-item.messenger-section {
   top: 210px;
   width: 60px;
   left: 20px;
   transition: none;
 }
 
-.layout.sidebar-collapsed .sidebar .menu-item.documents-section {
+.layout.sidebar-collapsed .sidebar .menu-item.messenger-section {
   top: 240px;
   width: 60px;
   left: 20px;
   transition: none;
 }
 
-.layout.sidebar-collapsed .sidebar .menu-item.standards-section {
+.layout.sidebar-collapsed .sidebar .menu-item.documents-section {
   top: 270px;
   width: 60px;
   left: 20px;
   transition: none;
 }
 
+.layout.sidebar-collapsed .sidebar .menu-item.standards-section {
+  top: 300px;
+  width: 60px;
+  left: 20px;
+  transition: none;
+}
+
 .layout.sidebar-collapsed .sidebar .menu-item.users-section {
-  top: 580px;
+  top: auto;
+  bottom: 130px;
   width: 60px;
   left: 20px;
 }
 
 .layout.sidebar-collapsed .sidebar .menu-item.changelog-section {
-  top: 615px;
+  top: auto;
+  bottom: 100px;
   width: 60px;
   left: 20px;
 }
 
 .layout.sidebar-collapsed .sidebar .menu-item.settings-section {
-  top: 650px;
+  top: auto;
+  bottom: 70px;
   width: 60px;
   left: 20px;
 }

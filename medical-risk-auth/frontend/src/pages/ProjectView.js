@@ -445,7 +445,7 @@ const ProjectView = () => {
 
     // Always active categories
     const activeCategories = new Set([
-      'Опасности, связанные с удобством использования (usability)',
+      'Опасности, связанные с удобством использования',
       'Опасности, связанные с надежностью, отказом конструкции или функций изделия',
       'Опасности клинического применения',
       'Другие'
@@ -484,10 +484,10 @@ const ProjectView = () => {
       'opticalSystems': 'Опасности, связанные с излучением',
       
       // Удобство использования (всегда активна)
-      'specialTraining': 'Опасности, связанные с удобством использования (usability)',
-      'specialNeeds': 'Опасности, связанные с удобством использования (usability)',
-      'interfaceError': 'Опасности, связанные с удобством использования (usability)',
-      'alarms': 'Опасности, связанные с удобством использования (usability)',
+      'specialTraining': 'Опасности, связанные с удобством использования',
+      'specialNeeds': 'Опасности, связанные с удобством использования',
+      'interfaceError': 'Опасности, связанные с удобством использования',
+      'alarms': 'Опасности, связанные с удобством использования',
       
       // Микробиологические факторы
       'isSterile': 'Опасности, связанные с микробиологическими факторами',
@@ -744,7 +744,8 @@ const ProjectView = () => {
       // Always also derive from checklist answers to avoid partial/legacy stored categories
       ...calculateActiveHazardCategoriesFromQuestions(project.hazardQuestions)
     ])
-  ].filter(category => category && category !== 'Другие'));
+  ].filter(category => category && category !== 'Другие')
+   .map(category => category.replace(' (usability)', '')));
 
   return (
     <div className="project-view">
@@ -757,7 +758,7 @@ const ProjectView = () => {
           </div>
           <p className="project-description">{project.description}</p>
         </div>
-        
+
         <div className="header-actions">
           {canEditProject() && (
             <Link to={`/project/${project.id}/edit`} className="btn btn-secondary">
@@ -772,25 +773,22 @@ const ProjectView = () => {
                 setSelectedLifecycleStages([]);
                 setShowAddMember(true);
               }}
-              style={{ marginRight: '8px' }}
             >
-              ➕ Add Product Manager
+              ➕ Добавить продукт-менеджера
             </button>
           )}
           {!isLimitedProjectAdmin() && (
-            <button 
+            <button
               className="btn btn-secondary"
               onClick={() => setShowRiskTable(true)}
-              style={{ marginRight: '8px' }}
             >
               Таблица управления рисками
             </button>
           )}
           {!isLimitedProjectAdmin() && (
-            <button 
+            <button
               className="btn btn-secondary"
               onClick={() => navigate(`/project/${project.id}/documents`)}
-              style={{ marginRight: '8px' }}
             >
               Просмотр документа
             </button>

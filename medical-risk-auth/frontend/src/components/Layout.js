@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import SupportButton from './SupportButton';
@@ -14,11 +14,9 @@ const Layout = ({ children }) => {
   const { instance } = useMsal();
   const [user, setUser] = useState(null);
   const [showReturn, setShowReturn] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    // Load collapsed state from localStorage
-    const saved = localStorage.getItem('sidebarCollapsed');
-    return saved ? JSON.parse(saved) : false;
-  });
+  const [isHovered, setIsHovered] = useState(false);
+  const isSidebarCollapsed = !isHovered;
+  const hoverTimeoutRef = useRef(null);
   const [projects, setProjects] = useState([]);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
 
@@ -43,7 +41,10 @@ const Layout = ({ children }) => {
       setShowReturn(scrollTop > 100);
     };
     window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
   }, []);
 
   const loadProjects = async () => {
@@ -74,10 +75,14 @@ const Layout = ({ children }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const toggleSidebar = () => {
-    const newState = !isSidebarCollapsed;
-    setIsSidebarCollapsed(newState);
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => setIsHovered(true), 200);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => setIsHovered(false), 300);
   };
 
   const toggleProjectsDropdown = () => {
@@ -125,7 +130,11 @@ const Layout = ({ children }) => {
   return (
     <div id="main-layout" className={`layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Sidebar */}
-      <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+      <div
+        className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         {/* User Profile Container */}
         {user && (
           <div
@@ -170,29 +179,15 @@ const Layout = ({ children }) => {
           </div>
         )}
 
-        {/* Collapsed search icon */}
-        {isSidebarCollapsed && (
-          <div
-            className="collapsed-search-icon"
-            onClick={() => navigate('/search')}
-            style={{
-              position: 'absolute',
-              top: '150px',
-              left: '20px',
-              width: '60px',
-              height: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              zIndex: 10
-            }}
-          >
+        {/* Выход из аккаунта - под аватаром */}
+        <div className="menu-item logout-section" onClick={handleLogout}>
+          <div className="menu-icon logout-icon">
             <svg width="20" height="20" viewBox="0 0 24 24">
-              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" fill="#6E6E6E"/>
+              <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" fill="#6E6E6E"/>
             </svg>
           </div>
-        )}
+          <span className="menu-text">Выйти из аккаунта</span>
+        </div>
 
         {/* Меню - абсолютное позиционирование по спецификации */}
 
@@ -363,14 +358,6 @@ const Layout = ({ children }) => {
           style={{ cursor: 'pointer' }}
         />
 
-        {/* Sidebar Toggle Button */}
-        <button
-          className={`sidebar-toggle ${isSidebarCollapsed ? 'collapsed' : ''}`}
-          onClick={toggleSidebar}
-          aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <img src={arrowIcon} alt="Toggle sidebar" className="sidebar-arrow-icon" />
-        </button>
       </div>
 
       {/* Main Content */}

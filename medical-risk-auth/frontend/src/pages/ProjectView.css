@@ -38,13 +38,19 @@
   margin-bottom: 30px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   display: flex;
-  justify-content: space-between;
+  flex-direction: row;
+  gap: 20px;
+}
+
+.project-header .header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 30px;
 }
 
 .header-main {
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 
@@ -61,9 +67,10 @@
   font-weight: 700;
   color: #131313;
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: break-word;
   max-width: 100%;
+  white-space: normal;
 }
 
 .status-badge {
@@ -104,9 +111,9 @@
 
 .header-actions {
   display: flex;
-  gap: 10px;
-  flex-shrink: 0;
-  flex-wrap: nowrap;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .btn {
@@ -744,6 +751,9 @@
   max-width: 500px;
   margin: 20px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-header {
@@ -782,6 +792,8 @@
 
 .modal-body {
   padding: 0 30px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .form-group {
@@ -828,25 +840,71 @@
   overflow-y: auto;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #fff;
+  background: #f8f9fa;
   padding: 8px 10px;
 }
 
 .lifecycle-stage-checkbox-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 2px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
   color: #111827;
   font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lifecycle-stage-checkbox-item:hover {
+  background-color: #e9ecef;
+}
+
+.lifecycle-stage-checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 2px solid #adb5bd;
+  border-radius: 5px;
+  background-color: #fff;
+  position: relative;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.lifecycle-stage-checkbox-item input[type="checkbox"]:hover {
+  border-color: #6b7280;
+}
+
+.lifecycle-stage-checkbox-item input[type="checkbox"]:checked {
+  background-color: #131313;
+  border-color: #131313;
+}
+
+.lifecycle-stage-checkbox-item input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: translate(-50%, -60%) rotate(45deg);
 }
 
 .modal-actions {
   display: flex;
   gap: 15px;
-  padding: 30px;
+  padding: 20px 30px;
   border-top: 1px solid #E8E8E8;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .btn {

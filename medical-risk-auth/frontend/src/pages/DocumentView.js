@@ -399,31 +399,32 @@ const DocumentView = () => {
     <div className="document-view">
       {/* Header */}
       <div className="document-header">
-        <div className="header-main">
-          <button 
+        <div className="document-header-top">
+          <button
             className="back-button"
             onClick={() => navigate(`/project/${id}`)}
           >
             ← Назад к проекту
           </button>
+          <div className="header-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowVersionHistory(!showVersionHistory)}
+            >
+              История версий ({versions.length})
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleGenerateDocument}
+              disabled={generating}
+            >
+              {generating ? 'Генерация...' : 'Создать новую версию'}
+            </button>
+          </div>
+        </div>
+        <div className="document-title-row">
           <h1>Отчет по управлению рисками</h1>
           {project && <p className="project-name">{project.device_name}</p>}
-        </div>
-
-        <div className="header-actions">
-          <button 
-            className="btn btn-secondary"
-            onClick={() => setShowVersionHistory(!showVersionHistory)}
-          >
-            История версий ({versions.length})
-          </button>
-          <button 
-            className="btn btn-primary"
-            onClick={handleGenerateDocument}
-            disabled={generating}
-          >
-            {generating ? 'Генерация...' : 'Создать новую версию'}
-          </button>
         </div>
       </div>
 

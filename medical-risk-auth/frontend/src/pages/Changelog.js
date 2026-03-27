@@ -12,14 +12,10 @@ const Changelog = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Get user info to check access
         const userData = localStorage.getItem('user');
         if (userData) {
             const parsedUser = JSON.parse(userData);
             setUser(parsedUser);
-            
-            // New access check: SYS_ADMIN can see all, USER can see own project logs
-            // Note: The actual access control is handled by the backend
         }
 
         fetchProjectsChangelog();
@@ -44,13 +40,13 @@ const Changelog = () => {
             });
 
             if (response.status === 403) {
-                setError('Access denied. Only administrators can view changelog.');
+                setError('Доступ запрещён. Только администраторы могут просматривать журнал.');
                 setLoading(false);
                 return;
             }
 
             if (!response.ok) {
-                throw new Error('Failed to fetch changelog');
+                throw new Error('Не удалось загрузить журнал изменений');
             }
 
             const data = await response.json();
@@ -64,7 +60,7 @@ const Changelog = () => {
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleString('en-GB', {
+        return date.toLocaleString('ru-RU', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -86,11 +82,11 @@ const Changelog = () => {
 
     const getStatusText = (status) => {
         const statusTexts = {
-            'draft': 'Draft',
-            'in_progress': 'In progress',
-            'review': 'Under review',
-            'completed': 'Completed',
-            'archived': 'Archived'
+            'draft': 'Черновик',
+            'in_progress': 'В процессе',
+            'review': 'На проверке',
+            'completed': 'Завершено',
+            'archived': 'Архивировано'
         };
         return statusTexts[status] || status;
     };
@@ -100,32 +96,16 @@ const Changelog = () => {
     };
 
     const handleChangeClick = (changeId) => {
-        console.log(`🔄 Navigating to change detail: ${changeId}`);
         navigate(`/changelog/change/${changeId}`);
-    };
-
-    const translateRuToEn = (text) => {
-        if (!text || typeof text !== 'string') return text;
-        const replacements = [
-            [/(Обновлен|Обновлён) проект/gi, 'Project updated'],
-            [/(Изменен|Изменён) статус проекта/gi, 'Project status changed'],
-            [/Изменены поля:/gi, 'Changed fields:'],
-            [/Создан риск/gi, 'Risk created'],
-            [/(Обновлен|Обновлён) риск/gi, 'Risk updated'],
-            [/Создан проект/gi, 'Project created'],
-            [/Создан новый проект/gi, 'New project created'],
-            [/в проекте/gi, 'in project'],
-        ];
-        return replacements.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), text);
     };
 
     if (loading) {
         return (
             <div className="changelog-container">
                 <div className="changelog-header">
-                    <h1>Changelog</h1>
+                    <h1>Журнал изменений</h1>
                 </div>
-                <div className="loading">Loading...</div>
+                <div className="loading">Загрузка...</div>
             </div>
         );
     }
@@ -134,13 +114,13 @@ const Changelog = () => {
         return (
             <div className="changelog-container">
                 <div className="changelog-header">
-                    <h1>Changelog</h1>
+                    <h1>Журнал изменений</h1>
                 </div>
                 <div className="error-message">
                     <div className="error-icon">🚫</div>
-                    <h3>Access denied</h3>
+                    <h3>Доступ запрещён</h3>
                     <p>{error}</p>
-                    <p>You can only view logs of the projects you created.</p>
+                    <p>Вы можете просматривать только журналы проектов, в которых вы являетесь администратором.</p>
                 </div>
             </div>
         );
@@ -149,11 +129,11 @@ const Changelog = () => {
     return (
         <div className="changelog-container">
             <div className="changelog-header">
-                <h1>Changelog</h1>
+                <h1>Журнал изменений</h1>
                 <p>
-                    {user?.role === 'SYS_ADMIN' 
-                        ? 'Change history for all system projects'
-                        : 'Change history for your projects'
+                    {user?.role === 'SYS_ADMIN'
+                        ? 'История изменений всех проектов системы'
+                        : 'История изменений ваших проектов'
                     }
                 </p>
             </div>
@@ -164,8 +144,8 @@ const Changelog = () => {
                         <div className="project-info">
                             <div className="project-main-info">
                                 <div className="project-status-indicator">
-                                    <div 
-                                        className="status-circle" 
+                                    <div
+                                        className="status-circle"
                                         style={{ backgroundColor: getStatusColor(project.project_status) }}
                                     />
                                     <span className="project-version">1</span>
@@ -173,15 +153,15 @@ const Changelog = () => {
                                 <div className="project-details">
                                     <h3 className="project-name">{project.project_name}</h3>
                                     <p className="project-description">
-                                        {project.project_description || 'No project description'}
+                                        {project.project_description || 'Описание проекта отсутствует'}
                                     </p>
                                     <div className="project-device">
-                                        <span className="device-label">Device:</span>
+                                        <span className="device-label">Устройство:</span>
                                         <span className="device-name">{project.device_name}</span>
                                     </div>
                                     <div className="project-meta">
                                         <div className="project-status">
-                                            <span 
+                                            <span
                                                 className="status-badge"
                                                 style={{ backgroundColor: getStatusColor(project.project_status) }}
                                             >
@@ -190,11 +170,11 @@ const Changelog = () => {
                                         </div>
                                         <div className="project-stats">
                                             <div className="stat-item">
-                                                <span className="stat-label">Members:</span>
+                                                <span className="stat-label">Участники:</span>
                                                 <span className="stat-value">{project.members_count}</span>
                                             </div>
                                             <div className="stat-item">
-                                                <span className="stat-label">Updated:</span>
+                                                <span className="stat-label">Обновлено:</span>
                                                 <span className="stat-value">{formatDate(project.last_updated)}</span>
                                             </div>
                                         </div>
@@ -204,17 +184,17 @@ const Changelog = () => {
                         </div>
 
                         <div className="project-changelog">
-                            <h4>Recent changes</h4>
+                            <h4>Последние изменения</h4>
                             <div className="recent-changes">
                                 {project.recent_changes.length === 0 ? (
                                     <div className="no-changes">
-                                        <p>No changes yet</p>
+                                        <p>Изменений пока нет</p>
                                     </div>
                                 ) : (
                                     <div className="changes-list">
                                         {project.recent_changes.map((change, index) => (
-                                            <div 
-                                                key={change.id} 
+                                            <div
+                                                key={change.id}
                                                 className="change-item clickable"
                                                 onClick={() => handleChangeClick(change.id)}
                                             >
@@ -223,7 +203,7 @@ const Changelog = () => {
                                                         <span className="user-name">{change.user_name}</span>
                                                         <span className="user-role">({change.user_role})</span>
                                                     </div>
-                                                    <div className="change-action">{translateRuToEn(change.action_display_name)}</div>
+                                                    <div className="change-action">{change.action_display_name}</div>
                                                     <div className="change-time">{formatDate(change.created_at)}</div>
                                                 </div>
                                             </div>
@@ -231,14 +211,14 @@ const Changelog = () => {
                                     </div>
                                 )}
                             </div>
-                            
+
                             {project.total_changes > 4 && (
                                 <div className="view-full-history">
-                                    <button 
+                                    <button
                                         className="view-history-btn"
                                         onClick={() => handleViewFullHistory(project.project_id)}
                                     >
-                                        View change history ({project.total_changes})
+                                        Просмотреть всю историю ({project.total_changes})
                                     </button>
                                 </div>
                             )}
@@ -250,11 +230,11 @@ const Changelog = () => {
             {projects.length === 0 && (
                 <div className="no-projects">
                     <div className="no-projects-message">
-                        <h3>No projects available for logs</h3>
+                        <h3>Нет доступных проектов</h3>
                         <p>
-                            {user?.role === 'SYS_ADMIN' 
-                                ? 'There are no projects with changes in the system.'
-                                : 'You do not have admin rights in any project. Logs are only available to project admins.'
+                            {user?.role === 'SYS_ADMIN'
+                                ? 'В системе нет проектов с изменениями.'
+                                : 'У вас нет прав администратора ни в одном проекте. Журналы доступны только администраторам проектов.'
                             }
                         </p>
                     </div>
@@ -264,7 +244,7 @@ const Changelog = () => {
             <button
                 className={`floating-return ${showReturn ? 'visible' : ''}`}
                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                aria-label="Return to top"
+                aria-label="Наверх"
             >
                 ↑
             </button>

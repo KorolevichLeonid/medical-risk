@@ -571,7 +571,7 @@
 .home-floating-return {
   position: fixed;
   bottom: 30px;
-  left: 30px; /* same inset as support button (right: 30px) */
+  left: 332px; /* правее развёрнутого сайдбара (312px + 20px) */
   background-color: rgba(217, 217, 217, 0.72);
   color: #131313;
   border: none;
@@ -595,6 +595,10 @@
 .home-floating-return.visible {
   opacity: 1;
   visibility: visible;
+}
+
+#main-layout.sidebar-collapsed .home-floating-return {
+  left: 120px;
 }
 
 .home-floating-return:hover {

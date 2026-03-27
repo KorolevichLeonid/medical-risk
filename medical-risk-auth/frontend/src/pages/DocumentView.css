@@ -1,34 +1,42 @@
 
 /* Header */
 .document-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 2px solid #e5e7eb;
 }
 
-.header-main {
-  flex: 1;
+.document-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.document-title-row {
+  padding-bottom: 1.25rem;
+  border-bottom: 2px solid #6366f1;
 }
 
 .back-button {
-  background: none;
-  border: none;
-  color: #6366f1;
-  font-size: 1rem;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 0.9rem;
   cursor: pointer;
-  padding: 0.5rem 0;
-  margin-bottom: 1rem;
-  transition: color 0.2s;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: background 0.2s, border-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .back-button:hover {
-  color: #4f46e5;
+  background: #e5e7eb;
+  border-color: #d1d5db;
 }
 
-.document-header h1 {
+.document-header h1,
+.document-title-row h1 {
   font-size: 2rem;
   font-weight: 700;
   color: #1f2937;
@@ -240,20 +248,10 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  animation: float 3s ease-in-out infinite;
   pointer-events: auto;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateX(-50%) translateY(0px);
-  }
-  50% {
-    transform: translateX(-50%) translateY(-10px);
-  }
 }
 
 .btn-floating {
@@ -263,19 +261,30 @@
   font-weight: 500;
   border: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.btn-primary.btn-floating {
   background-color: #6366f1;
   color: white;
   box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
 }
 
-.floating-download-btn:hover .btn-floating {
+.btn-primary.btn-floating:hover {
   background-color: #4f46e5;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
+}
+
+.btn-secondary.btn-floating {
+  background-color: #f3f4f6;
+  color: #374151;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.btn-secondary.btn-floating:hover {
+  background-color: #e5e7eb;
 }
 
 
