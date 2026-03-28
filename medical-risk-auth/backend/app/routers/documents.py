@@ -1662,7 +1662,8 @@ def generate_html_preview(project, doc_version, risks, team_members):
         
         <!-- 9. Выводы -->
         <div class="section">
-            <h2>9.1 Общие выводы</h2>
+            <h2>9. ВЫВОДЫ И УТВЕРЖДЕНИЕ</h2>
+            <h3>9.1 Общие выводы</h3>
             <p>На основании проведённого процесса идентификации опасностей, анализа, оценки и управления рисками, подтверждено, что:</p>
             <ul>
                 <li>{reviewed_line}</li>
@@ -1785,38 +1786,32 @@ def generate_risks_table(risks, columns):
                 'harm': 'Вред'
             }
         elif columns == ['lifecycle_stage', 'hazard', 'control_measures']:
-            # Table 6.2 - Control measures with ALL fields (remove Категория опасности and Последовательность событий, remove prefix)
+            # Table 6.2 - Control measures: initial risk + Контроль риска (меры + верификация). No residual columns.
             all_columns = [
-                'table_name', 'hazard_name', 'hazardous_situation', 'harm',
-                'severity_score', 'probability_score', 'risk_score', 'risk_level_1',
+                'table_name', 'hazard_category', 'hazard_name', 'event_sequence',
+                'hazardous_situation', 'harm',
+                'severity_score', 'probability_score', 'risk_score', 'risk_level_1', 'comment_1',
                 'control_measure_1', 'control_measure_2', 'control_measure_3',
                 'verification_1', 'verification_2', 'verification_3',
-                'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2',
-                'comment_1', 'comment_2', 'inherent_safety', 'protective_measure'
             ]
             col_names = {
                 'table_name': 'Этап жизненного цикла',
-                'hazard_name': 'Наименование опасности',  # Skip category
+                'hazard_category': 'Категория опасности',
+                'hazard_name': 'Наименование опасности',
+                'event_sequence': 'Последовательность событий',
                 'hazardous_situation': 'Опасная ситуация',
                 'harm': 'Вред',
                 'severity_score': 'Тяжесть вреда, балл',
                 'probability_score': 'Вероятность причинения вреда, балл',
                 'risk_score': 'Риск, балл',
                 'risk_level_1': 'Уровень риска (доп./не доп.)',
-                'control_measure_1': 'Меры по управлению риском (1)',
-                'control_measure_2': 'Меры по управлению риском (2)',
-                'control_measure_3': 'Меры по управлению риском (3)',
-                'verification_1': 'Верификация мер по управлению риском (1)',
-                'verification_2': 'Верификация мер по управлению риском (2)',
-                'verification_3': 'Верификация мер по управлению риском (3)',
-                'residual_risk_level': 'Тяжесть вреда, балл (остат.)',
-                'residual_probability': 'Вероятность причинения вреда, балл (остат.)',
-                'residual_risk_score': 'Достигнутый риск и его уровень',
-                'risk_level_2': 'Уровень риска (доп./не доп.) (остат.)',
                 'comment_1': 'Комментарий',
-                'comment_2': 'Комментарий (остат.)',
-                'inherent_safety': 'Безопасность, заложенная в конструкции',
-                'protective_measure': 'Защитная мера/средство'
+                'control_measure_1': 'Безопасность, заложенная в конструкции',
+                'control_measure_2': 'Защитная мера/средство',
+                'control_measure_3': 'Информация по безопасности/обучению',
+                'verification_1': 'Безопасность, заложенная в конструкции',
+                'verification_2': 'Защитная мера/средство',
+                'verification_3': 'Информация по безопасности',
             }
         else:
             # Default case
@@ -1860,6 +1855,52 @@ def generate_risks_table(risks, columns):
             'safety_information': 'Информация по безопасности/обучению'
         }
 
+    # For table 6.2 (control measures): render two-level header with "Контроль риска" group
+    is_62_table = columns == ['lifecycle_stage', 'hazard', 'control_measures']
+    if is_62_table:
+        base_cols = ['table_name', 'hazard_category', 'hazard_name', 'event_sequence',
+                     'hazardous_situation', 'harm', 'severity_score', 'probability_score',
+                     'risk_score', 'risk_level_1', 'comment_1']
+        ctrl_cols = ['control_measure_1', 'control_measure_2', 'control_measure_3',
+                     'verification_1', 'verification_2', 'verification_3']
+        html = '<table><thead>'
+        # Row 1: base cols with rowspan=2, then group header
+        html += '<tr>'
+        for col in base_cols:
+            html += f'<th rowspan="2">{col_names.get(col, col)}</th>'
+        html += '<th colspan="3">Меры по управлению риском</th>'
+        html += '<th colspan="3">Верификация мер по управлению риском</th>'
+        html += '</tr>'
+        # Row 2: sub-columns under "Контроль риска"
+        ctrl_labels = [
+            'Безопасность, заложенная в конструкции',
+            'Защитная мера/средство',
+            'Информация по безопасности/обучению',
+            'Безопасность, заложенная в конструкции',
+            'Защитная мера/средство',
+            'Информация по безопасности',
+        ]
+        html += '<tr>'
+        for label in ctrl_labels:
+            html += f'<th>{label}</th>'
+        html += '</tr>'
+        html += '</thead><tbody>'
+        ordered_cols = base_cols + ctrl_cols
+        for risk in risks:
+            html += '<tr>'
+            for col in ordered_cols:
+                value = risk.get(col, '')
+                if not value or str(value).strip() == '':
+                    value = '<span class="empty-field">не заполнено</span>'
+                else:
+                    if col == 'table_name':
+                        value = _format_lifecycle_stage_label(value)
+                    value = html_module.escape(str(value))
+                html += f'<td>{value}</td>'
+            html += '</tr>'
+        html += '</tbody></table>'
+        return html
+
     html = '<table><thead><tr>'
     for col in all_columns:
         col_name = col_names.get(col, col.replace('_', ' ').title())
@@ -1884,20 +1925,18 @@ def generate_risks_table(risks, columns):
 
 
 def generate_residual_risks_table(risks):
-    """Generate HTML table for residual risks with ALL Excel fields including Категория опасности and Последовательность событий"""
+    """Generate HTML table for residual risks (table 7.2) using residual fields from ExcelTable."""
     import html as html_module
 
     if not risks:
         return '<p class="empty-field">Нет данных</p>'
 
-    # Show comprehensive table with ALL Excel columns for residual risk evaluation
     all_columns = [
         'table_name', 'hazard_category', 'hazard_name', 'event_sequence', 'harm',
         'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2',
         'comment_2', 'risk_benefit_analysis', 'new_risks'
     ]
 
-    # Column name mapping
     col_names = {
         'table_name': 'Этап жизненного цикла',
         'hazard_category': 'Категория опасности',
@@ -1915,8 +1954,7 @@ def generate_residual_risks_table(risks):
 
     html = '<table><thead><tr>'
     for col in all_columns:
-        col_name = col_names.get(col, col.replace('_', ' ').title())
-        html += f'<th>{col_name}</th>'
+        html += f'<th>{col_names[col]}</th>'
     html += '</tr></thead><tbody>'
 
     for risk in risks:

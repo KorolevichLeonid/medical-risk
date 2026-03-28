@@ -1137,7 +1137,7 @@ const RiskAnalysis = () => {
                         <option value="">Нет назначенных этапов ЖЦ</option>
                       )
                     ) : (
-                      lifecycleStages.map(stage => (
+                      lifecycleStages.filter(stage => stage !== 'other' && stage !== 'Другие').map(stage => (
                         <option key={stage} value={stage}>
                           {formatLifecycleStageForDisplay(stage)}
                         </option>
@@ -1253,7 +1253,7 @@ const RiskAnalysis = () => {
                     onChange={(e) => setSelectedRisk({...selectedRisk, lifecycleStage: e.target.value})}
                     required
                   >
-                    {lifecycleStages.map(stage => (
+                    {lifecycleStages.filter(stage => stage !== 'other' && stage !== 'Другие').map(stage => (
                       <option key={stage} value={stage}>
                         {formatLifecycleStageForDisplay(stage)}
                       </option>
