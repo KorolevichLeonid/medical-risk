@@ -453,22 +453,6 @@ def run_postgresql_migration():
         # Don't raise - this is not critical for app startup
 
 
-def create_admin_user():
-    """Check if any admin user exists for Azure auth system"""
-    db = SessionLocal()
-    try:
-        # Check if any admin user exists
-        admin_count = db.query(User).filter(User.role == UserRole.SYS_ADMIN).count()
-        if admin_count == 0:
-            print("[!] No system administrator found!")
-            print("   After first Azure login, manually assign sys_admin role:")
-            print("   UPDATE users SET role = 'sys_admin' WHERE email = 'your-admin-email@domain.com';")
-        else:
-            print(f"[i] Found {admin_count} system administrator(s)")
-    finally:
-        db.close()
-
-
 def init_database():
     """Initialize the database with tables and sample data"""
     print("[*] Initializing database...")
@@ -511,9 +495,6 @@ def init_database():
         sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         from init_permissions import init_permissions
         init_permissions()
-
-        # Check admin user status (Azure auth system)
-        create_admin_user()
 
         # Users are created automatically through Azure authentication
         print("[i] Users will be created automatically through Azure authentication")
