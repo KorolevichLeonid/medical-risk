@@ -19,29 +19,38 @@ async def verify_azure_token_mock(token: str) -> Dict[str, Any]:
         unverified_payload = jwt.get_unverified_claims(token)
         print(f"Token payload keys: {list(unverified_payload.keys())}")
         
-        # Extract email and clean it (remove domain part and decode if needed)
-        raw_email = (unverified_payload.get("email") or
-                    unverified_payload.get("preferred_username") or
-                    unverified_payload.get("upn") or
-                    unverified_payload.get("unique_name"))
+        # Извлекаем настоящий email для Azure B2C локальных аккаунтов.
+        # Поле preferred_username / upn содержит GUID вида:
+        #   b19a9a9f-b64c-48c4-8d99-490f46bef617@tenant.onmicrosoft.com
+        # Настоящий email хранится в поле 'emails' (массив) или 'email'.
 
-        # Remove domain part (everything after @)
-        if raw_email and "@" in raw_email:
-            clean_email = raw_email.split("@")[0]
-            # Try to decode if it looks like base64 or UUID
-            if len(clean_email) > 0:
-                # Check if it's a UUID-like string (contains hyphens and looks like UUID)
-                if "-" in clean_email:
-                    try:
-                        # If it can be decoded as base64, do it
-                        import base64
-                        decoded = base64.b64decode(clean_email + "==").decode('utf-8')
-                        clean_email = decoded
-                    except:
-                        # If not base64, keep as is
-                        pass
+        # 1. Поле 'emails' — массив, специфичный для Azure B2C (самый надёжный)
+        emails_list = unverified_payload.get("emails")
+        if emails_list and isinstance(emails_list, list) and len(emails_list) > 0:
+            clean_email = emails_list[0]
+            print(f"📧 Email из поля 'emails': {clean_email}")
+
+        # 2. Прямое поле 'email'
+        elif unverified_payload.get("email"):
+            clean_email = unverified_payload.get("email")
+            print(f"📧 Email из поля 'email': {clean_email}")
+
+        # 3. preferred_username / upn / unique_name — только если это НЕ GUID
         else:
-            clean_email = raw_email
+            for field in ("preferred_username", "upn", "unique_name"):
+                raw = unverified_payload.get(field, "")
+                if not raw:
+                    continue
+                local_part = raw.split("@")[0] if "@" in raw else raw
+                # GUID содержит ровно 4 дефиса в формате 8-4-4-4-12
+                if local_part.count("-") == 4 and len(local_part) == 36:
+                    print(f"⚠️  Поле '{field}' содержит GUID, пропускаем: {raw}")
+                    continue
+                clean_email = raw
+                print(f"📧 Email из поля '{field}': {clean_email}")
+                break
+            else:
+                clean_email = None
 
         object_id = (unverified_payload.get("oid") or
                     unverified_payload.get("sub") or
