@@ -128,6 +128,11 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!isAuthenticated || !isBackendAuthenticated) {
+    // Сохраняем путь, куда хотел попасть пользователь, чтобы восстановить его после авторизации
+    const intendedPath = location.pathname + location.search;
+    if (intendedPath !== '/login' && intendedPath !== '/') {
+      sessionStorage.setItem('auth_redirect', intendedPath);
+    }
     return <Navigate to="/login" replace />;
   }
 

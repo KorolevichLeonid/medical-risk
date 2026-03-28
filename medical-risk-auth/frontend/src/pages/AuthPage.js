@@ -11,7 +11,14 @@ export default function AuthPage() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      // Восстанавливаем страницу, на которую пользователь хотел попасть до авторизации
+      const redirectPath = sessionStorage.getItem('auth_redirect');
+      if (redirectPath) {
+        sessionStorage.removeItem('auth_redirect');
+        navigate(redirectPath, { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
   }, [isAuthenticated, navigate]);
 
