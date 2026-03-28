@@ -322,11 +322,13 @@ const RiskAnalysis = () => {
         console.log('=== END LOADING PROJECT DATA ===');
         
         // Set default lifecycle stage and hazard category for new risk
+        // Используем filteredCategories (без "Другие"), чтобы дефолтное значение
+        // совпадало с опциями дропдауна и не сохранялось как "Другие"
         if (stages.length > 0) {
           setNewRisk(prev => ({
             ...prev, 
             lifecycleStage: stages[0],
-            hazardCategory: hazardCategories.length > 0 ? hazardCategories[0] : ''
+            hazardCategory: filteredCategories.length > 0 ? filteredCategories[0] : ''
           }));
         }
       }
