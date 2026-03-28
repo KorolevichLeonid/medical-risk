@@ -51,6 +51,20 @@ const DocumentView = () => {
 
       if (response.ok) {
         const projectData = await response.json();
+
+        // Проверяем права доступа: только менеджер и SYS_ADMIN видят документы
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          const currentUser = JSON.parse(userData);
+          const isSysAdmin = currentUser.role === 'SYS_ADMIN';
+          const isManager = Array.isArray(projectData.team) &&
+            projectData.team.some(m => m.id === currentUser.id && m.role === 'manager');
+          if (!isSysAdmin && !isManager) {
+            navigate(`/project/${id}`, { replace: true });
+            return;
+          }
+        }
+
         setProject(projectData);
       } else {
         console.error('Failed to load project');

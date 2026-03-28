@@ -785,7 +785,7 @@ const ProjectView = () => {
               Таблица управления рисками
             </button>
           )}
-          {!isLimitedProjectAdmin() && (
+          {(isProductManager() || currentUser?.role === 'SYS_ADMIN') && (
             <button
               className="btn btn-secondary"
               onClick={() => navigate(`/project/${project.id}/documents`)}
