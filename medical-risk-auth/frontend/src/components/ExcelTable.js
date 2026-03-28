@@ -144,7 +144,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       const dynamicSheets = [];
 
       // Основные этапы жизненного цикла
-      lifecycleStages.forEach(stage => {
+      lifecycleStages.filter(stage => stage !== 'other' && stage !== 'Другие').forEach(stage => {
         dynamicSheets.push({
           id: stage, // Используем название этапа как id
           name: stage,

@@ -886,88 +886,47 @@ class RiskManagementReportGenerator:
         self.doc.add_heading('6.2 Таблица мер управления рисками', level=2)
 
         if self.risks:
-            # Create comprehensive table with ALL Excel columns for control measures (remove Категория опасности and Последовательность событий)
-            table = self.doc.add_table(rows=1, cols=23)
+            # Table 6.2: initial risk + Контроль риска (меры + верификация). No residual columns.
+            table = self.doc.add_table(rows=1, cols=18)
             table.style = 'Light Grid Accent 1'
 
-            # All Excel headers for control measures (removed Категория опасности and Последовательность событий)
             headers = [
-                '№', 'Этап жизненного цикла', 'Наименование опасности', 'Опасная ситуация', 'Вред',
+                '№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
+                'Последовательность событий', 'Опасная ситуация', 'Вред',
                 'Тяжесть вреда, балл', 'Вероятность причинения вреда, балл', 'Риск, балл',
                 'Уровень риска (доп./не доп.)', 'Комментарий',
-                'Меры по управлению риском (1)', 'Меры по управлению риском (2)', 'Меры по управлению риском (3)',
-                'Верификация мер по управлению риском (1)', 'Верификация мер по управлению риском (2)', 'Верификация мер по управлению риском (3)',
-                'Тяжесть вреда, балл (остат.)', 'Вероятность причинения вреда, балл (остат.)',
-                'Достигнутый риск и его уровень', 'Уровень риска (доп./не доп.) (остат.)', 'Комментарий (остат.)',
-                'Безопасность, заложенная в конструкции', 'Защитная мера/средство'
+                'Безопасность, заложенная в конструкции', 'Защитная мера/средство',
+                'Информация по безопасности/обучению',
+                'Безопасность, заложенная в конструкции', 'Защитная мера/средство',
+                'Информация по безопасности',
             ]
             header_cells = table.rows[0].cells
             for i, header in enumerate(headers):
                 header_cells[i].text = header
 
-            # Data rows with ALL fields (skip Категория опасности and Последовательность событий)
             for idx, risk in enumerate(self.risks, 1):
                 data = risk.get('data', {})
                 row = table.add_row().cells
 
-                # Calculate initial and residual risks using correct field names from database
-                def safe_int_convert(value):
-                    """Safely convert string to int, handling various formats"""
-                    if value is None:
-                        return 0
-                    # Convert to string first if not already
-                    value_str = str(value).strip()
-                    # Return 0 for empty strings
-                    if not value_str:
-                        return 0
-                    try:
-                        # Try direct int conversion first
-                        return int(value_str)
-                    except ValueError:
-                        try:
-                            # If direct int fails, try float conversion (handles "5.0")
-                            return int(float(value_str))
-                        except (ValueError, TypeError):
-                            # If all conversions fail, return 0
-                            return 0
-
-                s_init = safe_int_convert(data.get('severity_score', 0))
-                p_init = safe_int_convert(data.get('probability_score', 0))
-                risk_init = s_init * p_init
-
-                s_res = safe_int_convert(data.get('residual_risk_level', 0))
-                p_res = safe_int_convert(data.get('residual_probability', 0))
-                risk_res = s_res * p_res
-
-                # Determine risk acceptability based on threshold
-                risk_threshold = self.project.get('risk_threshold', 10)
-                initial_acceptability = 'Допустимый' if risk_init < risk_threshold else 'Недопустимый'
-                residual_acceptability = 'Допустимый' if risk_res < risk_threshold else 'Недопустимый'
-
                 row_data = [
-                    str(idx),  # №
+                    str(idx),
                     _format_lifecycle_stage_label(risk.get('table_name', data.get('lifecycle_stage', ''))),
-                    data.get('hazard_name', ''),  # Наименование опасности (skip category)
-                    data.get('hazardous_situation', ''),  # Опасная ситуация
-                    data.get('harm', ''),  # Вред
-                    str(data.get('severity_score', '')),  # Тяжесть вреда, балл
-                    str(data.get('probability_score', '')),  # Вероятность причинения вреда, балл
-                    str(risk_init) if risk_init else '',  # Риск, балл
-                    initial_acceptability,  # Уровень риска (доп./не доп.)
-                    data.get('comment_1', ''),  # Комментарий
-                    data.get('control_measure_1', ''),  # Меры по управлению риском (1)
-                    data.get('control_measure_2', ''),  # Меры по управлению риском (2)
-                    data.get('control_measure_3', ''),  # Меры по управлению риском (3)
-                    data.get('verification_1', ''),  # Верификация (1)
-                    data.get('verification_2', ''),  # Верификация (2)
-                    data.get('verification_3', ''),  # Верификация (3)
-                    str(data.get('residual_risk_level', '')),  # Тяжесть вреда, балл (остат.)
-                    str(data.get('residual_probability', '')),  # Вероятность причинения вреда, балл (остат.)
-                    str(risk_res) if risk_res else '',  # Достигнутый риск и его уровень
-                    residual_acceptability,  # Уровень риска (доп./не доп.) (остат.)
-                    data.get('comment_2', ''),  # Комментарий (остат.)
-                    data.get('inherent_safety', ''),  # Безопасность, заложенная в конструкции
-                    data.get('protective_measure', '')   # Защитная мера/средство
+                    data.get('hazard_category', ''),
+                    data.get('hazard_name', ''),
+                    data.get('event_sequence', ''),
+                    data.get('hazardous_situation', ''),
+                    data.get('harm', ''),
+                    str(data.get('severity_score', '')),
+                    str(data.get('probability_score', '')),
+                    str(data.get('risk_score', '')),
+                    str(data.get('risk_level_1', '')),
+                    data.get('comment_1', ''),
+                    data.get('control_measure_1', ''),
+                    data.get('control_measure_2', ''),
+                    data.get('control_measure_3', ''),
+                    data.get('verification_1', ''),
+                    data.get('verification_2', ''),
+                    data.get('verification_3', ''),
                 ]
 
                 for i, cell_data in enumerate(row_data):
@@ -996,13 +955,13 @@ class RiskManagementReportGenerator:
         self.doc.add_heading('7.2 Таблица оценки остаточных рисков', level=2)
 
         if self.risks:
-            # Create comprehensive table with ALL Excel columns for residual risk evaluation (remove Категория опасности and Последовательность событий)
-            table = self.doc.add_table(rows=1, cols=11)
+            # Table 7.2: residual risk fields from ExcelTable second evaluation set
+            table = self.doc.add_table(rows=1, cols=13)
             table.style = 'Light Grid Accent 1'
 
-            # All Excel headers for residual risk evaluation (removed Категория опасности and Последовательность событий)
             headers = [
-                '№', 'Этап жизненного цикла', 'Наименование опасности', 'Вред',
+                '№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
+                'Последовательность событий', 'Вред',
                 'Тяжесть вреда, балл (остат.)', 'Вероятность причинения вреда, балл (остат.)',
                 'Достигнутый риск и его уровень', 'Уровень риска (доп./не доп.) (остат.)',
                 'Комментарий (остат.)', 'Анализ остаточный риск/польза',
@@ -1018,41 +977,34 @@ class RiskManagementReportGenerator:
             for idx, risk in enumerate(self.risks, 1):
                 data = risk.get('data', {})
 
-                # Calculate residual risk
-                s_res = data.get('severity_residual', 0) or 0
-                p_res = data.get('probability_residual', 0) or 0
-                risk_res = s_res * p_res
-
-                # Determine residual risk acceptability based on threshold
-                risk_threshold = self.project.get('risk_threshold', 10)
-                residual_acceptability = 'Допустимый' if risk_res < risk_threshold else 'Недопустимый'
-
-                if risk_res < risk_threshold:
-                    acceptable_residual += 1
-                else:
-                    unacceptable_residual += 1
-
                 row = table.add_row().cells
-                # Remove prefix from table_name
                 table_name = _format_lifecycle_stage_label(risk.get('table_name', data.get('lifecycle_stage', '')))
 
                 row_data = [
-                    str(idx),  # №
-                    table_name,  # Этап жизненного цикла (no prefix)
-                    data.get('hazardous_situation', ''),  # Наименование опасности (skip category and sequence)
-                    data.get('harm', ''),  # Вред
-                    str(data.get('severity_residual', '')),  # Тяжесть вреда, балл (остат.)
-                    str(data.get('probability_residual', '')),  # Вероятность причинения вреда, балл (остат.)
-                    str(risk_res) if risk_res else '',  # Достигнутый риск и его уровень
-                    residual_acceptability,  # Уровень риска (доп./не доп.) (остат.)
-                    data.get('comment_2', ''),  # Комментарий (остат.)
-                    data.get('risk_benefit_analysis', ''),  # Анализ остаточный риск/польза
-                    data.get('new_risks', '')   # Новые риски в результате принятия мер по управлению
+                    str(idx),
+                    table_name,
+                    data.get('hazard_category', ''),
+                    data.get('hazard_name', ''),
+                    data.get('event_sequence', ''),
+                    data.get('harm', ''),
+                    str(data.get('residual_risk_level', '')),
+                    str(data.get('residual_probability', '')),
+                    str(data.get('residual_risk_score', '')),
+                    str(data.get('risk_level_2', '')),
+                    data.get('comment_2', ''),
+                    data.get('risk_benefit_analysis', ''),
+                    data.get('new_risks', ''),
                 ]
 
                 for i, cell_data in enumerate(row_data):
                     if i < len(row):
                         row[i].text = str(cell_data)
+
+                risk_level_2 = str(data.get('risk_level_2', '')).lower()
+                if 'доп' in risk_level_2 and 'не доп' not in risk_level_2:
+                    acceptable_residual += 1
+                else:
+                    unacceptable_residual += 1
         else:
             self.doc.add_paragraph('Нет данных по остаточным рискам')
             acceptable_residual = 0
@@ -2384,22 +2336,21 @@ class PDFRiskManagementReportGenerator:
 
         story.append(Paragraph('6.2 Таблица мер управления рисками', self.styles['Heading2']))
 
-        if is_plan:
-            headers = [
-                '№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
-                'Последовательность событий', 'Опасная ситуация', 'Вред',
-                'Тяжесть вреда, балл', 'Вероятность причинения вреда, балл', 'Риск, балл',
-                'Уровень риска (доп./не доп.)', 'Комментарий',
-                'Меры по управлению риском (1)', 'Меры по управлению риском (2)', 'Меры по управлению риском (3)',
-                'Верификация мер по управлению риском (1)', 'Верификация мер по управлению риском (2)', 'Верификация мер по управлению риском (3)',
-                'Тяжесть вреда, балл (остат.)', 'Вероятность причинения вреда, балл (остат.)',
-                'Достигнутый риск и его уровень', 'Уровень риска (доп./не доп.) (остат.)', 'Комментарий (остат.)',
-                'Безопасность, заложенная в конструкции', 'Защитная мера/средство'
-            ]
-            table_data = [headers, ['не заполнено'] * len(headers)]
+        headers_62 = [
+            '№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
+            'Последовательность событий', 'Опасная ситуация', 'Вред',
+            'Тяжесть вреда, балл', 'Вероятность причинения вреда, балл', 'Риск, балл',
+            'Уровень риска (доп./не доп.)', 'Комментарий',
+            'Безопасность, заложенная в конструкции', 'Защитная мера/средство',
+            'Информация по безопасности/обучению',
+            'Безопасность, заложенная в конструкции', 'Защитная мера/средство',
+            'Информация по безопасности',
+        ]
 
+        if is_plan:
+            table_data = [headers_62, ['не заполнено'] * len(headers_62)]
             table_data = self._wrap_table_data(table_data, header_size=6, body_size=5)
-            table = Table(table_data, colWidths=self._calc_col_widths([1] * len(headers)), repeatRows=1)
+            table = Table(table_data, colWidths=self._calc_col_widths([1] * len(headers_62)), repeatRows=1)
             self._apply_table_style(table, [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2407,80 +2358,29 @@ class PDFRiskManagementReportGenerator:
             ])
             story.append(table)
         elif self.risks:
-            # Create comprehensive table with ALL Excel columns for control measures
-            table_data = [['№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
-                          'Последовательность событий', 'Опасная ситуация', 'Вред',
-                          'Тяжесть вреда, балл', 'Вероятность причинения вреда, балл', 'Риск, балл',
-                          'Уровень риска (доп./не доп.)', 'Комментарий',
-                          'Меры по управлению риском (1)', 'Меры по управлению риском (2)', 'Меры по управлению риском (3)',
-                          'Верификация мер по управлению риском (1)', 'Верификация мер по управлению риском (2)', 'Верификация мер по управлению риском (3)',
-                          'Тяжесть вреда, балл (остат.)', 'Вероятность причинения вреда, балл (остат.)',
-                          'Достигнутый риск и его уровень', 'Уровень риска (доп./не доп.) (остат.)', 'Комментарий (остат.)',
-                          'Безопасность, заложенная в конструкции', 'Защитная мера/средство']]
+            table_data = [headers_62]
 
             for idx, risk in enumerate(self.risks, 1):
                 data = risk.get('data', {})
-
-                # Calculate initial and residual risks using correct field names from database with safe conversion
-                def safe_int_convert(value):
-                    """Safely convert string to int, handling various formats"""
-                    if value is None:
-                        return 0
-                    # Convert to string first if not already
-                    value_str = str(value).strip()
-                    # Return 0 for empty strings
-                    if not value_str:
-                        return 0
-                    try:
-                        # Try direct int conversion first
-                        return int(value_str)
-                    except ValueError:
-                        try:
-                            # If direct int fails, try float conversion (handles "5.0")
-                            return int(float(value_str))
-                        except (ValueError, TypeError):
-                            # If all conversions fail, return 0
-                            return 0
-
-                s_init = safe_int_convert(data.get('severity_score', 0))
-                p_init = safe_int_convert(data.get('probability_score', 0))
-                risk_init = s_init * p_init
-
-                s_res = safe_int_convert(data.get('residual_risk_level', 0))
-                p_res = safe_int_convert(data.get('residual_probability', 0))
-                risk_res = s_res * p_res
-
-                # Determine risk acceptability based on threshold
-                risk_threshold = self.project.get('risk_threshold', 10)
-                initial_acceptability = 'Допустимый' if risk_init < risk_threshold else 'Недопустимый'
-                residual_acceptability = 'Допустимый' if risk_res < risk_threshold else 'Недопустимый'
-
                 table_data.append([
-                    str(idx),  # №
+                    str(idx),
                     _format_lifecycle_stage_label(risk.get('table_name', data.get('lifecycle_stage', ''))),
-                    data.get('hazard_category', ''),  # Категория опасности
-                    data.get('hazard_name', ''),  # Наименование опасности
-                    data.get('event_sequence', ''),  # Последовательность событий
-                    data.get('hazardous_situation', ''),  # Опасная ситуация
-                    data.get('harm', ''),  # Вред
-                    str(data.get('severity_score', '')),  # Тяжесть вреда, балл
-                    str(data.get('probability_score', '')),  # Вероятность причинения вреда, балл
-                    str(risk_init) if risk_init else '',  # Риск, балл
-                    initial_acceptability,  # Уровень риска (доп./не доп.)
-                    data.get('comment_1', ''),  # Комментарий
-                    data.get('control_measure_1', ''),  # Меры по управлению риском (1)
-                    data.get('control_measure_2', ''),  # Меры по управлению риском (2)
-                    data.get('control_measure_3', ''),  # Меры по управлению риском (3)
-                    data.get('verification_1', ''),  # Верификация (1)
-                    data.get('verification_2', ''),  # Верификация (2)
-                    data.get('verification_3', ''),  # Верификация (3)
-                    str(data.get('residual_risk_level', '')),  # Тяжесть вреда, балл (остат.)
-                    str(data.get('residual_probability', '')),  # Вероятность причинения вреда, балл (остат.)
-                    str(risk_res) if risk_res else '',  # Достигнутый риск и его уровень
-                    residual_acceptability,  # Уровень риска (доп./не доп.) (остат.)
-                    data.get('comment_2', ''),  # Комментарий (остат.)
-                    data.get('inherent_safety', ''),  # Безопасность, заложенная в конструкции
-                    data.get('protective_measure', '')   # Защитная мера/средство
+                    data.get('hazard_category', ''),
+                    data.get('hazard_name', ''),
+                    data.get('event_sequence', ''),
+                    data.get('hazardous_situation', ''),
+                    data.get('harm', ''),
+                    str(data.get('severity_score', '')),
+                    str(data.get('probability_score', '')),
+                    str(data.get('risk_score', '')),
+                    str(data.get('risk_level_1', '')),
+                    data.get('comment_1', ''),
+                    data.get('control_measure_1', ''),
+                    data.get('control_measure_2', ''),
+                    data.get('control_measure_3', ''),
+                    data.get('verification_1', ''),
+                    data.get('verification_2', ''),
+                    data.get('verification_3', ''),
                 ])
 
             col_widths = self._calc_col_widths([1] * len(table_data[0]))
@@ -2518,18 +2418,18 @@ class PDFRiskManagementReportGenerator:
 
         story.append(Paragraph('7.2 Таблица оценки остаточных рисков', self.styles['Heading2']))
 
-        if is_plan:
-            headers = [
-                '№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
-                'Последовательность событий', 'Вред', 'Тяжесть вреда, балл (остат.)',
-                'Вероятность причинения вреда, балл (остат.)', 'Достигнутый риск и его уровень',
-                'Уровень риска (доп./не доп.) (остат.)', 'Комментарий (остат.)',
-                'Анализ остаточный риск/польза', 'Новые риски в результате принятия мер по управлению'
-            ]
-            table_data = [headers, ['не заполнено'] * len(headers)]
+        headers_72 = [
+            '№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
+            'Последовательность событий', 'Вред', 'Тяжесть вреда, балл (остат.)',
+            'Вероятность причинения вреда, балл (остат.)', 'Достигнутый риск и его уровень',
+            'Уровень риска (доп./не доп.) (остат.)', 'Комментарий (остат.)',
+            'Анализ остаточный риск/польза', 'Новые риски в результате принятия мер по управлению'
+        ]
 
+        if is_plan:
+            table_data = [headers_72, ['не заполнено'] * len(headers_72)]
             table_data = self._wrap_table_data(table_data, header_size=6, body_size=5)
-            table = Table(table_data, colWidths=self._calc_col_widths([1] * len(headers)), repeatRows=1)
+            table = Table(table_data, colWidths=self._calc_col_widths([1] * len(headers_72)), repeatRows=1)
             self._apply_table_style(table, [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2537,51 +2437,36 @@ class PDFRiskManagementReportGenerator:
             ])
             story.append(table)
         elif self.risks:
-            # Create comprehensive table with ALL Excel columns for residual risk evaluation
-            table_data = [['№', 'Этап жизненного цикла', 'Категория опасности', 'Наименование опасности',
-                          'Последовательность событий', 'Вред', 'Тяжесть вреда, балл (остат.)',
-                          'Вероятность причинения вреда, балл (остат.)', 'Достигнутый риск и его уровень',
-                          'Уровень риска (доп./не доп.) (остат.)', 'Комментарий (остат.)',
-                          'Анализ остаточный риск/польза', 'Новые риски в результате принятия мер по управлению']]
+            table_data = [headers_72]
 
             acceptable_residual = 0
             unacceptable_residual = 0
 
             for idx, risk in enumerate(self.risks, 1):
                 data = risk.get('data', {})
-
-                # Calculate residual risk
-                s_res = data.get('severity_residual', 0) or 0
-                p_res = data.get('probability_residual', 0) or 0
-                risk_res = s_res * p_res
-
-                # Determine residual risk acceptability based on threshold
-                risk_threshold = self.project.get('risk_threshold', 10)
-                residual_acceptability = 'Допустимый' if risk_res < risk_threshold else 'Недопустимый'
-
-                if risk_res < risk_threshold:
-                    acceptable_residual += 1
-                else:
-                    unacceptable_residual += 1
-
-                # Remove prefix from table_name for PDF table 7.2
                 table_name = _format_lifecycle_stage_label(risk.get('table_name', data.get('lifecycle_stage', '')))
 
                 table_data.append([
-                    str(idx),  # №
-                    table_name,  # Этап жизненного цикла (remove prefix)
-                    data.get('hazard_category', ''),  # Категория опасности
-                    data.get('hazard_name', ''),  # Наименование опасности
-                    data.get('event_sequence', ''),  # Последовательность событий
-                    data.get('harm', ''),  # Вред
-                    str(data.get('severity_residual', '')),  # Тяжесть вреда, балл (остат.)
-                    str(data.get('probability_residual', '')),  # Вероятность причинения вреда, балл (остат.)
-                    str(risk_res) if risk_res else '',  # Достигнутый риск и его уровень
-                    residual_acceptability,  # Уровень риска (доп./не доп.) (остат.)
-                    data.get('comment_2', ''),  # Комментарий (остат.)
-                    data.get('risk_benefit_analysis', ''),  # Анализ остаточный риск/польза
-                    data.get('new_risks', '')   # Новые риски в результате принятия мер по управлению
+                    str(idx),
+                    table_name,
+                    data.get('hazard_category', ''),
+                    data.get('hazard_name', ''),
+                    data.get('event_sequence', ''),
+                    data.get('harm', ''),
+                    str(data.get('residual_risk_level', '')),
+                    str(data.get('residual_probability', '')),
+                    str(data.get('residual_risk_score', '')),
+                    str(data.get('risk_level_2', '')),
+                    data.get('comment_2', ''),
+                    data.get('risk_benefit_analysis', ''),
+                    data.get('new_risks', ''),
                 ])
+
+                risk_level_2 = str(data.get('risk_level_2', '')).lower()
+                if 'доп' in risk_level_2 and 'не доп' not in risk_level_2:
+                    acceptable_residual += 1
+                else:
+                    unacceptable_residual += 1
 
             table_data = self._wrap_table_data(table_data, header_size=6, body_size=5)
             col_widths = self._calc_col_widths([1] * len(table_data[0]))
