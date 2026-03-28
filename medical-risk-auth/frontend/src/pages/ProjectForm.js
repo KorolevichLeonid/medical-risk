@@ -1374,8 +1374,12 @@ const ProjectForm = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Введите название проекта"
+                maxLength={250}
                 required
               />
+              <span style={{ fontSize: '12px', color: (formData.name || '').length >= 250 ? '#e53e3e' : '#9A9B9F', float: 'right', marginTop: '4px' }}>
+                {(formData.name || '').length}/250
+              </span>
             </div>
           </div>
 
@@ -1475,8 +1479,12 @@ const ProjectForm = () => {
               value={formData.name}
               onChange={handleInputChange}
               placeholder="Введите название проекта"
+              maxLength={250}
               required
             />
+            <span style={{ fontSize: '12px', color: (formData.name || '').length >= 250 ? '#e53e3e' : '#9A9B9F', float: 'right', marginTop: '4px' }}>
+              {(formData.name || '').length}/250
+            </span>
           </div>
 
           <div className="form-group">

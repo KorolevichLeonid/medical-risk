@@ -990,7 +990,7 @@ const ProjectView = () => {
       {/* Add Member Modal */}
       {showAddMember && (
         <div className="modal-overlay" onClick={() => setShowAddMember(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content member-modal" onClick={(e) => e.stopPropagation()} style={{ maxHeight: 'none', overflow: 'visible' }}>
             <div className="modal-header">
               <h2>{isLimitedProjectAdmin() ? 'Назначить продукт-менеджера' : 'Добавить участника проекта'}</h2>
               <button 
@@ -1077,24 +1077,24 @@ const ProjectView = () => {
                   </div>
                 </div>
               )}
-            </div>
-            
-            <div className="modal-actions">
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                onClick={() => setShowAddMember(false)}
-              >
-                Отмена
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-primary"
-                onClick={handleAddMember}
-                disabled={!selectedUser || addingMember}
-              >
-                {addingMember ? 'Добавление...' : 'Добавить участника'}
-              </button>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAddMember(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleAddMember}
+                  disabled={!selectedUser || addingMember}
+                >
+                  {addingMember ? 'Добавление...' : 'Добавить участника'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

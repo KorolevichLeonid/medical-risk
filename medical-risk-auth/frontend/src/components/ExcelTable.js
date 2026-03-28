@@ -217,6 +217,8 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     const normalizedRiskBenefit = String(rowDataOnly.risk_benefit_analysis || '').trim().toLowerCase();
 
     if (normalizedRiskBenefit === 'нет') {
+      // Пользователь отклонил анализ риск/польза — начинаем новый цикл переоценки.
+      // Сохраняем текущие значения как «hint» для сравнения, очищаем поля второй оценки.
       REOPENED_SECOND_EVAL_COLUMNS.forEach((field) => {
         const hintField = SECOND_EVAL_HINT_FIELD_MAP[field];
         if (!hintField) return;
@@ -239,11 +241,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
       rowDataOnly.residual_risk_score = '';
       rowDataOnly.risk_level_2 = '';
       rowDataOnly.comment_2 = '';
-    } else if (normalizedRiskBenefit === 'ожидание ответа') {
-      rowDataOnly.risk_benefit_analysis = 'Ожидание ответа';
-      rowDataOnly.risk_status = 'pending_benefit';
-      rowDataOnly.locked_after_second = true;
     }
+    // ВАЖНО: ветку 'ожидание ответа' намеренно не обрабатываем здесь.
+    // Раньше она выставляла locked_after_second = true при каждом сохранении,
+    // что блокировало residual_probability во время цикла переоценки (после 'Нет').
+    // Значения locked_after_second и risk_status уже корректно установлены
+    // через handleCellChange / applyEvaluations и должны сохраняться как есть.
   };
 
   const showAllowedScoresAlert = (columnKey, allowedValues) => {
@@ -1298,27 +1301,26 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     if (!isAutoManagedSheet()) {
       return []; // Оценка требуется только для листов этапов жизненного цикла
     }
-    
-    // Проверяем, может ли текущий пользователь оценивать риски
-    if (!userPermissions.includes('assess_severity') && !userPermissions.includes('assess_probability')) {
-      return []; // Только пользователи с правами оценки могут оценивать
-    }
-    
+
+    // Диалог подтверждения появляется только когда пользователь СЕЙЧАС изменил
+    // поле вероятности (probability_score или residual_probability) в текущей сессии.
+    // Проверка разрешений не нужна: если пользователь мог заполнить поле — он видит диалог.
     const risksNeedingEval = [];
-    
+
     data.forEach((row, rowIndex) => {
       // Пропускаем полностью закрытые риски
       if (row.risk_status === 'fully_closed') {
         return;
       }
-      
-      // Проверяем первичную оценку (столбцы 6-8)
+
+      // Проверяем первичную оценку:
+      // диалог появляется только если probability_score был изменён в текущей сессии
+      const probabilityModifiedThisSession = modifiedCells.has(`${activeSheet}_${rowIndex}_probability_score`);
       const hasSeverity = row.severity_score && row.severity_score.toString().trim() !== '';
       const hasProbability = row.probability_score && row.probability_score.toString().trim() !== '';
       const hasRiskScore = row.risk_score && row.risk_score.toString().trim() !== '';
-      
-      // Если заполнены оценки но нет first_evaluation_done - нужна первичная оценка
-      if (hasSeverity && hasProbability && hasRiskScore && !row.first_evaluation_done) {
+
+      if (probabilityModifiedThisSession && hasSeverity && hasProbability && hasRiskScore && !row.first_evaluation_done) {
         risksNeedingEval.push({
           rowIndex,
           id: row.risk_id || row.id,
@@ -1330,14 +1332,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
           evaluationType: 'first'
         });
       }
-      
-      // Проверяем вторичную оценку (столбцы 17-19)
+
+      // Проверяем вторичную оценку (остаточный риск):
+      // диалог появляется только если residual_probability был изменён в текущей сессии
+      const residualProbabilityModifiedThisSession = modifiedCells.has(`${activeSheet}_${rowIndex}_residual_probability`);
       const hasResidualSeverity = row.residual_risk_level && row.residual_risk_level.toString().trim() !== '';
       const hasResidualProbability = row.residual_probability && row.residual_probability.toString().trim() !== '';
       const hasResidualScore = row.residual_risk_score && row.residual_risk_score.toString().trim() !== '';
-      
-      // Если заполнены остаточные оценки но нет second_evaluation_done - нужна вторичная оценка
-      if (hasResidualSeverity && hasResidualProbability && hasResidualScore && !row.second_evaluation_done) {
+
+      if (residualProbabilityModifiedThisSession && hasResidualSeverity && hasResidualProbability && hasResidualScore && !row.second_evaluation_done) {
         risksNeedingEval.push({
           rowIndex,
           id: row.risk_id || row.id,
@@ -1350,7 +1353,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
         });
       }
     });
-    
+
     return risksNeedingEval;
   };
 

@@ -66,6 +66,8 @@
   font-size: clamp(20px, 2.2vw, 30px);
   font-weight: 700;
   color: #131313;
+  word-break: break-word;
+  overflow-wrap: break-word;
   margin: 0;
   overflow-wrap: break-word;
   word-break: break-word;
@@ -224,6 +226,9 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .info-item.full-width {
@@ -739,9 +744,11 @@
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1000;
+  overflow-y: auto;
+  padding: 40px 20px;
 }
 
 .modal-content {
@@ -749,20 +756,26 @@
   border-radius: 15px;
   width: 100%;
   max-width: 500px;
-  margin: 20px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-  max-height: 90vh;
   display: flex;
   flex-direction: column;
+  margin: auto;
+}
+
+.member-modal {
+  max-height: none !important;
+  overflow-y: visible !important;
+  width: 100% !important;
+  max-width: 500px !important;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 30px 30px 0 30px;
+  padding: 30px 30px 20px 30px;
   border-bottom: 1px solid #E8E8E8;
-  margin-bottom: 30px;
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -791,9 +804,7 @@
 }
 
 .modal-body {
-  padding: 0 30px;
-  overflow-y: auto;
-  flex: 1;
+  padding: 20px 30px;
 }
 
 .form-group {
@@ -845,16 +856,18 @@
 }
 
 .lifecycle-stage-checkbox-item {
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
   padding: 8px 10px;
   color: #111827;
   font-size: 14px;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s;
+  font-weight: normal;
+  margin-bottom: 0;
 }
 
 .lifecycle-stage-checkbox-item:hover {
@@ -874,6 +887,8 @@
   position: relative;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  align-self: center;
+  margin: 0;
 }
 
 .lifecycle-stage-checkbox-item input[type="checkbox"]:hover {
@@ -901,10 +916,8 @@
 .modal-actions {
   display: flex;
   gap: 15px;
-  padding: 20px 30px;
-  border-top: 1px solid #E8E8E8;
+  padding-top: 20px;
   justify-content: flex-end;
-  flex-shrink: 0;
 }
 
 .btn {
