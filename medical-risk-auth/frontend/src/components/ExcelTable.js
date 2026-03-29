@@ -4,7 +4,7 @@ import RiskEvaluationWizard from './RiskEvaluationWizard';
 import BatchRiskEvaluation from './BatchRiskEvaluation';
 import API_BASE_URL from '../config';
 
-const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
+const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
   // Lifecycle stage labels mapping
   const LIFECYCLE_STAGE_LABELS = {
     design_development: 'Проектирование и разработка',
@@ -51,7 +51,13 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
   const [saving, setSaving] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [activeSheet, setActiveSheet] = useState(initialSheet);
+  // Restore last active sheet from localStorage, or defer to 'first' logic
+  const [activeSheet, setActiveSheet] = useState(() => {
+    const specific = initialSheet && initialSheet !== 'first';
+    if (specific) return initialSheet;
+    const saved = localStorage.getItem(`project_${projectId}_active_sheet`);
+    return saved || null; // null = "not yet resolved"
+  });
   const [cellColors, setCellColors] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
   const [modifiedCells, setModifiedCells] = useState(new Set());
@@ -752,7 +758,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     
     // Переключаемся на первый лист, если удаляем активный
     if (activeSheet === sheetId) {
-      setActiveSheet('operation');
+      setActiveSheet(sheets[0]?.id || null);
     }
     
     setHasChanges(true);
@@ -849,8 +855,16 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     };
   }, [resizing, activeSheet]);
 
+  // Persist active sheet so refresh restores it
+  useEffect(() => {
+    if (activeSheet) {
+      localStorage.setItem(`project_${projectId}_active_sheet`, activeSheet);
+    }
+  }, [projectId, activeSheet]);
+
   // Загрузка данных при монтировании и смене листа
   useEffect(() => {
+    if (!activeSheet) return; // Don't load until sheet is resolved
     loadData();
   }, [projectId, activeSheet]);
 
@@ -883,28 +897,16 @@ const ExcelTable = ({ projectId, onClose, initialSheet = 'sheet1' }) => {
     logUserData();
   }, [projectId]);
 
-  // Обновление активного листа при изменении initialSheet
+  // Once sheets are loaded, resolve activeSheet if it's still null or points to a non-existent sheet
   useEffect(() => {
-    if (isInitialLoad) {
-      if (initialSheet === 'first') {
-        // Если указан 'first', установим его при следующей загрузке данных
-        // Не устанавливаем сразу, чтобы дождаться загрузки sheets
-      } else {
-        // Для других значений initialSheet устанавливаем сразу
-        setActiveSheet(initialSheet);
-        setIsInitialLoad(false);
-      }
-    }
-  }, [initialSheet, isInitialLoad]);
-
-  // Отдельный useEffect для установки первого листа после загрузки данных (только один раз)
-  useEffect(() => {
-    if (initialSheet === 'first' && isInitialLoad && sheets.length > 0) {
-      const firstSheetId = sheets[0]?.id || 'operation';
-      setActiveSheet(firstSheetId);
-      setIsInitialLoad(false);
-    }
-  }, [sheets]); // Убираем initialSheet и isInitialLoad из зависимостей, чтобы избежать повторных вызовов
+    if (sheets.length === 0) return;
+    const sheetIds = sheets.map(s => s.id);
+    if (activeSheet && sheetIds.includes(activeSheet)) return; // already on a valid sheet
+    // activeSheet is null or stale — pick best available
+    const firstSheet = sheets[0].id;
+    setActiveSheet(firstSheet);
+    setIsInitialLoad(false);
+  }, [sheets]);
 
   const loadUserRole = async () => {
     setLoadingRole(true);
