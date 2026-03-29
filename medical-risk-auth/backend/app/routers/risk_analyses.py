@@ -887,9 +887,15 @@ async def get_project_risk_factors(
                             matched_row = row
                 
                 if matched_row:
-                    # Get risk status from matched row
                     matched_data = matched_row.data or {}
                     factor_dict["risk_status"] = matched_data.get('risk_status', 'new')
+                    # Return residual risk score from the table if present
+                    raw_residual = matched_data.get('residual_risk_score', '')
+                    if raw_residual not in (None, ''):
+                        try:
+                            factor_dict["residual_risk_score"] = int(float(str(raw_residual)))
+                        except (ValueError, TypeError):
+                            pass
         
         risk_factors_with_status.append(factor_dict)
     

@@ -220,39 +220,9 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
   );
 
   const applyRiskBenefitSelectionOnSave = (rowDataOnly) => {
-    const normalizedRiskBenefit = String(rowDataOnly.risk_benefit_analysis || '').trim().toLowerCase();
-
-    if (normalizedRiskBenefit === 'нет') {
-      // Пользователь отклонил анализ риск/польза — начинаем новый цикл переоценки.
-      // Сохраняем текущие значения как «hint» для сравнения, очищаем поля второй оценки.
-      REOPENED_SECOND_EVAL_COLUMNS.forEach((field) => {
-        const hintField = SECOND_EVAL_HINT_FIELD_MAP[field];
-        if (!hintField) return;
-        const currentValue = rowDataOnly[field];
-        const existingHint = rowDataOnly[hintField];
-        if (String(currentValue || '').trim() !== '') {
-          rowDataOnly[hintField] = currentValue;
-        } else if (String(existingHint || '').trim() !== '') {
-          rowDataOnly[hintField] = existingHint;
-        } else {
-          rowDataOnly[hintField] = '';
-        }
-      });
-      rowDataOnly.risk_benefit_analysis = 'Ожидание ответа';
-      rowDataOnly.risk_status = 'pending_second';
-      rowDataOnly.locked_after_second = false;
-      rowDataOnly.second_evaluation_done = false;
-      rowDataOnly.residual_risk_level = '';
-      rowDataOnly.residual_probability = '';
-      rowDataOnly.residual_risk_score = '';
-      rowDataOnly.risk_level_2 = '';
-      rowDataOnly.comment_2 = '';
-    }
-    // ВАЖНО: ветку 'ожидание ответа' намеренно не обрабатываем здесь.
-    // Раньше она выставляла locked_after_second = true при каждом сохранении,
-    // что блокировало residual_probability во время цикла переоценки (после 'Нет').
-    // Значения locked_after_second и risk_status уже корректно установлены
-    // через handleCellChange / applyEvaluations и должны сохраняться как есть.
+    // Значения risk_benefit_analysis и risk_status сохраняются как есть.
+    // 'Нет' — пользователь отказал в анализе, риск остаётся в статусе pending_benefit.
+    // 'Да' и закрытие риска уже обработаны в handleCellChange / applyEvaluations.
   };
 
   const showAllowedScoresAlert = (columnKey, allowedValues) => {
@@ -1450,10 +1420,17 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
           row.comment_2 = evaluation.comment;
         }
 
-        // После вторичной оценки ожидаем решение в столбце анализа риск/польза.
         row.locked_after_second = true;
-        row.risk_benefit_analysis = 'Ожидание ответа';
-        row.risk_status = 'pending_benefit';
+
+        if (evaluation.isAcceptable) {
+          // Остаточный риск допустим — закрываем автоматически, как и при первой оценке.
+          row.risk_benefit_analysis = 'Да';
+          row.risk_status = 'closed';
+        } else {
+          // Остаточный риск недопустим — ждём решения в столбце анализа риск/польза.
+          row.risk_benefit_analysis = 'Ожидание ответа';
+          row.risk_status = 'pending_benefit';
+        }
       }
     });
     

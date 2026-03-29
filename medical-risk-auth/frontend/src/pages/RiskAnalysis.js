@@ -312,8 +312,18 @@ const RiskAnalysis = () => {
           console.log('No hazard categories found in project data');
         }
         
-        // Фильтрация пустых значений и исключение категории "Другие"
-        const filteredCategories = hazardCategories.filter(cat => cat && cat.trim() && cat.trim() !== 'Другие');
+        // Кастомные опасности хранятся отдельно как строка, разделённая переносами строк
+        const customHazards = (projectData.custom_hazard || '')
+          .split('\n')
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        // Фильтрация пустых значений и исключение категории "Другие", добавляем кастомные опасности
+        const baseCategories = hazardCategories.filter(cat => cat && cat.trim() && cat.trim() !== 'Другие');
+        const filteredCategories = [
+          ...baseCategories,
+          ...customHazards.filter(h => !baseCategories.includes(h))
+        ];
         
         setSelectedHazardCategories(filteredCategories);
         console.log('Final hazardCategories array:', filteredCategories);
@@ -364,6 +374,7 @@ const RiskAnalysis = () => {
             severityScore: risk.severity_score,
             probabilityScore: risk.probability_score,
             riskScore: risk.risk_score,
+            residualRiskScore: risk.residual_risk_score || null,
             controlMeasures: risk.control_measures || '',
             status: 'identified', // Default status for now
             lastUpdated: risk.updated_at || risk.created_at,
@@ -969,8 +980,12 @@ const RiskAnalysis = () => {
           </thead>
           <tbody>
             {filteredRisks.map(risk => {
-              const riskLevel = risk.riskScore ? getRiskLevel(risk.riskScore) : { level: 'unknown', color: '#9E9E9E' };
-              
+              // Если риск не прошёл после повторной оценки (pending_benefit) и есть остаточный балл —
+              // показываем актуальный остаточный балл вместо первичного.
+              const isAfterSecondEval = risk.risk_status === 'pending_benefit' && risk.residualRiskScore;
+              const displayScore = isAfterSecondEval ? risk.residualRiskScore : risk.riskScore;
+              const riskLevel = displayScore ? getRiskLevel(displayScore) : { level: 'unknown', color: '#9E9E9E' };
+
               // Определяем статус риска
               const getRiskStatusIcon = (status) => {
                 switch(status) {
@@ -1017,12 +1032,14 @@ const RiskAnalysis = () => {
                     {risk.harm}
                   </td>
                   <td className="risk-score-cell">
-                    {risk.riskScore ? (
-                      <span 
+                    {displayScore ? (
+                      <span
                         className={`risk-score ${riskLevel.level}`}
                         style={{ backgroundColor: riskLevel.color }}
+                        title={isAfterSecondEval ? 'Балл после повторной оценки (остаточный)' : undefined}
                       >
-                        {risk.riskScore}
+                        {displayScore}
+                        {isAfterSecondEval && <span style={{ fontSize: '10px', marginLeft: '3px', opacity: 0.7 }}>*</span>}
                       </span>
                     ) : (
                       <span className="not-evaluated" style={{ color: '#999', fontStyle: 'italic' }}>

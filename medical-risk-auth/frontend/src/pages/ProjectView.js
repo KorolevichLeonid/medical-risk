@@ -708,7 +708,7 @@ const ProjectView = () => {
       ...(project.lifecycleStages || []),
       ...(project.customLifecycleStages || [])
     ])
-  ];
+  ].filter(stage => stage && stage !== 'other' && stage !== 'Другие');
 
   const availableLifecycleStages = availableLifecycleStageValues
     .filter(stage => stage && stage !== 'other' && stage !== 'Другие')
