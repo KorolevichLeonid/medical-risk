@@ -760,8 +760,7 @@ const RiskAnalysis = () => {
             <button
               className="btn btn-info"
               onClick={() => {
-                // Открываем таблицу управления рисками с первым листом
-                navigate(`/project/${id}?openRiskTable=true&sheet=first`);
+                navigate(`/project/${id}/table`);
               }}
             >
               Таблица управления рисками
@@ -957,7 +956,7 @@ const RiskAnalysis = () => {
         <table className="risk-table">
           <thead>
             <tr>
-              <th style={{ width: '50px', textAlign: 'center' }}>Статус</th>
+              <th style={{ width: '70px', minWidth: '70px', textAlign: 'center', whiteSpace: 'nowrap' }}>Статус</th>
               <th>Категория</th>
               <th>Этап ЖЦ</th>
               <th>Опасность</th>
@@ -1060,10 +1059,8 @@ const RiskAnalysis = () => {
                           // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
                           const sheetId = risk.lifecycleStage;
 
-                          sessionStorage.setItem('highlightRiskId', risk.id);
-                          sessionStorage.setItem('openSheet', sheetId);
-
-                          navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${risk.id}`);
+                          localStorage.setItem(`project_${id}_active_sheet`, sheetId);
+                          navigate(`/project/${id}/table`);
                         }}
                         title="Open in Risk Table"
                       >
@@ -1415,12 +1412,8 @@ const RiskAnalysis = () => {
                     // Используем lifecycleStage напрямую как sheetId (динамические этапы жизненного цикла)
                     const sheetId = selectedRisk.lifecycleStage;
 
-                    // Сохраняем информацию о том, какой риск нужно подсветить
-                    sessionStorage.setItem('highlightRiskId', selectedRisk.id);
-                    sessionStorage.setItem('openSheet', sheetId);
-
-                    // Перенаправляем на страницу проекта с флагом открытия таблицы
-                    navigate(`/project/${id}?openRiskTable=true&sheet=${sheetId}&riskId=${selectedRisk.id}`);
+                    localStorage.setItem(`project_${id}_active_sheet`, sheetId);
+                    navigate(`/project/${id}/table`);
                   }}
                 >
                   📊 Open in Risk Table
