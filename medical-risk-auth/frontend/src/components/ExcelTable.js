@@ -2142,22 +2142,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
 
       if (riskScore >= acceptableRiskLevel) {
         value = 'не допустимый';
-        // Автоматически устанавливаем красный цвет для не допустимого риска
-        if (cellColor !== '#FF4444') {
-          handleCellColorChange(rowIndex, column.key, '#FF4444');
-        }
       } else if (riskScore > 0 && riskScore < acceptableRiskLevel) {
         value = 'допустимый';
-        // Автоматически устанавливаем зеленый цвет для допустимого риска
-        if (cellColor !== '#4CAF50') {
-          handleCellColorChange(rowIndex, column.key, '#4CAF50');
-        }
       } else if (riskScore === 0) {
         value = '';
-        // Для нулевого риска устанавливаем белый цвет
-        if (cellColor !== '#FFFFFF') {
-          handleCellColorChange(rowIndex, column.key, '#FFFFFF');
-        }
       }
     }
 
@@ -2342,35 +2330,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
             )}
           </div>
           <div className="excel-toolbar-right">
-            {/* Палитра цветов - не показываем для заблокированных ячеек */}
-            {selectedCell && !isCellLocked(selectedCell.rowIndex, selectedCell.columnKey) && (
-              <div className="toolbar-color-picker">
-                <span className="color-picker-label">Цвет ячейки:</span>
-                <div
-                  className="toolbar-color-option color-reset-btn"
-                  style={{ backgroundColor: '#FFFFFF', border: '2px solid #ccc' }}
-                  onClick={() => {
-                    handleCellColorChange(selectedCell.rowIndex, selectedCell.columnKey, '#FFFFFF');
-                    setSelectedCell(null);
-                  }}
-                  title="Сбросить цвет"
-                >
-                  Сброс
-                </div>
-                {colors.map(color => (
-                  <div
-                    key={color.value}
-                    className="toolbar-color-option"
-                    style={{ backgroundColor: color.value }}
-                    onClick={() => {
-                      handleCellColorChange(selectedCell.rowIndex, selectedCell.columnKey, color.value);
-                      setSelectedCell(null);
-                    }}
-                    title={color.name}
-                  />
-                ))}
-              </div>
-            )}
             <button
               className="excel-btn excel-btn-save"
               onClick={handleSave}
