@@ -196,11 +196,14 @@ def build_dynamic_conclusion_lines(risks: list, risk_threshold: int, device_name
     total_risks = len(risks) if risks else 0
 
     evaluated_initial = 0
-    acceptable_initial = 0
-    unacceptable_initial = 0
+    acceptable_before = 0       # приемлимы сразу до мер
+    unacceptable_before = 0     # неприемлимы до мер (нужны меры)
 
     evaluated_residual = 0
-    unacceptable_residual = 0
+    acceptable_after = 0        # стали приемлимыми после мер
+    unacceptable_after = 0      # всё ещё неприемлимы после мер
+    not_evaluated_after = 0     # неприемлимы до мер, остаточная оценка отсутствует
+    closed_via_benefit = 0      # закрыты через анализ польза/риск несмотря на неприемлимый балл
 
     for raw_risk in risks or []:
         data = raw_risk.get('data') if isinstance(raw_risk, dict) else None
@@ -208,24 +211,34 @@ def build_dynamic_conclusion_lines(risks: list, risk_threshold: int, device_name
 
         s_init = _to_int_or_none(risk.get('severity_score', risk.get('severity_initial')))
         p_init = _to_int_or_none(risk.get('probability_score', risk.get('probability_initial')))
+        risk_status = risk.get('risk_status', 'new')
+
         if s_init is not None and p_init is not None and s_init > 0 and p_init > 0:
             evaluated_initial += 1
             initial_score = s_init * p_init
             if initial_score < risk_threshold:
-                acceptable_initial += 1
+                # Приемлим сразу — меры не нужны
+                acceptable_before += 1
             else:
-                unacceptable_initial += 1
+                # Неприемлим — проверяем остаточную оценку
+                unacceptable_before += 1
+                s_res = _to_int_or_none(risk.get('residual_risk_level', risk.get('severity_residual')))
+                p_res = _to_int_or_none(risk.get('residual_probability', risk.get('probability_residual')))
+                if s_res is not None and p_res is not None and s_res > 0 and p_res > 0:
+                    evaluated_residual += 1
+                    residual_score = s_res * p_res
+                    if residual_score < risk_threshold:
+                        acceptable_after += 1
+                    else:
+                        unacceptable_after += 1
+                        if risk_status in ('closed', 'fully_closed'):
+                            closed_via_benefit += 1
+                else:
+                    not_evaluated_after += 1
 
-        s_res = _to_int_or_none(risk.get('residual_risk_level', risk.get('severity_residual')))
-        p_res = _to_int_or_none(risk.get('residual_probability', risk.get('probability_residual')))
-        if s_res is not None and p_res is not None and s_res > 0 and p_res > 0:
-            evaluated_residual += 1
-            residual_score = s_res * p_res
-            if residual_score >= risk_threshold:
-                unacceptable_residual += 1
+    open_risks = not_evaluated_after  # риски, требующие ещё остаточной оценки
 
-    open_risks = max(total_risks - evaluated_residual, 0)
-
+    # Строка 1: полнота оценки
     if total_risks == 0:
         reviewed_line = 'Идентифицированные риски отсутствуют; оценка рисков в таблицах не требуется.'
     elif evaluated_initial == total_risks:
@@ -235,37 +248,56 @@ def build_dynamic_conclusion_lines(risks: list, risk_threshold: int, device_name
     else:
         reviewed_line = f'Идентифицированные риски рассмотрены частично: оценено {evaluated_initial} из {total_risks}.'
 
-    risk_count_line = (
-        f'Идентифицировано рисков – {total_risks}; '
-        f'из них приемлемых - {acceptable_initial}; '
-        f'неприемлемых - {unacceptable_initial}.'
-    )
-
+    # Строка 2: итоги до мер
     if total_risks == 0:
-        controls_line = 'Меры контроля риска не требуются, так как идентифицированные риски отсутствуют.'
-    elif evaluated_initial < total_risks:
-        controls_line = 'Эффективность мер контроля риска не подтверждена для всех рисков, так как часть рисков не оценена.'
-    elif unacceptable_initial == 0:
+        risk_count_line = 'Идентифицированные риски отсутствуют.'
+    else:
+        risk_count_line = (
+            f'До принятия мер управления рисками: всего рисков — {total_risks}; '
+            f'приемлемых (не требуют мер) — {acceptable_before}; '
+            f'неприемлемых (требуют мер) — {unacceptable_before}.'
+        )
+
+    # Строка 3: эффективность мер
+    if total_risks == 0 or unacceptable_before == 0:
+        controls_line = (
+            'Все риски признаны приемлемыми до применения мер; меры контроля не потребовались.'
+            if (total_risks > 0 and unacceptable_before == 0)
+            else 'Меры контроля риска не требуются, так как идентифицированные риски отсутствуют.'
+        )
+    elif open_risks > 0:
+        controls_line = (
+            f'Меры контроля приняты не для всех рисков: {open_risks} риск(а) ещё не оценены после мер.'
+        )
+    elif unacceptable_after == 0:
         controls_line = 'Все меры контроля риска внедрены, проверены и признаны эффективными.'
     else:
-        controls_line = 'Не все меры контроля риска признаны эффективными, так как остаются неприемлемые риски.'
-
-    if total_risks == 0:
-        residual_line = 'Остаточные риски отсутствуют.'
-    elif evaluated_residual < total_risks:
-        residual_line = (
-            f'Не все остаточные риски оценены: оценено {evaluated_residual} из {total_risks}; '
-            f'не закрытых рисков - {open_risks}.'
+        controls_line = (
+            f'После применения мер управления: приемлемых — {acceptable_after}; '
+            f'неприемлемых — {unacceptable_after}'
+            + (f' (из них закрыты через анализ польза/риск — {closed_via_benefit})' if closed_via_benefit > 0 else '') + '.'
         )
-    elif unacceptable_residual == 0:
-        residual_line = 'Все остаточные риски находятся на приемлемом уровне или в зоне ALARP.'
+
+    # Строка 4: остаточные риски
+    if total_risks == 0 or unacceptable_before == 0:
+        residual_line = 'Остаточные риски отсутствуют — все идентифицированные риски были приемлемы до мер.'
+    elif open_risks > 0:
+        residual_line = (
+            f'Остаточные риски оценены не полностью: '
+            f'оценено {evaluated_residual} из {unacceptable_before} неприемлемых рисков; '
+            f'ещё не оценено — {open_risks}.'
+        )
+    elif unacceptable_after == 0:
+        residual_line = 'Все остаточные риски находятся на приемлемом уровне после применения мер.'
     else:
         residual_line = (
-            f'Не все остаточные риски находятся на приемлемом уровне: '
-            f'неприемлемых остаточных рисков - {unacceptable_residual}.'
+            f'После мер управления: приемлемых остаточных рисков — {acceptable_after}; '
+            f'неприемлемых — {unacceptable_after}'
+            + (f', из которых {closed_via_benefit} закрыты через обоснование польза/риск' if closed_via_benefit > 0 else '') + '.'
         )
 
-    overall_risk_acceptable = total_risks == 0 or (open_risks == 0 and unacceptable_residual == 0)
+    # Строка 5: общий вывод
+    overall_risk_acceptable = total_risks == 0 or (open_risks == 0 and unacceptable_after == 0)
     if overall_risk_acceptable:
         overall_line = 'Совокупный остаточный риск признан приемлемым в контексте назначения изделия и ожидаемой пользы.'
         conclusion_main_line = (
@@ -274,18 +306,18 @@ def build_dynamic_conclusion_lines(risks: list, risk_threshold: int, device_name
         )
         conclusion_process_line = 'Процесс управления рисками реализован в полном соответствии с ISO 14971:2019.'
     else:
-        overall_line = 'Совокупный остаточный риск не может быть признан приемлемым до закрытия всех открытых и/или неприемлемых рисков.'
+        overall_line = 'Совокупный остаточный риск не может быть признан приемлемым до завершения оценки и закрытия всех проблемных рисков.'
         reasons = []
         if open_risks > 0:
-            reasons.append(f'не закрытые риски: {open_risks}')
-        if unacceptable_residual > 0:
-            reasons.append(f'неприемлемые остаточные риски: {unacceptable_residual}')
-        if not reasons and unacceptable_initial > 0:
-            reasons.append(f'неприемлемые оцененные риски: {unacceptable_initial}')
+            reasons.append(f'не завершена остаточная оценка: {open_risks} риск(а)')
+        if unacceptable_after > 0:
+            reasons.append(f'неприемлемых остаточных рисков: {unacceptable_after}')
+        if not reasons and unacceptable_before > 0:
+            reasons.append(f'риски не оценены после мер: {unacceptable_before}')
         reason_text = '; '.join(reasons) if reasons else 'требуются дополнительные мероприятия по управлению рисками'
         conclusion_main_line = (
             f'На момент утверждения данного отчёта изделие {device_name} не может быть допущено к реализации, '
-            f'поскольку выявлены {reason_text}.'
+            f'поскольку выявлены следующие проблемы: {reason_text}.'
         )
         conclusion_process_line = 'Процесс управления рисками не завершён: требуется закрытие и повторная оценка всех проблемных рисков.'
 
