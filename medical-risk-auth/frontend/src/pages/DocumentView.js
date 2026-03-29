@@ -43,21 +43,30 @@ const DocumentView = () => {
   const loadProjectData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+
+      // Check user's role in this project via my-role endpoint
+      const roleResponse = await fetch(`${API_BASE_URL}/api/projects/${id}/my-role`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (roleResponse.ok) {
+        const roleData = await roleResponse.json();
+        if (roleData.user_role !== 'manager') {
+          navigate(`/project/${id}`, { replace: true });
+          return;
         }
+      } else {
+        navigate(`/project/${id}`, { replace: true });
+        return;
+      }
+
+      // Load full project data
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
         const projectData = await response.json();
-
-        // Проверяем права доступа: только менеджер видит документы
-        if (projectData.user_role !== 'manager') {
-          navigate(`/project/${id}`, { replace: true });
-          return;
-        }
-
         setProject(projectData);
       } else {
         console.error('Failed to load project');
