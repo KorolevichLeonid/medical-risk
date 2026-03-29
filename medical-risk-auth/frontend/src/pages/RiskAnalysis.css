@@ -337,6 +337,35 @@
   background-color: #FFCDD2;
 }
 
+/* Новые классы ячеек матрицы */
+.matrix-cell.matrix-covered-green {
+  background-color: #E8F5E9;
+  color: #2E7D32;
+}
+.matrix-cell.matrix-covered-green:hover {
+  background-color: #C8E6C9;
+  transform: scale(1.05);
+  cursor: pointer;
+}
+
+.matrix-cell.matrix-covered-red {
+  background-color: #FFEBEE;
+  color: #C62828;
+}
+.matrix-cell.matrix-covered-red:hover {
+  background-color: #FFCDD2;
+  transform: scale(1.05);
+  cursor: pointer;
+}
+
+.matrix-cell.matrix-uncovered {
+  background-color: #F5F5F5;
+  color: #9E9E9E;
+}
+.matrix-cell.matrix-uncovered:hover {
+  background-color: #EEEEEE;
+}
+
 /* Status badges container */
 .cell-status-badges {
   display: flex;
@@ -524,7 +553,27 @@
 }
 
 .risk-row:hover {
-  background-color: #F8F9FA;
+  filter: brightness(0.96);
+}
+
+/* Цвет строк по статусу риска */
+.risk-row.row-green {
+  background-color: rgba(0, 200, 83, 0.08);
+}
+.risk-row.row-red {
+  background-color: rgba(255, 68, 68, 0.08);
+}
+.risk-row.row-gray {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Пара баллов: до мер + после мер */
+.risk-score-pair {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .hazard-cell {

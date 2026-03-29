@@ -461,49 +461,47 @@ const RiskAnalysis = () => {
     const coveredSet = new Set();
     const missingCombinations = [];
 
-    // Инициализируем матрицу - теперь для каждой комбинации храним статусы
+    const threshold = Number(riskThreshold) || 10;
+
+    // Инициализируем матрицу: закрытые приемлимые, закрытые неприемлимые, незакрытые
     lifecycleStages.forEach(stage => {
       matrix[stage] = {};
       selectedHazardCategories.forEach(hazard => {
         matrix[stage][hazard] = {
-          new: 0,
-          evaluated: 0,
-          pending_second: 0,
-          pending_benefit: 0,
-          pending_closure: 0,
-          closed: 0,
-          fully_closed: 0,
+          closedAcceptable: 0,   // закрыт + балл приемлим
+          closedUnacceptable: 0, // закрыт + балл неприемлим (через анализ польза/риск)
+          notClosed: 0,          // не закрыт (новый / в работе / ожидание)
           total: 0
         };
       });
     });
 
-    // Заполняем матрицу на основе существующих рисков
+    // Заполняем матрицу на основе всех рисков
     risks.forEach(risk => {
-      if (risk.risk_status !== 'closed' && risk.risk_status !== 'fully_closed') {
-        return;
-      }
-      if (matrix[risk.lifecycleStage] && matrix[risk.lifecycleStage][risk.hazardCategory]) {
-        const cell = matrix[risk.lifecycleStage][risk.hazardCategory];
-        cell.total++;
-        
-        // Группируем по статусам
-        const status = risk.risk_status || 'new';
-        
-        if (cell[status] !== undefined) {
-          cell[status]++;
+      if (!matrix[risk.lifecycleStage] || !matrix[risk.lifecycleStage][risk.hazardCategory]) return;
+      const cell = matrix[risk.lifecycleStage][risk.hazardCategory];
+      cell.total++;
+
+      const isClosed = risk.risk_status === 'closed' || risk.risk_status === 'fully_closed';
+      if (isClosed) {
+        // Актуальный балл: остаточный (после мер) если есть, иначе первичный
+        const effectiveScore = risk.residualRiskScore || risk.riskScore;
+        const isAcceptable = effectiveScore != null && effectiveScore < threshold;
+        if (isAcceptable) {
+          cell.closedAcceptable++;
         } else {
-          cell.new++; // Если статус неизвестен, считаем как new
+          cell.closedUnacceptable++;
         }
-        
         coveredSet.add(`${risk.lifecycleStage}|||${risk.hazardCategory}`);
+      } else {
+        cell.notClosed++;
       }
     });
 
-    // Находим недостающие комбинации
+    // Находим недостающие комбинации (нет ни одного закрытого риска)
     lifecycleStages.forEach(stage => {
       selectedHazardCategories.forEach(hazard => {
-        if (matrix[stage][hazard].total === 0) {
+        if ((matrix[stage][hazard].closedAcceptable + matrix[stage][hazard].closedUnacceptable) === 0) {
           missingCombinations.push({ stage, hazard });
         }
       });
@@ -853,57 +851,49 @@ const RiskAnalysis = () => {
                         {formatLifecycleStageForDisplay(stage)}
                       </td>
                       {selectedHazardCategories.map((hazard, hazardIdx) => {
-                        const cellData = coverage.matrix[stage]?.[hazard] || { total: 0 };
-                        const isCovered = cellData.total > 0;
-                        
+                        const cellData = coverage.matrix[stage]?.[hazard] || { closedAcceptable: 0, closedUnacceptable: 0, notClosed: 0, total: 0 };
+                        const hasClosed = cellData.closedAcceptable + cellData.closedUnacceptable > 0;
+                        const hasUnacceptable = cellData.closedUnacceptable > 0;
+
+                        // Цвет ячейки: зелёный = закрыт+приемлим, красный = закрыт+неприемлим, серый = нет закрытых
+                        const cellClass = !hasClosed
+                          ? 'matrix-uncovered'
+                          : hasUnacceptable
+                            ? 'matrix-covered-red'
+                            : 'matrix-covered-green';
+
+                        const titleText = hasClosed
+                          ? `Закрытых приемлимых: ${cellData.closedAcceptable} | Закрытых неприемлимых: ${cellData.closedUnacceptable} | Незакрытых: ${cellData.notClosed}`
+                          : `Нет закрытых рисков | Незакрытых: ${cellData.notClosed}`;
+
                         return (
-                          <td 
-                            key={hazardIdx} 
-                            className={`matrix-cell ${isCovered ? 'covered' : 'missing'}`}
-                            title={isCovered ? 
-                              `Total: ${cellData.total} | New: ${cellData.new} | In work: ${cellData.evaluated} | Pending second: ${cellData.pending_second} | Pending analysis: ${cellData.pending_benefit} | Pending closure: ${cellData.pending_closure} | Closed: ${cellData.closed} | Fully closed: ${cellData.fully_closed}` 
-                              : 'No risks yet'}
+                          <td
+                            key={hazardIdx}
+                            className={`matrix-cell ${cellClass}`}
+                            title={titleText}
                           >
-                            {isCovered ? (
+                            {hasClosed ? (
                               <div className="cell-status-badges">
-                                {cellData.new > 0 && (
-                                  <span className="status-badge status-new">
-                                    ⚪{cellData.new}
-                                  </span>
-                                )}
-                                {cellData.evaluated > 0 && (
-                                  <span className="status-badge status-evaluated">
-                                    🟡{cellData.evaluated}
-                                  </span>
-                                )}
-                                {cellData.pending_second > 0 && (
-                                  <span className="status-badge status-pending">
-                                    🟠{cellData.pending_second}
-                                  </span>
-                                )}
-                                {cellData.pending_benefit > 0 && (
-                                  <span className="status-badge status-pending">
-                                    🟠{cellData.pending_benefit}
-                                  </span>
-                                )}
-                                {cellData.pending_closure > 0 && (
-                                  <span className="status-badge status-pending">
-                                    🟠{cellData.pending_closure}
-                                  </span>
-                                )}
-                                {cellData.closed > 0 && (
+                                {cellData.closedAcceptable > 0 && (
                                   <span className="status-badge status-closed">
-                                    🟢{cellData.closed}
+                                    🟢{cellData.closedAcceptable}
                                   </span>
                                 )}
-                                {cellData.fully_closed > 0 && (
-                                  <span className="status-badge status-closed">
-                                    🟢{cellData.fully_closed}
+                                {cellData.closedUnacceptable > 0 && (
+                                  <span className="status-badge status-unacceptable">
+                                    🔴{cellData.closedUnacceptable}
+                                  </span>
+                                )}
+                                {cellData.notClosed > 0 && (
+                                  <span className="status-badge status-not-closed">
+                                    ⚪{cellData.notClosed}
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <span className="cell-empty">—</span>
+                              <span className="cell-empty">
+                                {cellData.notClosed > 0 ? `⚪${cellData.notClosed}` : '—'}
+                              </span>
                             )}
                           </td>
                         );
@@ -980,30 +970,40 @@ const RiskAnalysis = () => {
           </thead>
           <tbody>
             {filteredRisks.map(risk => {
-              // Если риск не прошёл после повторной оценки (pending_benefit) и есть остаточный балл —
-              // показываем актуальный остаточный балл вместо первичного.
-              const isAfterSecondEval = risk.risk_status === 'pending_benefit' && risk.residualRiskScore;
-              const displayScore = isAfterSecondEval ? risk.residualRiskScore : risk.riskScore;
-              const riskLevel = displayScore ? getRiskLevel(displayScore) : { level: 'unknown', color: '#9E9E9E' };
+              const threshold = Number(riskThreshold) || 10;
+              const isClosed = risk.risk_status === 'closed' || risk.risk_status === 'fully_closed';
+
+              // Актуальный балл для определения цвета строки и статуса
+              const effectiveScore = risk.residualRiskScore || risk.riskScore;
+              const isEffectiveAcceptable = effectiveScore != null && effectiveScore < threshold;
+
+              // Цвет строки: зелёный = закрыт+приемлим, красный = закрыт+неприемлим, серый = не закрыт
+              const rowColorClass = isClosed
+                ? (isEffectiveAcceptable ? 'row-green' : 'row-red')
+                : 'row-gray';
+
+              // Цвет значений балла
+              const initialLevel = risk.riskScore != null ? getRiskLevel(risk.riskScore) : null;
+              const residualLevel = risk.residualRiskScore != null ? getRiskLevel(risk.residualRiskScore) : null;
 
               // Определяем статус риска
               const getRiskStatusIcon = (status) => {
                 switch(status) {
-                  case 'closed': return { icon: '🟢', title: 'Closed' };
-                  case 'fully_closed': return { icon: '🟢', title: 'Fully Closed' };
-                  case 'pending_closure': return { icon: '🟠', title: 'Pending Closure' };
-                  case 'pending_benefit': return { icon: '🟠', title: 'Pending Risk/Benefit Analysis' };
-                  case 'pending_second': return { icon: '🟠', title: 'Pending Second Evaluation' };
-                  case 'evaluated': return { icon: '🟡', title: 'In Work' };
-                  case 'new': return { icon: '⚪', title: 'New' };
-                  default: return { icon: '⚪', title: 'New' };
+                  case 'closed': return { icon: '🟢', title: 'Закрыт' };
+                  case 'fully_closed': return { icon: '🟢', title: 'Полностью закрыт' };
+                  case 'pending_closure': return { icon: '🟠', title: 'Ожидает закрытия' };
+                  case 'pending_benefit': return { icon: '🟠', title: 'Ожидает анализа польза/риск' };
+                  case 'pending_second': return { icon: '🟠', title: 'Ожидает повторной оценки' };
+                  case 'evaluated': return { icon: '🟡', title: 'В работе' };
+                  case 'new': return { icon: '⚪', title: 'Новый' };
+                  default: return { icon: '⚪', title: 'Новый' };
                 }
               };
-              
+
               const statusInfo = getRiskStatusIcon(risk.risk_status);
-              
+
               return (
-                <tr key={risk.id} className="risk-row">
+                <tr key={risk.id} className={`risk-row ${rowColorClass}`}>
                   <td className="status-cell" style={{ textAlign: 'center' }}>
                     <span 
                       className="risk-status-icon"
@@ -1032,16 +1032,31 @@ const RiskAnalysis = () => {
                     {risk.harm}
                   </td>
                   <td className="risk-score-cell">
-                    {displayScore ? (
-                      <span
-                        className={`risk-score ${riskLevel.level}`}
-                        style={{ backgroundColor: riskLevel.color }}
-                        title={isAfterSecondEval ? 'Балл после повторной оценки (остаточный)' : undefined}
-                      >
-                        {displayScore}
-                        {isAfterSecondEval && <span style={{ fontSize: '10px', marginLeft: '3px', opacity: 0.7 }}>*</span>}
-                      </span>
-                    ) : (
+                    <div className="risk-score-pair">
+                      {risk.riskScore != null ? (
+                        <span
+                          className={`risk-score ${initialLevel.level}`}
+                          style={{ backgroundColor: initialLevel.color }}
+                          title="Балл до мер (тяжесть × вероятность)"
+                        >
+                          {risk.riskScore}
+                        </span>
+                      ) : (
+                        <span className="not-evaluated" style={{ color: '#999', fontStyle: 'italic' }}>
+                          —
+                        </span>
+                      )}
+                      {risk.residualRiskScore != null && (
+                        <span
+                          className={`risk-score ${residualLevel.level}`}
+                          style={{ backgroundColor: residualLevel.color }}
+                          title="Балл после мер (тяжесть × вероятность, остаточный)"
+                        >
+                          {risk.residualRiskScore}*
+                        </span>
+                      )}
+                    </div>
+                    {risk.riskScore == null && risk.residualRiskScore == null && (
                       <span className="not-evaluated" style={{ color: '#999', fontStyle: 'italic' }}>
                         Не оценивалось
                       </span>
