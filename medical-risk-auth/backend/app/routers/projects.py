@@ -70,7 +70,8 @@ def _extract_hazard_category_text(risk: RiskFactor) -> str:
 
 
 def _calculate_coverage_progress(db: Session, project: Project) -> float:
-    lifecycle_stages = _safe_json_list(project.lifecycle_stages) + _safe_json_list(project.custom_lifecycle_stages)
+    # 'other' is a UI flag meaning "custom stages exist" — exclude it, use actual custom stage names
+    lifecycle_stages = [s for s in _safe_json_list(project.lifecycle_stages) if s not in ('other', 'Другие')] + _safe_json_list(project.custom_lifecycle_stages)
     
     # Calculate active hazard categories from hazard_questions
     hazard_categories = _calculate_active_hazard_categories_from_questions(project.hazard_questions)
@@ -584,7 +585,7 @@ def get_project_completion_issues(project: Project):
         if value is None or (isinstance(value, str) and not value.strip()):
             missing.append(label)
 
-    lifecycle_stages = _safe_json_list(project.lifecycle_stages) + _safe_json_list(project.custom_lifecycle_stages)
+    lifecycle_stages = [s for s in _safe_json_list(project.lifecycle_stages) if s not in ('other', 'Другие')] + _safe_json_list(project.custom_lifecycle_stages)
     if len(lifecycle_stages) == 0:
         missing.append("Этапы жизненного цикла")
 
@@ -1956,7 +1957,9 @@ async def get_my_project_role(
         except json.JSONDecodeError:
             return None
 
-    lifecycle_stages_data = safe_json_load(db_project.lifecycle_stages)
+    raw_lifecycle_stages = safe_json_load(db_project.lifecycle_stages)
+    # Filter out 'other' flag — custom stage names come from custom_lifecycle_stages
+    lifecycle_stages_data = [s for s in (raw_lifecycle_stages or []) if s not in ('other', 'Другие')] or None
     custom_lifecycle_stages_data = safe_json_load(db_project.custom_lifecycle_stages)
 
     return {

@@ -229,20 +229,19 @@ const RiskAnalysis = () => {
         setRiskThreshold(projectData.risk_threshold || projectData.acceptable_risk_level || 10);
 
         // Load lifecycle stages
+        // 'other' in lifecycle_stages is a flag meaning "custom stages exist" — never shown directly
         const stages = [];
         if (projectData.lifecycle_stages) {
-          if (Array.isArray(projectData.lifecycle_stages)) {
-            stages.push(...projectData.lifecycle_stages);
-          } else if (typeof projectData.lifecycle_stages === 'string') {
-            stages.push(...JSON.parse(projectData.lifecycle_stages));
-          }
+          const raw = Array.isArray(projectData.lifecycle_stages)
+            ? projectData.lifecycle_stages
+            : JSON.parse(projectData.lifecycle_stages);
+          stages.push(...raw.filter(s => s !== 'other' && s !== 'Другие'));
         }
         if (projectData.custom_lifecycle_stages) {
-          if (Array.isArray(projectData.custom_lifecycle_stages)) {
-            stages.push(...projectData.custom_lifecycle_stages);
-          } else if (typeof projectData.custom_lifecycle_stages === 'string') {
-            stages.push(...JSON.parse(projectData.custom_lifecycle_stages));
-          }
+          const customRaw = Array.isArray(projectData.custom_lifecycle_stages)
+            ? projectData.custom_lifecycle_stages
+            : JSON.parse(projectData.custom_lifecycle_stages);
+          stages.push(...customRaw.filter(Boolean));
         }
         setLifecycleStages(stages);
         
