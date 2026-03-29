@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
+import { InteractionStatus } from '@azure/msal-browser';
 import { loginRequest } from '../authConfig';
 import API_BASE_URL from '../config';
 
 const ProtectedRoute = ({ children }) => {
-  const { instance, accounts } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const navigate = useNavigate();
   const location = useLocation();
@@ -14,24 +15,19 @@ const ProtectedRoute = ({ children }) => {
   const [userInfo, setUserInfo] = useState(null);
 
   useEffect(() => {
-    console.log('🔄 ProtectedRoute useEffect triggered');
-    console.log('isAuthenticated:', isAuthenticated);
-    console.log('accounts:', accounts);
-    console.log('accounts.length:', accounts.length);
-    
+    // Wait for MSAL to finish any in-progress interaction before deciding auth state
+    if (inProgress !== InteractionStatus.None) {
+      return;
+    }
+
     if (isAuthenticated && accounts.length > 0) {
-      console.log('✅ User is authenticated, proceeding with backend auth');
       authenticateWithBackend();
-    } else if (isAuthenticated && accounts.length === 0) {
-      console.log('⚠️  Authenticated but no accounts found');
-      setIsBackendAuthenticated(false);
-      setIsLoading(false);
-    } else {
-      console.log('❌ User not authenticated with Azure');
+    } else if (!isAuthenticated) {
       setIsBackendAuthenticated(false);
       setIsLoading(false);
     }
-  }, [isAuthenticated, accounts]);
+    // If isAuthenticated && accounts.length === 0: MSAL still settling, keep loading
+  }, [isAuthenticated, accounts, inProgress]);
 
   const authenticateWithBackend = async () => {
     try {

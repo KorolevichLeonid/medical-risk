@@ -19,8 +19,8 @@ const ProjectTable = () => {
   };
 
   return (
-    <ExcelTable 
-      projectId={id} 
+    <ExcelTable
+      projectId={parseInt(id)}
       onClose={handleClose}
     />
   );

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import './ProjectView.css';
-import ExcelTable from '../components/ExcelTable';
 import API_BASE_URL from '../config';
 
 const LIFECYCLE_STAGE_LABELS = {
@@ -25,7 +24,6 @@ const LIFECYCLE_STAGE_LABELS = {
 const ProjectView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -35,7 +33,6 @@ const ProjectView = () => {
   const [selectedLifecycleStages, setSelectedLifecycleStages] = useState([]);
   const [addingMember, setAddingMember] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [showRiskTable, setShowRiskTable] = useState(false);
   const [showEditMemberRole, setShowEditMemberRole] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState(null);
   const [roleToEdit, setRoleToEdit] = useState('specialist');
@@ -230,12 +227,7 @@ const ProjectView = () => {
     fetchProject();
     loadAvailableUsers();
     
-    // Check if we need to open risk table from URL params
-    const openRiskTable = searchParams.get('openRiskTable');
-    if (openRiskTable === 'true') {
-      setShowRiskTable(true);
-    }
-  }, [id, searchParams]);
+  }, [id]);
 
   useEffect(() => {
     // Keep form state consistent with role restrictions when opening member modal.
@@ -251,17 +243,6 @@ const ProjectView = () => {
     }
   }, [showAddMember]);
 
-  useEffect(() => {
-    const className = 'hide-floating-shortcuts';
-    if (showRiskTable) {
-      document.body.classList.add(className);
-    } else {
-      document.body.classList.remove(className);
-    }
-    return () => {
-      document.body.classList.remove(className);
-    };
-  }, [showRiskTable]);
 
   const loadCurrentUser = () => {
     const userData = localStorage.getItem('user');
@@ -780,7 +761,7 @@ const ProjectView = () => {
           {!isLimitedProjectAdmin() && (
             <button
               className="btn btn-secondary"
-              onClick={() => setShowRiskTable(true)}
+              onClick={() => navigate(`/project/${project.id}/table`)}
             >
               Таблица управления рисками
             </button>
@@ -1182,36 +1163,18 @@ const ProjectView = () => {
         </div>
       )}
 
-      {/* Risk Management Table Modal */}
-      {showRiskTable && !isLimitedProjectAdmin() && (
-        <ExcelTable
-          projectId={parseInt(id)}
-          initialSheet={searchParams.get('sheet') || 'first'}
-          onClose={() => {
-            setShowRiskTable(false);
-            // Clear URL params
-            searchParams.delete('openRiskTable');
-            searchParams.delete('sheet');
-            searchParams.delete('riskId');
-            setSearchParams(searchParams);
-          }}
-        />
-      )}
-
-      {/* Floating return button like Personal Account */}
-      {!showRiskTable && (
-        <button
-          className={`floating-return visible`}
-          onClick={() => {
-            const content = document.querySelector('.content-body');
-            if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
-            else window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          aria-label="Return to top"
-        >
-          ↑
-        </button>
-      )}
+      {/* Floating return button */}
+      <button
+        className={`floating-return visible`}
+        onClick={() => {
+          const content = document.querySelector('.content-body');
+          if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+          else window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        aria-label="Return to top"
+      >
+        ↑
+      </button>
     </div>
   );
 };
