@@ -51,7 +51,7 @@ const DocumentView = () => {
 
       if (roleResponse.ok) {
         const roleData = await roleResponse.json();
-        if (roleData.user_role !== 'manager') {
+        if (!['manager', 'admin'].includes(roleData.user_role)) {
           navigate(`/project/${id}`, { replace: true });
           return;
         }

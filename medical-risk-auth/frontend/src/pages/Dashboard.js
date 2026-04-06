@@ -125,8 +125,8 @@ const Dashboard = () => {
   };
 
   const canEditProject = (project) => {
-    // Только продукт-менеджер продолжает заполнение проекта.
-    return project.userRole === 'manager';
+    // Администратор и продукт-менеджер могут редактировать проект.
+    return project.userRole === 'manager' || project.userRole === 'admin';
   };
 
   const canDeleteProject = (project) => {

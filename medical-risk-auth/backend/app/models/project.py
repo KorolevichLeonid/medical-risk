@@ -215,15 +215,45 @@ class ProjectMember(Base):
         ),
         default=ProjectRole.SPECIALIST,
         nullable=False,
-    )  # Project role
+    )  # Effective primary role (highest hierarchical role or doctor)
+    roles = Column(Text, nullable=True)  # JSON array of all assigned role strings
     assigned_lifecycle_stage = Column(Text, nullable=True)  # Stores one or many lifecycle stages (JSON for multi-stage)
-    
+
     # Timestamps
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     project = relationship("Project", back_populates="members")
     user = relationship("User", back_populates="project_memberships")
+
+    def get_roles(self) -> list:
+        """Return list of all assigned role strings. Falls back to [role.value] if not set."""
+        import json as _json
+        if self.roles:
+            try:
+                parsed = _json.loads(self.roles)
+                if isinstance(parsed, list) and parsed:
+                    return parsed
+            except (ValueError, TypeError):
+                pass
+        return [self.role.value]
+
+    @staticmethod
+    def compute_effective_role(roles_list: list) -> str:
+        """Return the effective primary role from a list of role strings.
+
+        Hierarchy (ascending): specialist < risk_assessment_team_leader < manager
+        Doctor is orthogonal — it can coexist with one hierarchical role.
+        The effective primary role is the highest hierarchical role present,
+        or 'doctor' if only the doctor role is present.
+        """
+        HIERARCHY = ['specialist', 'risk_assessment_team_leader', 'manager']
+        hierarchical = [r for r in roles_list if r in HIERARCHY]
+        if hierarchical:
+            return max(hierarchical, key=lambda r: HIERARCHY.index(r))
+        if 'doctor' in roles_list:
+            return 'doctor'
+        return roles_list[0] if roles_list else 'specialist'
 
     def __repr__(self):
         return f"<ProjectMember(project_id={self.project_id}, user_id={self.user_id})>"

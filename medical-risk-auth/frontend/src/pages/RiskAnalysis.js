@@ -152,30 +152,24 @@ const RiskAnalysis = () => {
     if (!currentUser || !userProjectRole) {
       return false;
     }
-    // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // Product manager, risk team leader, and specialists can add risks.
-    return ['manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
+    return ['admin', 'manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
   };
 
   const canEditRisks = () => {
     if (!currentUser || !userProjectRole) {
       return false;
     }
-    // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // Product manager, risk team leader, and specialists can edit risks.
-    return ['manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
+    return ['admin', 'manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
   };
 
   const canDeleteRisks = () => {
     if (!currentUser || !userProjectRole) {
       return false;
     }
-    // System admin can always manage risks
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // Product manager, risk team leader, and specialists can delete risks.
-    return ['manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
+    return ['admin', 'manager', 'risk_assessment_team_leader', 'specialist'].includes(userProjectRole);
   };
 
   const canOpenRiskTable = () => {
@@ -183,7 +177,7 @@ const RiskAnalysis = () => {
       return false;
     }
     if (currentUser.role === 'SYS_ADMIN') return true;
-    return ['manager', 'risk_assessment_team_leader', 'doctor', 'specialist'].includes(userProjectRole);
+    return ['admin', 'manager', 'risk_assessment_team_leader', 'doctor', 'specialist'].includes(userProjectRole);
   };
 
   useEffect(() => {

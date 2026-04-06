@@ -69,6 +69,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
 
   // Состояние для роли пользователя в проекте
   const [userRole, setUserRole] = useState(null);
+  const [userRoles, setUserRoles] = useState([]);  // All assigned roles (multi-role support)
   const [userPermissions, setUserPermissions] = useState([]);
   const [loadingRole, setLoadingRole] = useState(true);
   const [assignedLifecycleStages, setAssignedLifecycleStages] = useState([]);
@@ -279,10 +280,10 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
   ];
 
   const isManagerAlwaysEditableField = (columnKey) =>
-    userRole === 'manager' && managerAlwaysEditableColumns.includes(columnKey);
+    (userRole === 'manager' || userRole === 'admin') && managerAlwaysEditableColumns.includes(columnKey);
 
   const canUseRiskBenefitColumn = () =>
-    userRole === 'manager' || userRole === 'risk_assessment_team_leader';
+    userRole === 'manager' || userRole === 'risk_assessment_team_leader' || userRole === 'admin';
 
   const buildScoreOptions = (levels = []) => {
     const optionsByValue = new Map();
@@ -327,6 +328,13 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
     // Эти поля всегда только для автоматического расчета
     if (['risk_level_1', 'risk_level_2', 'risk_score', 'residual_risk_score'].includes(columnKey)) {
       return true;
+    }
+
+    // Администратор имеет полный доступ ко всем полям, кроме авто-расчётных и
+    // первых 5 столбцов в листах ЖЦ (они управляются из Risk Analysis)
+    if (userRole === 'admin') {
+      const alwaysLockedColumns = ['hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'];
+      return isAutoManagedSheet() && alwaysLockedColumns.includes(columnKey);
     }
 
     // Анализ остаточного риска/пользы: доступ только у PM и руководителя команды по рискам.
@@ -977,6 +985,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
         }
 
         setUserRole(roleData.user_role);
+        setUserRoles(roleData.user_roles || [roleData.user_role].filter(Boolean));
         const stagesFromApi = normalizeLifecycleStages(roleData.assigned_lifecycle_stages);
         const resolvedStages =
           stagesFromApi.length > 0

@@ -81,21 +81,29 @@ def init_permissions():
         #
         role_permissions_data = [
             # ── Admin ──
+            # Создатель проекта — полный доступ ко всему
             {"role": "admin", "permissions": [
                 "view_project",
                 "view_all",
                 "create_project",
+                "edit_project",
                 "delete_project",
                 "manage_subscriptions",
+                "assign_lifecycle_access",
                 "manage_members",
+                "create_risks",
+                "edit_risks",
+                "edit_risk_tables",
+                "assess_severity",
+                "assess_probability",
+                "create_report",
             ]},
             # ── Manager ──
+            # Управление участниками и ролями — только у администратора
             {"role": "manager", "permissions": [
                 "view_project",
                 "view_all",
                 "edit_project",
-                "assign_lifecycle_access",
-                "manage_members",
                 "create_risks",
                 "edit_risks",
                 "edit_risk_tables",

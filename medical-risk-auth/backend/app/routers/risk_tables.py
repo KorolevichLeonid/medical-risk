@@ -138,53 +138,35 @@ def get_risk_table(db: Session, table_id: int) -> RiskManagementTable:
 
 
 def check_user_permission(user: User, permission_key: str, project_id: int = None, db: Session = None):
-    """Check if user has a specific permission"""
-    # System admin has all permissions
-    if user.role == "SYS_ADMIN":
+    """Check if user has a specific permission (union across all assigned roles)."""
+    if hasattr(user, 'role') and str(user.role) in ("SYS_ADMIN", "UserRole.SYS_ADMIN"):
         return True
 
     if not db or not project_id:
         return False
 
-    # Get user's role in the project
-    project_role = None
     project = db.query(Project).filter(Project.id == project_id).first()
-
     if not project:
         return False
 
-    # Check if user is project owner (always admin)
     if project.owner_id == user.id:
-        project_role = "admin"
+        roles_to_check = ["admin"]
     else:
-        # Check if user is a project member
         member = db.query(ProjectMember).filter(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == user.id
         ).first()
-
-        if member:
-            project_role = member.role.value
-
-    # Get permissions for the role
-    if project_role:
-        if project_role == "admin" and permission_key in {
-            "edit_risk_tables",
-            "edit_risks",
-            "assess_severity",
-            "assess_probability",
-            "create_report",
-        }:
+        if not member:
             return False
+        roles_to_check = member.get_roles()
 
-        from ..models.project import RolePermission
-        role_permissions = db.query(RolePermission).filter(
-            RolePermission.role_name == project_role
-        ).all()
-        permission_keys = [rp.permission_key for rp in role_permissions]
-        return permission_key in permission_keys
+    from ..models.project import RolePermission
+    all_keys: set = set()
+    for role_name in roles_to_check:
+        rps = db.query(RolePermission).filter(RolePermission.role_name == role_name).all()
+        all_keys.update(rp.permission_key for rp in rps)
 
-    return False
+    return permission_key in all_keys
 
 
 def check_risk_table_edit_permission(project: Project, user: User, db: Session):
@@ -193,22 +175,28 @@ def check_risk_table_edit_permission(project: Project, user: User, db: Session):
 
 
 def check_specialist_sheet_access(user: User, project_id: int, sheet_id: str, db: Session):
-    """Check if a specialist has access to a specific sheet/lifecycle stage. Non-specialists always have access."""
-    if hasattr(user, 'role') and str(user.role) == 'SYS_ADMIN':
+    """Check if user has access to a specific sheet/lifecycle stage.
+    Doctors bypass the specialist restriction. Pure specialists are limited to assigned stages.
+    """
+    if hasattr(user, 'role') and str(user.role) in ('SYS_ADMIN', 'UserRole.SYS_ADMIN'):
         return True
     member = db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id,
         ProjectMember.user_id == user.id
     ).first()
     if not member:
-        # Could be project owner
         project = db.query(Project).filter(Project.id == project_id).first()
         if project and project.owner_id == user.id:
             return True
         return False
-    if member.role != ProjectRole.SPECIALIST:
-        return True  # Non-specialists have access to all sheets
-    # Specialist can only access assigned lifecycle stage sheets
+    member_roles = member.get_roles()
+    # Doctor can access all sheets
+    if 'doctor' in member_roles:
+        return True
+    # Non-specialist hierarchical roles have access to all sheets
+    if 'specialist' not in member_roles:
+        return True
+    # Pure specialist: restricted to assigned lifecycle stage sheets
     return sheet_id in _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
 
 

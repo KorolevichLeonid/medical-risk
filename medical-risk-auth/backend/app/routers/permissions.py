@@ -60,6 +60,7 @@ async def get_user_permissions(
     """Get current user's permissions, optionally for a specific project"""
     permissions = []
     project_role = None
+    project_roles: list = []
     assigned_lifecycle_stage = None
     assigned_lifecycle_stages = []
 
@@ -67,34 +68,35 @@ async def get_user_permissions(
     if hasattr(current_user, 'role') and current_user.role == "SYS_ADMIN":
         all_perms = db.query(Permission).all()
         permissions = [p.key for p in all_perms]
-        project_role = "admin"  # Sys admin is always admin in projects
+        project_role = "admin"
+        project_roles = ["admin"]
     elif project_id:
-        # Get user's role in the project
         from ..models.project import Project
         project = db.query(Project).filter(Project.id == project_id).first()
 
         if project:
-            # Check if user is project owner (always admin)
             if project.owner_id == current_user.id:
                 project_role = "admin"
+                project_roles = ["admin"]
             else:
-                # Check if user is a project member
                 member = db.query(ProjectMember).filter(
                     ProjectMember.project_id == project_id,
                     ProjectMember.user_id == current_user.id
                 ).first()
 
                 if member:
-                    project_role = member.role.value
+                    project_roles = member.get_roles()
+                    project_role = member.role.value  # effective primary role
                     assigned_lifecycle_stages = _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
                     assigned_lifecycle_stage = assigned_lifecycle_stages[0] if assigned_lifecycle_stages else None
 
-            # Get permissions based on project role
-            if project_role:
-                role_permissions = db.query(RolePermission).filter(
-                    RolePermission.role_name == project_role
-                ).all()
-                permissions = [rp.permission_key for rp in role_permissions]
+            # Union permissions from all assigned roles
+            if project_roles:
+                all_keys: set = set()
+                for role_name in project_roles:
+                    rps = db.query(RolePermission).filter(RolePermission.role_name == role_name).all()
+                    all_keys.update(rp.permission_key for rp in rps)
+                permissions = list(all_keys)
 
     return {
         "user_id": current_user.id,
@@ -103,6 +105,7 @@ async def get_user_permissions(
         "user_role": getattr(current_user, 'role', None),
         "project_id": project_id,
         "project_role": project_role,
+        "project_roles": project_roles,
         "assigned_lifecycle_stage": assigned_lifecycle_stage,
         "assigned_lifecycle_stages": assigned_lifecycle_stages,
         "permissions": permissions

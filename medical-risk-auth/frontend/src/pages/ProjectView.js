@@ -30,12 +30,14 @@ const ProjectView = () => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedRole, setSelectedRole] = useState('specialist');
+  const [selectedRoleDoctor, setSelectedRoleDoctor] = useState(false);
   const [selectedLifecycleStages, setSelectedLifecycleStages] = useState([]);
   const [addingMember, setAddingMember] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showEditMemberRole, setShowEditMemberRole] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState(null);
   const [roleToEdit, setRoleToEdit] = useState('specialist');
+  const [roleToEditDoctor, setRoleToEditDoctor] = useState(false);
   const [lifecycleStagesToEdit, setLifecycleStagesToEdit] = useState([]);
 
   const normalizeLifecycleStages = (value) => {
@@ -193,6 +195,7 @@ const ProjectView = () => {
               id: member.user_id,
               name: `${member.user_first_name} ${member.user_last_name}`,
               role: member.role,
+              roles: member.roles || [member.role],
               assigned_lifecycle_stages: getMemberLifecycleStages(member),
               assigned_lifecycle_stage: member.assigned_lifecycle_stage || null,
               email: member.user_email,
@@ -256,7 +259,10 @@ const ProjectView = () => {
     if (!currentUser || !project) return false;
     // SYS_ADMIN can edit all projects
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // Only product manager can continue project filling.
+    // Project owner is always admin
+    if (currentUser.id === project.ownerId) return true;
+    // Admin and product manager can edit project
+    if (project.team.some(member => member.id === currentUser.id && member.role === 'admin')) return true;
     if (project.team.some(member => member.id === currentUser.id && member.role === 'manager')) return true;
     return false;
   };
@@ -265,12 +271,10 @@ const ProjectView = () => {
     if (!currentUser || !project) return false;
     // SYS_ADMIN can manage all projects
     if (currentUser.role === 'SYS_ADMIN') return true;
-    // Admin can add members
+    // Project owner is always admin
+    if (currentUser.id === project.ownerId) return true;
+    // Только администратор проекта управляет участниками и ролями
     if (project.team.some(member => member.id === currentUser.id && member.role === 'admin')) return true;
-    // Manager can add members only after required project data is filled
-    if (project.team.some(member => member.id === currentUser.id && member.role === 'manager')) {
-      return isProjectReadyForRoleManagement();
-    }
     return false;
   };
 
@@ -278,6 +282,10 @@ const ProjectView = () => {
     if (!currentUser) return false;
     // SYS_ADMIN can manage all risks
     if (currentUser.role === 'SYS_ADMIN') return true;
+    // Project owner is always admin
+    if (project && currentUser.id === project.ownerId) return true;
+    // Admin has full access
+    if (project.team.some(member => member.id === currentUser.id && member.role === 'admin')) return true;
     // Product manager can manage risks
     if (project.team.some(member => member.id === currentUser.id && member.role === 'manager')) return true;
     // Specialist can manage risks (in their lifecycle stage only - backend enforces)
@@ -285,11 +293,8 @@ const ProjectView = () => {
     return false;
   };
 
-  const isLimitedProjectAdmin = () => {
-    if (!currentUser || !project) return false;
-    if (currentUser.role === 'SYS_ADMIN') return false;
-    return project.team.some(member => member.id === currentUser.id && member.role === 'admin');
-  };
+  // Администратор больше не ограничен — функция всегда возвращает false
+  const isLimitedProjectAdmin = () => false;
 
   const getCurrentProductManager = () => {
     if (!project?.team) return null;
@@ -388,7 +393,7 @@ const ProjectView = () => {
     return colors[level] || '#9A9B9F';
   };
 
-  const getProjectRoleBadge = (role, assignedLifecycleStages = []) => {
+  const getProjectRoleBadge = (role, assignedLifecycleStages = [], roles = []) => {
     const roleConfig = {
       admin: { label: 'АДМИНИСТРАТОР', className: 'role-admin' },
       manager: { label: 'ПРОДУКТ-МЕНЕДЖЕР', className: 'role-manager' },
@@ -402,7 +407,13 @@ const ProjectView = () => {
     const displayLabel = role === 'specialist' && specialistStages.length > 0
       ? `${config.label}: ${specialistStages.map(formatLifecycleStageForDisplay).join(', ')}`
       : config.label;
-    return <span className={`role-badge ${config.className}`} title={displayLabel}>{displayLabel}</span>;
+    const hasDoctor = Array.isArray(roles) && roles.includes('doctor') && role !== 'doctor';
+    return (
+      <>
+        <span className={`role-badge ${config.className}`} title={displayLabel}>{displayLabel}</span>
+        {hasDoctor && <span className="role-badge role-doctor" title="ДОКТОР" style={{ marginLeft: 4 }}>ДОКТОР</span>}
+      </>
+    );
   };
 
   /**
@@ -521,47 +532,33 @@ const ProjectView = () => {
 
   const handleAddMember = async () => {
     if (!selectedUser) return;
-    const isAdminLimited = isLimitedProjectAdmin();
-    const isPm = isProductManager();
-    if (isPm && !isProjectReadyForRoleManagement()) {
-      alert('Сначала заполните обязательные поля проекта и выберите минимум один этап жизненного цикла.');
-      return;
-    }
-    if (isAdminLimited && selectedRole !== 'manager') {
-      alert('Администратор проекта может назначить только продукт-менеджера');
-      return;
-    }
-    if (isPm && selectedRole !== 'specialist') {
-      if (!['specialist', 'doctor', 'risk_assessment_team_leader'].includes(selectedRole)) {
-        alert('Продукт-менеджер может назначать только: доктор, руководитель команды по рискам, специалист.');
-        return;
-      }
-    }
     if (selectedRole === 'specialist' && selectedLifecycleStages.length === 0) {
       alert('Для роли "Специалист" необходимо выбрать минимум один этап жизненного цикла');
       return;
     }
-    
+
     setAddingMember(true);
     try {
       const token = localStorage.getItem('token');
       const userId = parseInt(selectedUser);
-      let endpoint = `${API_BASE_URL}/api/projects/${id}/members`;
-      let body = {
+
+      // Build roles list: primary hierarchical role + optional doctor
+      const roles = [selectedRole];
+      if (selectedRoleDoctor && selectedRole !== 'doctor') {
+        roles.push('doctor');
+      }
+
+      const body = {
         user_id: userId,
-        role: selectedRole
+        role: selectedRole,
+        roles: roles
       };
       if (selectedRole === 'specialist') {
         body.assigned_lifecycle_stages = selectedLifecycleStages;
         body.assigned_lifecycle_stage = selectedLifecycleStages[0];
       }
 
-      if (isAdminLimited) {
-        endpoint = `${API_BASE_URL}/api/projects/${id}/product-manager`;
-        body = { user_id: userId };
-      }
-
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -575,6 +572,7 @@ const ProjectView = () => {
         setShowAddMember(false);
         setSelectedUser('');
         setSelectedRole('specialist');
+        setSelectedRoleDoctor(false);
         setSelectedLifecycleStages([]);
       } else {
         const errData = await response.json().catch(() => ({}));
@@ -588,24 +586,14 @@ const ProjectView = () => {
       setShowAddMember(false);
       setSelectedUser('');
       setSelectedRole('specialist');
+      setSelectedRoleDoctor(false);
       setSelectedLifecycleStages([]);
     }
   };
 
   const handleRemoveMember = async (userId) => {
     if (!confirm('Are you sure you want to remove this team member?')) return;
-    if (isProductManager()) {
-      const member = project?.team?.find(m => m.id === userId);
-      if (!member || member.role !== 'specialist') {
-        alert('Продукт-менеджер может удалять только специалистов.');
-        return;
-      }
-      if (!isProjectReadyForRoleManagement()) {
-        alert('Сначала заполните обязательные поля проекта и выберите минимум один этап жизненного цикла.');
-        return;
-      }
-    }
-    
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members/${userId}`, {
@@ -630,21 +618,6 @@ const ProjectView = () => {
 
   const handleUpdateMemberRole = async () => {
     if (!memberToEdit) return;
-    if (isProductManager()) {
-      const allowed = ['specialist', 'doctor', 'risk_assessment_team_leader'];
-      if (!allowed.includes(memberToEdit.role) || !allowed.includes(roleToEdit)) {
-        alert('Продукт-менеджер может изменять только роли: доктор, руководитель команды по рискам, специалист.');
-        return;
-      }
-      if (!isProjectReadyForRoleManagement()) {
-        alert('Сначала заполните обязательные поля проекта и выберите минимум один этап жизненного цикла.');
-        return;
-      }
-    }
-    if (isLimitedProjectAdmin() && roleToEdit !== 'manager') {
-      alert('Администратор проекта может назначить только продукт-менеджера');
-      return;
-    }
     if (roleToEdit === 'specialist' && lifecycleStagesToEdit.length === 0) {
       alert('Для роли "Специалист" необходимо выбрать минимум один этап жизненного цикла');
       return;
@@ -652,7 +625,14 @@ const ProjectView = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const body = { role: roleToEdit };
+
+      // Build roles list: primary hierarchical role + optional doctor
+      const roles = [roleToEdit];
+      if (roleToEditDoctor && roleToEdit !== 'doctor') {
+        roles.push('doctor');
+      }
+
+      const body = { role: roleToEdit, roles };
       if (roleToEdit === 'specialist') {
         body.assigned_lifecycle_stages = lifecycleStagesToEdit;
         body.assigned_lifecycle_stage = lifecycleStagesToEdit[0];
@@ -670,6 +650,7 @@ const ProjectView = () => {
         window.location.reload();
         setShowEditMemberRole(false);
         setMemberToEdit(null);
+        setRoleToEditDoctor(false);
       } else {
         const errData = await response.json().catch(() => ({}));
         alert(errData.detail || 'Не удалось обновить роль');
@@ -746,7 +727,7 @@ const ProjectView = () => {
               Редактировать проект
             </Link>
           )}
-          {isLimitedProjectAdmin() && canAddMembers() && (
+          {canAddMembers() && (
             <button
               className="btn btn-secondary"
               onClick={() => {
@@ -755,18 +736,16 @@ const ProjectView = () => {
                 setShowAddMember(true);
               }}
             >
-              ➕ Добавить продукт-менеджера
+              ➕ Добавить участника
             </button>
           )}
-          {!isLimitedProjectAdmin() && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => navigate(`/project/${project.id}/table`)}
-            >
-              Таблица управления рисками
-            </button>
-          )}
-          {(isProductManager() || currentUser?.role === 'SYS_ADMIN') && (
+          <button
+            className="btn btn-secondary"
+            onClick={() => navigate(`/project/${project.id}/table`)}
+          >
+            Таблица управления рисками
+          </button>
+          {(isProductManager() || currentUser?.role === 'SYS_ADMIN' || currentUser?.id === project?.ownerId) && (
             <button
               className="btn btn-secondary"
               onClick={() => navigate(`/project/${project.id}/documents`)}
@@ -902,16 +881,20 @@ const ProjectView = () => {
                 </div>
                 <div className="member-info">
                   <div className="member-name">{member.name}</div>
-                  <div className="member-role">{getProjectRoleBadge(member.role, member.assigned_lifecycle_stages)}</div>
+                  <div className="member-role">{getProjectRoleBadge(member.role, member.assigned_lifecycle_stages, member.roles)}</div>
                   <div className="member-email">{member.email}</div>
                 </div>
                 <div className="member-actions">
-                  {!isLimitedProjectAdmin() && canAddMembers() && member.id !== project.ownerId && (!isProductManager() || ['specialist', 'doctor', 'risk_assessment_team_leader'].includes(member.role)) && (
+                  {canAddMembers() && member.id !== project.ownerId && (
                     <button
                       className="edit-member-btn"
                       onClick={() => {
+                        const memberRoles = member.roles || [member.role];
+                        const HIERARCHICAL = ['specialist', 'risk_assessment_team_leader', 'manager'];
+                        const primaryRole = memberRoles.find(r => HIERARCHICAL.includes(r)) || (memberRoles.includes('doctor') ? 'doctor' : member.role);
                         setMemberToEdit(member);
-                        setRoleToEdit(member.role);
+                        setRoleToEdit(primaryRole);
+                        setRoleToEditDoctor(memberRoles.includes('doctor') && primaryRole !== 'doctor');
                         setLifecycleStagesToEdit(getMemberLifecycleStages(member));
                         setShowEditMemberRole(true);
                       }}
@@ -920,8 +903,8 @@ const ProjectView = () => {
                       ✎
                     </button>
                   )}
-                  {canAddMembers() && member.id !== project.ownerId && (!isProductManager() || ['specialist', 'doctor', 'risk_assessment_team_leader'].includes(member.role)) && (
-                    <button 
+                  {canAddMembers() && member.id !== project.ownerId && (
+                    <button
                       className="remove-member-btn"
                       onClick={() => handleRemoveMember(member.id)}
                       title="Remove from project"
@@ -934,22 +917,17 @@ const ProjectView = () => {
             ))}
           </div>
           
-          {canAddMembers() && !isLimitedProjectAdmin() && (
-            <button 
+          {canAddMembers() && (
+            <button
               className="add-member-btn"
               onClick={() => {
-                setSelectedRole(isProductManager() ? 'specialist' : 'manager');
+                setSelectedRole('manager');
                 setSelectedLifecycleStages([]);
                 setShowAddMember(true);
               }}
             >
-              {isLimitedProjectAdmin() ? '➕ Добавить продукт-менеджера' : '➕ Добавить участника'}
+              ➕ Добавить участника
             </button>
-          )}
-          {isProductManager() && !isProjectReadyForRoleManagement() && (
-            <p style={{ marginTop: '10px', color: '#b45309', fontSize: '13px' }}>
-              Чтобы добавлять пользователей и назначать роли, сначала заполните обязательные поля проекта и выберите минимум один этап жизненного цикла.
-            </p>
           )}
         </div>
 
@@ -1013,34 +991,33 @@ const ProjectView = () => {
                 <label>Роль в проекте</label>
                 <select
                   value={selectedRole}
-                  onChange={(e) => { setSelectedRole(e.target.value); setSelectedLifecycleStages([]); }}
+                  onChange={(e) => { setSelectedRole(e.target.value); setSelectedLifecycleStages([]); if (e.target.value === 'doctor') setSelectedRoleDoctor(false); }}
                   className="form-select"
-                  disabled={isLimitedProjectAdmin()}
                 >
-                  {isLimitedProjectAdmin() ? (
-                    <option value="manager">Продукт-менеджер</option>
-                  ) : isProductManager() ? (
-                    <>
-                      <option value="risk_assessment_team_leader">Руководитель команды по рискам</option>
-                      <option value="doctor">Доктор</option>
-                      <option value="specialist">Специалист по жизненному циклу</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="manager">Продукт-менеджер</option>
-                      <option value="risk_assessment_team_leader">Руководитель команды по рискам</option>
-                      <option value="doctor">Доктор</option>
-                      <option value="specialist">Специалист по жизненному циклу</option>
-                    </>
-                  )}
+                  <option value="manager">Продукт-менеджер</option>
+                  <option value="risk_assessment_team_leader">Руководитель команды по рискам</option>
+                  <option value="doctor">Доктор</option>
+                  <option value="specialist">Специалист по жизненному циклу</option>
                 </select>
                 <small className="role-description">
-                  {selectedRole === 'manager' && 'Заполняет проект, управляет участниками и рисками, создаёт отчёты'}
+                  {selectedRole === 'manager' && 'Заполняет проект, управляет рисками, создаёт отчёты'}
                   {selectedRole === 'risk_assessment_team_leader' && 'Работает с рисками на всех этапах и оценивает вероятность'}
                   {selectedRole === 'doctor' && 'Работает с рисками на всех этапах и оценивает тяжесть вреда'}
                   {selectedRole === 'specialist' && 'Создаёт/редактирует риски только в назначенных этапах жизненного цикла'}
                 </small>
               </div>
+              {selectedRole !== 'doctor' && (
+                <div className="form-group">
+                  <label className="lifecycle-stage-checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={selectedRoleDoctor}
+                      onChange={(e) => setSelectedRoleDoctor(e.target.checked)}
+                    />
+                    <span>Также роль доктора (оценивает тяжесть вреда)</span>
+                  </label>
+                </div>
+              )}
               {selectedRole === 'specialist' && (
                 <div className="form-group">
                   <label>Этапы жизненного цикла</label>
@@ -1104,25 +1081,27 @@ const ProjectView = () => {
                 <label>Роль в проекте</label>
                 <select
                   value={roleToEdit}
-                  onChange={(e) => { setRoleToEdit(e.target.value); setLifecycleStagesToEdit([]); }}
+                  onChange={(e) => { setRoleToEdit(e.target.value); setLifecycleStagesToEdit([]); if (e.target.value === 'doctor') setRoleToEditDoctor(false); }}
                   className="form-select"
                 >
-                  {isProductManager() ? (
-                    <>
-                      <option value="risk_assessment_team_leader">Руководитель команды по рискам</option>
-                      <option value="doctor">Доктор</option>
-                      <option value="specialist">Специалист по жизненному циклу</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="manager">Продукт-менеджер</option>
-                      <option value="risk_assessment_team_leader">Руководитель команды по рискам</option>
-                      <option value="doctor">Доктор</option>
-                      {!isLimitedProjectAdmin() && <option value="specialist">Специалист по жизненному циклу</option>}
-                    </>
-                  )}
+                  <option value="manager">Продукт-менеджер</option>
+                  <option value="risk_assessment_team_leader">Руководитель команды по рискам</option>
+                  <option value="doctor">Доктор</option>
+                  <option value="specialist">Специалист по жизненному циклу</option>
                 </select>
               </div>
+              {roleToEdit !== 'doctor' && (
+                <div className="form-group">
+                  <label className="lifecycle-stage-checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={roleToEditDoctor}
+                      onChange={(e) => setRoleToEditDoctor(e.target.checked)}
+                    />
+                    <span>Также роль доктора (оценивает тяжесть вреда)</span>
+                  </label>
+                </div>
+              )}
               {roleToEdit === 'specialist' && (
                 <div className="form-group">
                   <label>Этапы жизненного цикла</label>

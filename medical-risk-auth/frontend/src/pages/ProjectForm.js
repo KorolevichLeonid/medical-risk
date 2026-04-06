@@ -1186,52 +1186,48 @@ const ProjectForm = () => {
     setError('');
 
     try {
-      // Для создания проекта-пустышки требуем только название проекта.
-      // Остальные поля можно заполнить позже на странице проекта.
       const errors = [];
       if (!formData.name || formData.name.trim() === '') {
         errors.push('Название проекта');
       }
 
-      // Расширенная валидация нужна только в режиме редактирования полной анкеты проекта.
-      if (isEditMode) {
-        const requiredEditFields = [
-          { key: 'description', label: 'Описание проекта' },
-          { key: 'deviceName', label: 'Название устройства' },
-          { key: 'deviceModel', label: 'Модель устройства' },
-          { key: 'devicePurpose', label: 'Назначение устройства' },
-          { key: 'deviceDescription', label: 'Описание устройства' },
-          { key: 'deviceClassification', label: 'Классификация устройства' },
-          { key: 'operatingEnvironment', label: 'Условия эксплуатации' },
-          { key: 'technicalSpecs', label: 'Технические характеристики' },
-          { key: 'regulatoryRequirements', label: 'Нормативные требования' },
-          { key: 'standards', label: 'Применимые стандарты' },
-          { key: 'indications', label: 'Показания' },
-          { key: 'contraindications', label: 'Противопоказания' },
-          { key: 'targetGroup', label: 'Целевая группа' },
-          { key: 'warnings', label: 'Предупреждения' },
-          { key: 'disposal', label: 'Утилизация' }
-        ];
-        requiredEditFields.forEach(({ key, label }) => {
-          const value = formData[key];
-          if (typeof value !== 'string' || value.trim() === '') {
-            errors.push(label);
-          }
-        });
-
-        if (!formData.lifecycleStages || formData.lifecycleStages.length === 0) {
-          errors.push('Этапы жизненного цикла (минимум один)');
+      // Полная валидация обязательна как при создании, так и при редактировании
+      const requiredEditFields = [
+        { key: 'description', label: 'Описание проекта' },
+        { key: 'deviceName', label: 'Название устройства' },
+        { key: 'deviceModel', label: 'Модель устройства' },
+        { key: 'devicePurpose', label: 'Назначение устройства' },
+        { key: 'deviceDescription', label: 'Описание устройства' },
+        { key: 'deviceClassification', label: 'Классификация устройства' },
+        { key: 'operatingEnvironment', label: 'Условия эксплуатации' },
+        { key: 'technicalSpecs', label: 'Технические характеристики' },
+        { key: 'regulatoryRequirements', label: 'Нормативные требования' },
+        { key: 'standards', label: 'Применимые стандарты' },
+        { key: 'indications', label: 'Показания' },
+        { key: 'contraindications', label: 'Противопоказания' },
+        { key: 'targetGroup', label: 'Целевая группа' },
+        { key: 'warnings', label: 'Предупреждения' },
+        { key: 'disposal', label: 'Утилизация' }
+      ];
+      requiredEditFields.forEach(({ key, label }) => {
+        const value = formData[key];
+        if (typeof value !== 'string' || value.trim() === '') {
+          errors.push(label);
         }
+      });
 
-        const severityScoreError = validateLevelScores(formData.severityLevels, 'уровни тяжести');
-        if (severityScoreError) {
-          errors.push(severityScoreError);
-        }
+      if (!formData.lifecycleStages || formData.lifecycleStages.length === 0) {
+        errors.push('Этапы жизненного цикла (минимум один)');
+      }
 
-        const probabilityScoreError = validateLevelScores(formData.probabilityLevels, 'уровни вероятностей');
-        if (probabilityScoreError) {
-          errors.push(probabilityScoreError);
-        }
+      const severityScoreError = validateLevelScores(formData.severityLevels, 'уровни тяжести');
+      if (severityScoreError) {
+        errors.push(severityScoreError);
+      }
+
+      const probabilityScoreError = validateLevelScores(formData.probabilityLevels, 'уровни вероятностей');
+      if (probabilityScoreError) {
+        errors.push(probabilityScoreError);
       }
 
       if (errors.length > 0) {
@@ -1245,69 +1241,51 @@ const ProjectForm = () => {
       
       const method = isEditMode ? 'PUT' : 'POST';
       
-      let requestBody = {
+      const normalizedThreshold = clampRiskThreshold(
+        parseInt(formData.riskThreshold),
+        formData.severityLevels,
+        formData.probabilityLevels
+      );
+
+      // Сохраняем canonical-ключи этапов (без преобразования в display-строки)
+      const lifecycleStagesForSave = prepareLifecycleStageKeysForSave(formData.lifecycleStages);
+
+      // Пересчитываем активные категории опасностей на основе текущих hazardQuestions
+      const activeHazardCategoriesForSave = calculateActiveHazardCategories(
+        formData.hazardQuestions,
+        formData.customHazards
+      );
+
+      // Полный набор полей отправляется как при создании, так и при редактировании
+      const requestBody = {
         name: formData.name.trim(),
-        // Include technical specification fields for both creation and editing
+        description: formData.description,
+        device_name: formData.deviceName,
+        device_model: formData.deviceModel,
+        device_purpose: formData.devicePurpose,
+        device_description: formData.deviceDescription,
+        device_classification: formData.deviceClassification,
+        intended_use: formData.intendedUse,
+        operating_environment: formData.operatingEnvironment,
+        technical_specs: formData.technicalSpecs,
+        regulatory_requirements: formData.regulatoryRequirements,
+        standards: formData.standards,
+        status: formData.status,
+        lifecycle_stages: lifecycleStagesForSave,
+        custom_lifecycle_stages: formData.customLifecycleStages,
+        hazard_questions: formData.hazardQuestions,
+        hazard_checklist_answers: formData.hazardChecklistAnswers,
+        active_hazard_categories: activeHazardCategoriesForSave,
+        custom_hazard: formData.customHazards.join('\n'),
+        severity_levels: formData.severityLevels,
+        probability_levels: formData.probabilityLevels,
+        risk_threshold: normalizedThreshold,
         indications: formData.indications,
         contraindications: formData.contraindications,
         target_group: formData.targetGroup,
         warnings: formData.warnings,
         disposal: formData.disposal
       };
-
-      if (isEditMode) {
-        const normalizedThreshold = clampRiskThreshold(
-          parseInt(formData.riskThreshold),
-          formData.severityLevels,
-          formData.probabilityLevels
-        );
-
-        // Сохраняем canonical-ключи этапов (без преобразования в display-строки)
-        const lifecycleStagesForSave = prepareLifecycleStageKeysForSave(formData.lifecycleStages);
-
-        // Пересчитываем активные категории опасностей на основе текущих hazardQuestions
-        const activeHazardCategoriesForSave = calculateActiveHazardCategories(
-          formData.hazardQuestions,
-          formData.customHazards
-        );
-
-        requestBody = {
-          ...requestBody,
-          description: formData.description,
-          device_name: formData.deviceName,
-          device_model: formData.deviceModel,
-          device_purpose: formData.devicePurpose,
-          device_description: formData.deviceDescription,
-          device_classification: formData.deviceClassification,
-          intended_use: formData.intendedUse,
-          operating_environment: formData.operatingEnvironment,
-          technical_specs: formData.technicalSpecs,
-          regulatory_requirements: formData.regulatoryRequirements,
-          standards: formData.standards,
-          status: formData.status,
-          lifecycle_stages: lifecycleStagesForSave,
-          custom_lifecycle_stages: formData.customLifecycleStages,
-          hazard_questions: formData.hazardQuestions,
-          hazard_checklist_answers: formData.hazardChecklistAnswers,
-          active_hazard_categories: activeHazardCategoriesForSave,
-          custom_hazard: formData.customHazards.join('\n'),
-          severity_levels: formData.severityLevels,
-          probability_levels: formData.probabilityLevels,
-          risk_threshold: normalizedThreshold,
-          // Новые поля для 14971 стандарта
-          indications: formData.indications,
-          contraindications: formData.contraindications,
-          target_group: formData.targetGroup,
-          warnings: formData.warnings,
-          disposal: formData.disposal
-        };
-      } else {
-        // Для создания проекта добавляем hazard_questions
-        requestBody = {
-          ...requestBody,
-          hazard_questions: formData.hazardQuestions
-        };
-      }
 
       const response = await fetch(url, {
         method: method,
@@ -1354,57 +1332,6 @@ const ProjectForm = () => {
     );
   }
 
-  if (!isEditMode) {
-    return (
-      <div className="project-form">
-        <div className="form-header">
-          <h1>Создать новый проект</h1>
-          <p>Быстрое создание: укажите только название проекта</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="form">
-          <div className="form-section">
-            <h2>Основная информация</h2>
-            <div className="form-group">
-              <label htmlFor="name">Название проекта</label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Введите название проекта"
-                maxLength={250}
-                required
-              />
-              <span style={{ fontSize: '12px', color: (formData.name || '').length >= 250 ? '#e53e3e' : '#9A9B9F', float: 'right', marginTop: '4px' }}>
-                {(formData.name || '').length}/250
-              </span>
-            </div>
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <div className="form-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate(-1)}
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? 'Сохранение...' : 'Создать проект'}
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  }
 
   // Mapping of hazard questions to their unlocked categories
   const hazardIndicators = {
@@ -1496,7 +1423,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Опишите цели и область проекта"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
         </div>
@@ -1515,7 +1442,7 @@ const ProjectForm = () => {
                 value={formData.deviceName}
                 onChange={handleInputChange}
                 placeholder="Введите название устройства"
-                required={isEditMode}
+                required
               />
             </div>
 
@@ -1528,7 +1455,7 @@ const ProjectForm = () => {
                 value={formData.deviceModel}
                 onChange={handleInputChange}
                 placeholder="Введите номер модели"
-                required={isEditMode}
+                required
               />
             </div>
           </div>
@@ -1542,7 +1469,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Опишите назначение устройства"
               rows="2"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1555,7 +1482,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Предоставьте подробное описание устройства"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1567,7 +1494,7 @@ const ProjectForm = () => {
                 name="deviceClassification"
                 value={formData.deviceClassification}
                 onChange={handleInputChange}
-                required={isEditMode}
+                required
               >
                 <option value="">Выберите классификацию</option>
                 <option value="Class I">Класс I</option>
@@ -1587,7 +1514,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Условия окружающей среды"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
         </div>
@@ -1605,7 +1532,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Ключевые технические характеристики и особенности"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1618,7 +1545,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Применимые нормативные требования (FDA, CE и т.д.)"
               rows="2"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1631,7 +1558,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Соответствующие отраслевые стандарты (ISO, IEC и т.д.)"
               rows="2"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1645,7 +1572,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Описание показаний к применению медицинского устройства"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1658,7 +1585,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Описание противопоказаний к применению"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1671,7 +1598,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Описание целевой группы пациентов"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1684,7 +1611,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Описание предупреждений и мер предосторожности"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
 
@@ -1697,7 +1624,7 @@ const ProjectForm = () => {
               onChange={handleInputChange}
               placeholder="Описание требований к утилизации устройства"
               rows="3"
-              required={isEditMode}
+              required
             />
           </div>
         </div>

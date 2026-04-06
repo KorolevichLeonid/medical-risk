@@ -445,6 +445,42 @@ def _get_member_primary_lifecycle_stage(member: ProjectMember):
     return stages[0] if stages else None
 
 
+_VALID_ASSIGNABLE_ROLES = {'manager', 'risk_assessment_team_leader', 'specialist', 'doctor'}
+_HIERARCHICAL_ROLES = ['specialist', 'risk_assessment_team_leader', 'manager']  # ascending
+
+
+def _normalize_roles_list(input_roles, fallback_role_value: str) -> List[str]:
+    """Validate and normalize a multi-role list.
+
+    Rules enforced:
+    - admin cannot be assigned
+    - only valid role names
+    - max 1 hierarchical role; if multiple given, keep only the highest
+    """
+    if not input_roles:
+        return [fallback_role_value]
+
+    roles_set = set(str(r).strip() for r in input_roles if str(r).strip())
+    if not roles_set:
+        return [fallback_role_value]
+
+    invalid = roles_set - _VALID_ASSIGNABLE_ROLES
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid assignable roles: {', '.join(sorted(invalid))}"
+        )
+
+    # If multiple hierarchical roles, keep only the highest
+    hierarchical = [r for r in _HIERARCHICAL_ROLES if r in roles_set]
+    if len(hierarchical) > 1:
+        highest = hierarchical[-1]  # ascending list, last = highest
+        for lower in hierarchical[:-1]:
+            roles_set.discard(lower)
+
+    return sorted(roles_set)
+
+
 def _validate_specialist_stage_capacity(
     db: Session,
     project_id: int,
@@ -498,7 +534,7 @@ def check_project_access(project: Project, user: User, db: Session):
 
 
 def check_user_permission(user: User, permission_key: str, project_id: int = None, db: Session = None):
-    """Check if user has a specific permission"""
+    """Check if user has a specific permission (union across all assigned roles)."""
     # System admin has all permissions
     if user.role == UserRole.SYS_ADMIN:
         return True
@@ -506,49 +542,30 @@ def check_user_permission(user: User, permission_key: str, project_id: int = Non
     if not db or not project_id:
         return False
 
-    # Get user's role in the project
-    project_role = None
     project = db.query(Project).filter(Project.id == project_id).first()
-
     if not project:
         return False
 
-    # Check if user is project owner (always admin)
+    # Project owner is always admin
     if project.owner_id == user.id:
-        project_role = "admin"
+        roles_to_check = ["admin"]
     else:
-        # Check if user is a project member
         member = db.query(ProjectMember).filter(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == user.id
         ).first()
-
-        if member:
-            project_role = member.role.value
-
-    # Get permissions for the role
-    if project_role:
-        # Project admin is the project creator and cannot perform product-manager workflow actions.
-        if project_role == "admin" and permission_key in {
-            "edit_project",
-            "assign_lifecycle_access",
-            "create_risks",
-            "edit_risks",
-            "edit_risk_tables",
-            "assess_severity",
-            "assess_probability",
-            "create_report",
-        }:
+        if not member:
             return False
+        roles_to_check = member.get_roles()
 
-        from ..models.project import RolePermission
-        role_permissions = db.query(RolePermission).filter(
-            RolePermission.role_name == project_role
-        ).all()
-        permission_keys = [rp.permission_key for rp in role_permissions]
-        return permission_key in permission_keys
+    # Union permissions from all assigned roles
+    from ..models.project import RolePermission
+    all_keys: set = set()
+    for role_name in roles_to_check:
+        rps = db.query(RolePermission).filter(RolePermission.role_name == role_name).all()
+        all_keys.update(rp.permission_key for rp in rps)
 
-    return False
+    return permission_key in all_keys
 
 
 def get_user_project_role(project: Project, user: User, db: Session):
@@ -767,6 +784,7 @@ async def create_project(
         project_id=db_project.id,
         user_id=owner.id,
         role="admin",  # Project owner is admin
+        roles=["admin"],
         joined_at=db_project.created_at,
         user_email=owner.email,
         user_first_name=owner.first_name,
@@ -787,6 +805,7 @@ async def create_project(
             project_id=db_project.id,
             user_id=current_user.id,
             role="admin",  # Sys admin is always admin in any project
+            roles=["admin"],
             joined_at=db_project.created_at,
             user_email=current_user.email,
             user_first_name=current_user.first_name,
@@ -807,6 +826,7 @@ async def create_project(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
+                roles=member.get_roles(),
                 assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
                 assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
@@ -920,19 +940,20 @@ async def read_project(
         project_id=project_id,
         user_id=owner.id,
         role="admin",  # Project owner is admin
+        roles=["admin"],
         joined_at=db_project.created_at,
         user_email=owner.email,
         user_first_name=owner.first_name,
         user_last_name=owner.last_name
     )
-    
+
     # Get project members
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
     member_responses = []
-    
+
     # Add owner to members list
     member_responses.append(owner_member)
-    
+
     # For sys admin: add them as admin if they're not the owner
     if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
         sysadmin_member = ProjectMemberResponse(
@@ -940,19 +961,20 @@ async def read_project(
             project_id=project_id,
             user_id=current_user.id,
             role="admin",  # Sys admin is always admin in any project
+            roles=["admin"],
             joined_at=db_project.created_at,
             user_email=current_user.email,
             user_first_name=current_user.first_name,
             user_last_name=current_user.last_name
         )
         member_responses.append(sysadmin_member)
-    
+
     # Add actual project members (excluding owner to avoid duplication)
     for member in members:
         # Skip if this member is the owner (already added above)
         if member.user_id == db_project.owner_id:
             continue
-            
+
         user = db.query(User).filter(User.id == member.user_id).first()
         if user:
             member_responses.append(ProjectMemberResponse(
@@ -960,6 +982,7 @@ async def read_project(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
+                roles=member.get_roles(),
                 assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
                 assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
@@ -967,7 +990,7 @@ async def read_project(
                 user_first_name=user.first_name,
                 user_last_name=user.last_name
             ))
-    
+
     # Deserialize JSON fields
     lifecycle_stages_data = _normalize_lifecycle_stages_for_frontend(db_project.lifecycle_stages)
     custom_lifecycle_stages_data = json.loads(db_project.custom_lifecycle_stages) if db_project.custom_lifecycle_stages else None
@@ -1165,22 +1188,23 @@ async def update_project(
         project_id=db_project.id,
         user_id=db_project.owner_id,
         role="admin",  # Project owner is admin
+        roles=["admin"],
         joined_at=db_project.created_at,
         user_email=db_project.owner.email,
         user_first_name=db_project.owner.first_name,
         user_last_name=db_project.owner.last_name
     )
-    
+
     # Get project members with user information
     members = db.query(ProjectMember).filter(
         ProjectMember.project_id == db_project.id
     ).all()
-    
+
     member_responses = []
-    
+
     # Add owner to response first
     member_responses.append(owner_member)
-    
+
     # For sys admin: add them as admin if they're not the owner AND not already a member
     if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
         # Check if sys admin is already in project members
@@ -1191,6 +1215,7 @@ async def update_project(
                 project_id=db_project.id,
                 user_id=current_user.id,
                 role="admin",  # Sys admin is always admin in any project
+                roles=["admin"],
                 joined_at=db_project.created_at,
                 user_email=current_user.email,
                 user_first_name=current_user.first_name,
@@ -1210,6 +1235,7 @@ async def update_project(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
+                roles=member.get_roles(),
                 assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
                 assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
@@ -1427,31 +1453,20 @@ async def add_project_member(
             detail="Not enough permissions to manage project members"
         )
 
-    actor_project_role = get_user_project_role(db_project, current_user, db)
-    if actor_project_role == "admin" and member.role != ProjectRole.MANAGER:
+    # admin role can only belong to the project creator
+    if member.role == ProjectRole.ADMIN or (member.roles and 'admin' in member.roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Project admin can assign only product manager"
-        )
-    if actor_project_role == "manager" and member.role not in {
-        ProjectRole.SPECIALIST,
-        ProjectRole.DOCTOR,
-        ProjectRole.RISK_ASSESSMENT_TEAM_LEADER,
-    }:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Product manager can assign only doctor, risk team leader, or specialist roles"
+            detail="Роль администратора нельзя назначить другому пользователю"
         )
 
-    # Admin is allowed to assign PM for bootstrap flow.
-    if actor_project_role != "admin":
-        ensure_project_ready_for_role_management(db_project)
-    
+    ensure_project_ready_for_role_management(db_project)
+
     # Check if user exists
     user = db.query(User).filter(User.id == member.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Check if user is already a member
     existing_member = db.query(ProjectMember).filter(
         ProjectMember.project_id == project_id,
@@ -1460,11 +1475,20 @@ async def add_project_member(
     if existing_member:
         raise HTTPException(status_code=400, detail="User is already a member")
 
-    _ensure_role_capacity(db, project_id, member.role)
-    
+    # Normalize roles list (validates and deduplicates)
+    roles_list = _normalize_roles_list(member.roles, member.role.value)
+
+    # Compute effective primary role from the normalized list
+    effective_role_value = ProjectMember.compute_effective_role(roles_list)
+    try:
+        effective_role = ProjectRole(effective_role_value)
+    except ValueError:
+        effective_role = member.role
+
+    _ensure_role_capacity(db, project_id, effective_role)
+
     specialist_stages: List[str] = []
-    # For specialist role, validate lifecycle stage assignment(s)
-    if member.role == ProjectRole.SPECIALIST:
+    if 'specialist' in roles_list:
         specialist_stages = _normalize_specialist_lifecycle_stages(
             member.assigned_lifecycle_stage,
             member.assigned_lifecycle_stages,
@@ -1484,18 +1508,18 @@ async def add_project_member(
     db_member = ProjectMember(
         project_id=project_id,
         user_id=member.user_id,
-        role=member.role,  # This will be ProjectRole enum
+        role=effective_role,
+        roles=json.dumps(roles_list, ensure_ascii=False),
         assigned_lifecycle_stage=(
             _encode_assigned_lifecycle_stages(specialist_stages)
-            if member.role == ProjectRole.SPECIALIST
+            if 'specialist' in roles_list
             else None
         )
     )
     db.add(db_member)
     db.commit()
     db.refresh(db_member)
-    
-    # Log member addition
+
     await log_project_member_added(
         db=db,
         user=current_user,
@@ -1506,13 +1530,13 @@ async def add_project_member(
         member_email=user.email,
         member_role=db_member.role.value
     )
-    
-    # Return properly formatted response
+
     return ProjectMemberResponse(
         id=db_member.id,
         project_id=db_member.project_id,
         user_id=db_member.user_id,
-        role=db_member.role.value,  # Convert enum to string
+        role=db_member.role.value,
+        roles=db_member.get_roles(),
         assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(db_member),
         assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(db_member),
         joined_at=db_member.joined_at,
@@ -1540,15 +1564,7 @@ async def assign_product_manager(
             detail="Not enough permissions to manage project members"
         )
 
-    actor_project_role = get_user_project_role(db_project, current_user, db)
-    if actor_project_role == "admin":
-        # Project admin is limited to product manager assignment only.
-        pass
-    if actor_project_role == "manager":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Product manager cannot assign or replace product manager"
-        )
+    # Этот эндпоинт доступен только администратору проекта (проверка выше через manage_members)
 
     if payload.user_id == db_project.owner_id:
         raise HTTPException(status_code=400, detail="Project owner cannot be assigned as product manager")
@@ -1589,6 +1605,7 @@ async def assign_product_manager(
         project_id=target_member.project_id,
         user_id=target_member.user_id,
         role=target_member.role.value,
+        roles=target_member.get_roles(),
         assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(target_member),
         assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(target_member),
         joined_at=target_member.joined_at,
@@ -1617,20 +1634,11 @@ async def update_project_member_role(
             detail="Not enough permissions to manage project members"
         )
 
-    actor_project_role = get_user_project_role(db_project, current_user, db)
-    if actor_project_role == "admin" and role_update.role != ProjectRole.MANAGER:
+    # admin role can only belong to the project creator
+    if role_update.role == ProjectRole.ADMIN or (role_update.roles and 'admin' in role_update.roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Project admin can assign only product manager"
-        )
-    if actor_project_role == "manager" and role_update.role not in {
-        ProjectRole.SPECIALIST,
-        ProjectRole.DOCTOR,
-        ProjectRole.RISK_ASSESSMENT_TEAM_LEADER,
-    }:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Product manager can assign only doctor, risk team leader, or specialist roles"
+            detail="Роль администратора нельзя назначить другому пользователю"
         )
 
     ensure_project_ready_for_role_management(db_project)
@@ -1647,22 +1655,20 @@ async def update_project_member_role(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    if actor_project_role == "manager" and member.role not in {
-        ProjectRole.SPECIALIST,
-        ProjectRole.DOCTOR,
-        ProjectRole.RISK_ASSESSMENT_TEAM_LEADER,
-    }:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Product manager can edit only doctor, risk team leader, or specialist roles"
-        )
+    # Normalize roles list
+    roles_list = _normalize_roles_list(role_update.roles, role_update.role.value)
 
-    if member.role != role_update.role:
-        _ensure_role_capacity(db, project_id, role_update.role, exclude_user_id=user_id)
+    effective_role_value = ProjectMember.compute_effective_role(roles_list)
+    try:
+        effective_role = ProjectRole(effective_role_value)
+    except ValueError:
+        effective_role = role_update.role
+
+    if member.role != effective_role:
+        _ensure_role_capacity(db, project_id, effective_role, exclude_user_id=user_id)
 
     specialist_stages: List[str] = []
-    # For specialist role, validate lifecycle stage assignment(s)
-    if role_update.role == ProjectRole.SPECIALIST:
+    if 'specialist' in roles_list:
         specialist_stages = _normalize_specialist_lifecycle_stages(
             role_update.assigned_lifecycle_stage,
             role_update.assigned_lifecycle_stages,
@@ -1685,10 +1691,11 @@ async def update_project_member_role(
         )
 
     old_role = member.role.value
-    member.role = role_update.role
+    member.role = effective_role
+    member.roles = json.dumps(roles_list, ensure_ascii=False)
     member.assigned_lifecycle_stage = (
         _encode_assigned_lifecycle_stages(specialist_stages)
-        if role_update.role == ProjectRole.SPECIALIST
+        if 'specialist' in roles_list
         else None
     )
     db.commit()
@@ -1713,6 +1720,7 @@ async def update_project_member_role(
         project_id=member.project_id,
         user_id=member.user_id,
         role=member.role.value,
+        roles=member.get_roles(),
         assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
         assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
         joined_at=member.joined_at,
@@ -1812,19 +1820,20 @@ async def get_project_members(
         project_id=project_id,
         user_id=owner.id,
         role="admin",  # Project owner is always admin
+        roles=["admin"],
         joined_at=db_project.created_at,
         user_email=owner.email,
         user_first_name=owner.first_name,
         user_last_name=owner.last_name
     )
-    
+
     # Get project members
     members = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
     member_responses = []
-    
+
     # Add owner to members list first (always admin)
     member_responses.append(owner_member)
-    
+
     # For sys admin: add them as admin if they're not the owner AND not already a member
     if current_user.role == UserRole.SYS_ADMIN and current_user.id != db_project.owner_id:
         # Check if sys admin is already in project members
@@ -1835,6 +1844,7 @@ async def get_project_members(
                 project_id=project_id,
                 user_id=current_user.id,
                 role="admin",  # Sys admin is always admin in any project
+                roles=["admin"],
                 joined_at=db_project.created_at,
                 user_email=current_user.email,
                 user_first_name=current_user.first_name,
@@ -1855,6 +1865,7 @@ async def get_project_members(
                 project_id=member.project_id,
                 user_id=member.user_id,
                 role=member.role.value,  # Convert enum to string
+                roles=member.get_roles(),
                 assigned_lifecycle_stage=_get_member_primary_lifecycle_stage(member),
                 assigned_lifecycle_stages=_get_member_assigned_lifecycle_stages(member),
                 joined_at=member.joined_at,
@@ -1928,23 +1939,24 @@ async def get_my_project_role(
 
     # Determine user's role in this project
     user_role = None
+    user_roles: list = []
     assigned_lifecycle_stage = None
     assigned_lifecycle_stages = []
     if current_user.role == UserRole.SYS_ADMIN:
-        # Sys admin is always admin in every project
         user_role = "admin"
+        user_roles = ["admin"]
     else:
-        # Check if user is owner (project creator = admin)
         if db_project.owner_id == current_user.id:
             user_role = "admin"
+            user_roles = ["admin"]
         else:
-            # Check if user is member and get their role
             member = db.query(ProjectMember).filter(
                 ProjectMember.project_id == project_id,
                 ProjectMember.user_id == current_user.id
             ).first()
             if member:
                 user_role = member.role.value
+                user_roles = member.get_roles()
                 assigned_lifecycle_stages = _get_member_assigned_lifecycle_stages(member)
                 assigned_lifecycle_stage = assigned_lifecycle_stages[0] if assigned_lifecycle_stages else None
 
@@ -1966,6 +1978,7 @@ async def get_my_project_role(
         "project_id": project_id,
         "user_id": current_user.id,
         "user_role": user_role,
+        "user_roles": user_roles,
         "assigned_lifecycle_stage": assigned_lifecycle_stage,
         "assigned_lifecycle_stages": assigned_lifecycle_stages,
         "user_name": f"{current_user.first_name} {current_user.last_name}",

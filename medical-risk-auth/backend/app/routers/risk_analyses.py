@@ -264,52 +264,35 @@ def calculate_analysis_statistics(risk_factors: List[RiskFactor]) -> dict:
 
 
 def check_user_permission(user: User, permission_key: str, project_id: int = None, db: Session = None):
-    """Check if user has a specific permission"""
-    # System admin has all permissions
+    """Check if user has a specific permission (union across all assigned roles)."""
     if user.role == UserRole.SYS_ADMIN:
         return True
 
     if not db or not project_id:
         return False
 
-    # Get user's role in the project
-    project_role = None
     project = db.query(Project).filter(Project.id == project_id).first()
-
     if not project:
         return False
 
-    # Check if user is project owner (always admin)
     if project.owner_id == user.id:
-        project_role = "admin"
+        roles_to_check = ["admin"]
     else:
-        # Check if user is a project member
         member = db.query(ProjectMember).filter(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == user.id
         ).first()
-
-        if member:
-            project_role = member.role.value
-
-    # Get permissions for the role
-    if project_role:
-        if project_role == "admin" and permission_key in {
-            "create_risks",
-            "edit_risks",
-            "assess_severity",
-            "assess_probability",
-        }:
+        if not member:
             return False
+        roles_to_check = member.get_roles()
 
-        from ..models.project import RolePermission
-        role_permissions = db.query(RolePermission).filter(
-            RolePermission.role_name == project_role
-        ).all()
-        permission_keys = [rp.permission_key for rp in role_permissions]
-        return permission_key in permission_keys
+    from ..models.project import RolePermission
+    all_keys: set = set()
+    for role_name in roles_to_check:
+        rps = db.query(RolePermission).filter(RolePermission.role_name == role_name).all()
+        all_keys.update(rp.permission_key for rp in rps)
 
-    return False
+    return permission_key in all_keys
 
 
 def check_risk_edit_permission(project: Project, user: User, db: Session):
@@ -330,7 +313,13 @@ def get_specialist_lifecycle_stage(user: User, project_id: int, db: Session):
 
 
 def check_specialist_lifecycle_access(user: User, project_id: int, lifecycle_stage: str, db: Session):
-    """Check if a specialist has access to a specific lifecycle stage. Non-specialists always have access."""
+    """Check if user has access to a specific lifecycle stage for risk create/edit/delete.
+
+    - Non-specialist roles (manager, leader, pure doctor): access to all stages.
+    - Specialist (with or without doctor): restricted to assigned stages.
+      (specialist+doctor gets specialist rights in assigned stages; other stages only doctor
+       rights but doctor lacks create_risks so that's enforced by the permission check.)
+    """
     if user.role == UserRole.SYS_ADMIN:
         return True
     member = db.query(ProjectMember).filter(
@@ -338,14 +327,15 @@ def check_specialist_lifecycle_access(user: User, project_id: int, lifecycle_sta
         ProjectMember.user_id == user.id
     ).first()
     if not member:
-        # Could be project owner
         project = db.query(Project).filter(Project.id == project_id).first()
         if project and project.owner_id == user.id:
             return True
         return False
-    if member.role != ProjectRole.SPECIALIST:
-        return True  # Non-specialists have access to all stages
-    # Specialist can only access assigned lifecycle stages
+    member_roles = member.get_roles()
+    # If no specialist role in list, allow all stages
+    if 'specialist' not in member_roles:
+        return True
+    # Specialist (with or without doctor): restricted to assigned lifecycle stages
     return lifecycle_stage in _decode_assigned_lifecycle_stages(member.assigned_lifecycle_stage)
 
 
