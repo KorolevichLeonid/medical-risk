@@ -279,11 +279,14 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
     'new_risks'
   ];
 
+  // Multi-role helper: check if any of the user's assigned roles matches
+  const hasRole = (roleName) => userRoles.includes(roleName) || userRole === roleName;
+
   const isManagerAlwaysEditableField = (columnKey) =>
-    (userRole === 'manager' || userRole === 'admin') && managerAlwaysEditableColumns.includes(columnKey);
+    (hasRole('manager') || hasRole('admin')) && managerAlwaysEditableColumns.includes(columnKey);
 
   const canUseRiskBenefitColumn = () =>
-    userRole === 'manager' || userRole === 'risk_assessment_team_leader' || userRole === 'admin';
+    hasRole('manager') || hasRole('risk_assessment_team_leader') || hasRole('admin');
 
   const buildScoreOptions = (levels = []) => {
     const optionsByValue = new Map();
@@ -332,7 +335,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
 
     // Администратор имеет полный доступ ко всем полям, кроме авто-расчётных и
     // первых 5 столбцов в листах ЖЦ (они управляются из Risk Analysis)
-    if (userRole === 'admin') {
+    if (hasRole('admin')) {
       const alwaysLockedColumns = ['hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'];
       return isAutoManagedSheet() && alwaysLockedColumns.includes(columnKey);
     }
@@ -353,7 +356,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
 
     // Если риск полностью закрыт (fully_closed) - ВСЕ ячейки заблокированы
     const isLeaderNewRisksField =
-      userRole === 'risk_assessment_team_leader' && columnKey === 'new_risks';
+      hasRole('risk_assessment_team_leader') && columnKey === 'new_risks';
 
     if (
       row.risk_status === 'fully_closed' &&
@@ -388,15 +391,15 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
 
     // Новые риски доступны только после закрытия риска
     if (columnKey === 'new_risks') {
-      // Специалист по ЖЦ никогда не редактирует этот столбец.
-      if (userRole === 'specialist') {
+      // Специалист по ЖЦ (без мульти-ролей менеджера/лидера) никогда не редактирует этот столбец.
+      if (hasRole('specialist') && !hasRole('manager') && !hasRole('risk_assessment_team_leader') && !hasRole('admin')) {
         return true;
       }
       if (isManagerAlwaysEditableField(columnKey)) {
         return false;
       }
       // Руководитель команды по рискам заполняет только после статуса "closed".
-      if (userRole === 'risk_assessment_team_leader') {
+      if (hasRole('risk_assessment_team_leader') && !hasRole('manager') && !hasRole('admin')) {
         return row.risk_status !== 'closed' && row.risk_status !== 'fully_closed';
       }
       return row.risk_status !== 'closed' && row.risk_status !== 'fully_closed';
@@ -1850,14 +1853,17 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
       return true;
     }
 
-    // Доктор может редактировать только столбцы тяжести
-    if (userRole === 'doctor') {
+    // Доктор без дополнительных ролей может редактировать только столбцы тяжести.
+    // При мульти-роли (напр. менеджер+доктор) это ограничение НЕ действует.
+    const isPureDoctor = userRole === 'doctor' && userRoles.length <= 1;
+    if (isPureDoctor) {
       const severityColumns = ['severity_score', 'residual_risk_level'];
       return severityColumns.includes(columnKey) && userPermissions.includes('assess_severity');
     }
 
-    // Специалист не может редактировать комментарии
-    if (userRole === 'specialist') {
+    // Специалист без дополнительных ролей не может редактировать комментарии
+    const isPureSpecialist = userRole === 'specialist' && !hasRole('manager') && !hasRole('risk_assessment_team_leader');
+    if (isPureSpecialist) {
       if (columnKey === 'comment_1' || columnKey === 'comment_2') {
         return false;
       }
@@ -1873,12 +1879,12 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
     // Руководитель команды и продукт-менеджер могут оценивать вероятность только после оценки тяжести от доктора
     const probabilityColumns = ['probability_score', 'residual_probability'];
     if (probabilityColumns.includes(columnKey)) {
-      const canAssessProbability = userPermissions.includes('assess_probability') || userRole === 'manager';
+      const canAssessProbability = userPermissions.includes('assess_probability') || hasRole('manager');
       if (!canAssessProbability) {
         return false;
       }
       // Для руководителя команды и продукт-менеджера проверяем наличие соответствующей оценки тяжести
-      if ((userRole === 'risk_assessment_team_leader' || userRole === 'manager') && row) {
+      if ((hasRole('risk_assessment_team_leader') || hasRole('manager')) && row) {
         if (columnKey === 'probability_score') {
           // Для первичной вероятности нужна первичная оценка тяжести
           const hasSeverity = row.severity_score && row.severity_score.toString().trim() !== '';
@@ -2120,7 +2126,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
     const handleCellClick = (e) => {
       e.stopPropagation();
       // Для руководителя команды и продукт-менеджера объясняем блокировку вероятности, если нет оценки тяжести
-      if ((userRole === 'risk_assessment_team_leader' || userRole === 'manager') && !canEdit) {
+      if ((hasRole('risk_assessment_team_leader') || hasRole('manager')) && !canEdit) {
         const probabilityColumns = ['probability_score', 'residual_probability'];
         if (probabilityColumns.includes(column.key)) {
           if (column.key === 'probability_score' && (!row.severity_score || row.severity_score.toString().trim() === '')) {
@@ -2324,12 +2330,25 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
             {userRole && !loadingRole && (
               <div className="user-role-indicator">
                 <span className="role-label">Ваша роль:</span>
-                <span
-                  className={`role-badge ${getRoleClassName(userRole)}`}
-                  title={getRoleDisplayName(userRole)}
-                >
-                  {getRoleDisplayName(userRole)}
-                </span>
+                {userRoles.length > 1 ? (
+                  userRoles.map(r => (
+                    <span
+                      key={r}
+                      className={`role-badge ${getRoleClassName(r)}`}
+                      title={getRoleDisplayName(r)}
+                      style={{ marginRight: 4 }}
+                    >
+                      {getRoleDisplayName(r)}
+                    </span>
+                  ))
+                ) : (
+                  <span
+                    className={`role-badge ${getRoleClassName(userRole)}`}
+                    title={getRoleDisplayName(userRole)}
+                  >
+                    {getRoleDisplayName(userRole)}
+                  </span>
+                )}
               </div>
             )}
             {loadingRole && (
@@ -2368,7 +2387,7 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
 
         {/* Вкладки листов */}
         <div className="excel-tabs">
-          {(userRole === 'specialist'
+          {(userRole === 'specialist' && !hasRole('manager') && !hasRole('risk_assessment_team_leader') && !hasRole('admin')
             ? sheets.filter(sheet => assignedLifecycleStages.includes(sheet.id) || sheet.id === 'sheet7')
             : sheets
           ).map(sheet => {

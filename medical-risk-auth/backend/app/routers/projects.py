@@ -1476,10 +1476,13 @@ async def add_project_member(
         raise HTTPException(status_code=400, detail="User is already a member")
 
     # Normalize roles list (validates and deduplicates)
+    print(f"[MULTI-ROLE DEBUG] Input: member.role={member.role}, member.roles={member.roles}")
     roles_list = _normalize_roles_list(member.roles, member.role.value)
+    print(f"[MULTI-ROLE DEBUG] Normalized roles_list={roles_list}")
 
     # Compute effective primary role from the normalized list
     effective_role_value = ProjectMember.compute_effective_role(roles_list)
+    print(f"[MULTI-ROLE DEBUG] Effective primary role={effective_role_value}")
     try:
         effective_role = ProjectRole(effective_role_value)
     except ValueError:
@@ -1505,11 +1508,13 @@ async def add_project_member(
             )
         _validate_specialist_stage_capacity(db, project_id, specialist_stages)
 
+    roles_json = json.dumps(roles_list, ensure_ascii=False)
+    print(f"[MULTI-ROLE DEBUG] Saving to DB: role={effective_role}, roles={roles_json}")
     db_member = ProjectMember(
         project_id=project_id,
         user_id=member.user_id,
         role=effective_role,
-        roles=json.dumps(roles_list, ensure_ascii=False),
+        roles=roles_json,
         assigned_lifecycle_stage=(
             _encode_assigned_lifecycle_stages(specialist_stages)
             if 'specialist' in roles_list
@@ -1519,6 +1524,7 @@ async def add_project_member(
     db.add(db_member)
     db.commit()
     db.refresh(db_member)
+    print(f"[MULTI-ROLE DEBUG] After save: db_member.roles={db_member.roles}, get_roles()={db_member.get_roles()}")
 
     await log_project_member_added(
         db=db,
@@ -1656,9 +1662,12 @@ async def update_project_member_role(
         raise HTTPException(status_code=404, detail="Member not found")
 
     # Normalize roles list
+    print(f"[MULTI-ROLE DEBUG UPDATE] Input: role_update.role={role_update.role}, role_update.roles={role_update.roles}")
     roles_list = _normalize_roles_list(role_update.roles, role_update.role.value)
+    print(f"[MULTI-ROLE DEBUG UPDATE] Normalized roles_list={roles_list}")
 
     effective_role_value = ProjectMember.compute_effective_role(roles_list)
+    print(f"[MULTI-ROLE DEBUG UPDATE] Effective primary role={effective_role_value}")
     try:
         effective_role = ProjectRole(effective_role_value)
     except ValueError:
@@ -1692,14 +1701,17 @@ async def update_project_member_role(
 
     old_role = member.role.value
     member.role = effective_role
-    member.roles = json.dumps(roles_list, ensure_ascii=False)
+    roles_json = json.dumps(roles_list, ensure_ascii=False)
+    member.roles = roles_json
     member.assigned_lifecycle_stage = (
         _encode_assigned_lifecycle_stages(specialist_stages)
         if 'specialist' in roles_list
         else None
     )
+    print(f"[MULTI-ROLE DEBUG UPDATE] Saving: role={effective_role}, roles={roles_json}")
     db.commit()
     db.refresh(member)
+    print(f"[MULTI-ROLE DEBUG UPDATE] After save: member.roles={member.roles}, get_roles()={member.get_roles()}")
 
     member_user = db.query(User).filter(User.id == user_id).first()
     member_name = f"{member_user.first_name} {member_user.last_name}" if member_user else f"User {user_id}"

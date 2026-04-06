@@ -191,6 +191,7 @@ const ProjectView = () => {
           
           if (membersResponse.ok) {
             const membersData = await membersResponse.json();
+            console.log('[MULTI-ROLE] Members loaded from server:', membersData.map(m => ({ user_id: m.user_id, role: m.role, roles: m.roles })));
             const teamMembers = membersData.map(member => ({
               id: member.user_id,
               name: `${member.user_first_name} ${member.user_last_name}`,
@@ -558,6 +559,8 @@ const ProjectView = () => {
         body.assigned_lifecycle_stage = selectedLifecycleStages[0];
       }
 
+      console.log('[MULTI-ROLE] Sending add member request:', JSON.stringify(body));
+
       const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members`, {
         method: 'POST',
         headers: {
@@ -568,6 +571,8 @@ const ProjectView = () => {
       });
 
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('[MULTI-ROLE] Server response:', responseData);
         window.location.reload();
         setShowAddMember(false);
         setSelectedUser('');
@@ -637,6 +642,7 @@ const ProjectView = () => {
         body.assigned_lifecycle_stages = lifecycleStagesToEdit;
         body.assigned_lifecycle_stage = lifecycleStagesToEdit[0];
       }
+      console.log('[MULTI-ROLE] Sending update member request:', JSON.stringify(body));
       const response = await fetch(`${API_BASE_URL}/api/projects/${id}/members/${memberToEdit.id}`, {
         method: 'PUT',
         headers: {
