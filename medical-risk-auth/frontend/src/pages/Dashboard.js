@@ -60,6 +60,7 @@ const Dashboard = () => {
           team: [], // TODO: получать участников проекта
           deviceType: project.device_name,
           userRole: project.user_role,
+          userRoles: project.user_roles || [],
           ownerId: project.owner_id,
           memberCount: project.member_count
         }));
@@ -86,7 +87,9 @@ const Dashboard = () => {
     }
 
     if (filterRole !== 'all') {
-      filtered = filtered.filter(project => project.userRole === filterRole);
+      filtered = filtered.filter(project =>
+        (project.userRoles && project.userRoles.includes(filterRole)) || project.userRole === filterRole
+      );
     }
     
     if (searchTerm) {
@@ -101,7 +104,7 @@ const Dashboard = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      draft: { label: 'Ожидание продукт-менеджера', className: 'status-draft' },
+      draft: { label: 'В процессе', className: 'status-draft' },
       in_progress: { label: 'В процессе', className: 'status-progress' },
       review: { label: 'На проверке', className: 'status-review' },
       completed: { label: 'Завершено', className: 'status-completed' }
@@ -111,17 +114,20 @@ const Dashboard = () => {
     return <span className={`status-badge ${config.className}`}>{config.label}</span>;
   };
 
-  const getRoleBadge = (role) => {
-    const roleConfig = {
-      admin: { label: 'АДМИНИСТРАТОР', className: 'role-admin' },
-      manager: { label: 'ПРОДУКТ-МЕНЕДЖЕР', className: 'role-manager' },
-      risk_assessment_team_leader: { label: 'РУКОВОДИТЕЛЬ КОМАНДЫ ПО РИСКАМ', className: 'role-risk-leader' },
-      doctor: { label: 'ДОКТОР', className: 'role-doctor' },
-      specialist: { label: 'СПЕЦИАЛИСТ ПО ЖЦ', className: 'role-specialist' }
-    };
-    
-    const config = roleConfig[role] || { label: role?.toUpperCase() || 'UNKNOWN', className: 'role-unknown' };
-    return <span className={`role-badge ${config.className}`} title={config.label}>{config.label}</span>;
+  const roleConfig = {
+    admin: { label: 'АДМИНИСТРАТОР', className: 'role-admin' },
+    manager: { label: 'ПРОДУКТ-МЕНЕДЖЕР', className: 'role-manager' },
+    risk_assessment_team_leader: { label: 'РУКОВОДИТЕЛЬ КОМАНДЫ ПО РИСКАМ', className: 'role-risk-leader' },
+    doctor: { label: 'ДОКТОР', className: 'role-doctor' },
+    specialist: { label: 'СПЕЦИАЛИСТ ПО ЖЦ', className: 'role-specialist' }
+  };
+
+  const getRoleBadges = (roles) => {
+    if (!roles || roles.length === 0) return null;
+    return roles.map((role, idx) => {
+      const config = roleConfig[role] || { label: role?.toUpperCase() || 'UNKNOWN', className: 'role-unknown' };
+      return <span key={idx} className={`role-badge ${config.className}`} title={config.label}>{config.label}</span>;
+    });
   };
 
   const canEditProject = (project) => {
@@ -298,7 +304,7 @@ const Dashboard = () => {
                 <span>{project.name}</span>
               </div>
               <div className="project-row-role">
-                {project.userRole && getRoleBadge(project.userRole)}
+                {getRoleBadges(project.userRoles && project.userRoles.length > 0 ? project.userRoles : (project.userRole ? [project.userRole] : []))}
               </div>
               <div className="project-row-team">
                 {project.memberCount + 1} участников
@@ -357,7 +363,7 @@ const Dashboard = () => {
                 </div>
                 <div className="project-badges">
                   {getStatusBadge(project.status)}
-                  {project.userRole && getRoleBadge(project.userRole)}
+                  {getRoleBadges(project.userRoles && project.userRoles.length > 0 ? project.userRoles : (project.userRole ? [project.userRole] : []))}
                 </div>
               </div>
 

@@ -332,17 +332,33 @@ def build_dynamic_conclusion_lines(risks: list, risk_threshold: int, device_name
     }
 
 
+ROLE_DISPLAY_MAPPING = {
+    'admin': 'Администратор',
+    'manager': 'Продукт-менеджер',
+    'risk_assessment_team_leader': 'Руководитель команды по рискам',
+    'doctor': 'Доктор',
+    'specialist': 'Специалист по жизненному циклу',
+}
+
+
 def format_role_display_name(role: str) -> str:
     """
-    Convert role code to display name in uppercase format
-    Used in documents to display roles consistently
+    Convert role code to display name in Russian.
+    Used in documents to display roles consistently.
     """
-    role_mapping = {
-        'admin': 'АДМИНИСТРАТОР',
-        'manager': 'МЕНЕДЖЕР',
-        'specialist': 'СПЕЦИАЛИСТ'
-    }
-    return role_mapping.get(role, role.upper() if role else 'UNKNOWN')
+    return ROLE_DISPLAY_MAPPING.get(role, role.upper() if role else 'UNKNOWN')
+
+
+def format_roles_display(roles) -> str:
+    """
+    Convert a list of role codes (or a single role string) to a comma-separated
+    Russian display string.
+    """
+    if isinstance(roles, str):
+        roles = [roles]
+    if not roles:
+        return 'UNKNOWN'
+    return ', '.join(format_role_display_name(r) for r in roles)
 
 
 class RiskManagementReportGenerator:
@@ -1106,7 +1122,7 @@ class RiskManagementReportGenerator:
             for member in self.team:
                 row = table.add_row().cells
                 row[0].text = member.get('name', '')
-                row[1].text = format_role_display_name(member.get('role', ''))
+                row[1].text = format_roles_display(member.get('roles') or member.get('role', ''))
                 row[2].text = ''  # Signature placeholder
                 row[3].text = datetime.now().strftime('%d.%m.%Y')
         else:
@@ -2584,7 +2600,7 @@ class PDFRiskManagementReportGenerator:
             for member in self.team:
                 table_data.append([
                     member.get('name', ''),
-                    format_role_display_name(member.get('role', '')),
+                    format_roles_display(member.get('roles') or member.get('role', '')),
                     '',  # Signature placeholder
                     datetime.now().strftime('%d.%m.%Y')
                 ])

@@ -376,8 +376,19 @@ def _build_live_preview_html(project: Project, project_id: int, db: Session, doc
             team_members.append({
                 'name': f"{user.first_name} {user.last_name}",
                 'role': member.role.value if hasattr(member.role, 'value') else str(member.role),
+                'roles': member.get_roles(),
                 'email': user.email
             })
+
+    # Ensure the project owner (admin) is always present in the team list
+    owner = db.query(User).filter(User.id == project.owner_id).first()
+    if owner and not any(m.get('email') == owner.email for m in team_members):
+        team_members.append({
+            'name': f"{owner.first_name or ''} {owner.last_name or ''}".strip(),
+            'email': owner.email or '',
+            'role': 'admin',
+            'roles': ['admin']
+        })
 
     if not doc_version:
         doc_version = SimpleNamespace(
@@ -459,7 +470,8 @@ def _build_generation_context(project, db: Session, version_number: str, report_
                 team_members.append({
                     'name': f"{user.first_name or ''} {user.last_name or ''}".strip(),
                     'email': user.email or '',
-                    'role': getattr(member.role, 'value', str(member.role)) if member.role else ''
+                    'role': getattr(member.role, 'value', str(member.role)) if member.role else '',
+                    'roles': member.get_roles(),
                 })
 
         owner = db.query(User).filter(User.id == project.owner_id).first()
@@ -467,7 +479,8 @@ def _build_generation_context(project, db: Session, version_number: str, report_
             team_members.append({
                 'name': f"{owner.first_name or ''} {owner.last_name or ''}".strip(),
                 'email': owner.email or '',
-                'role': 'admin'
+                'role': 'admin',
+                'roles': ['admin'],
             })
     except Exception as e:
         print(f"DEBUG: Error gathering team members: {e}")
@@ -2009,29 +2022,45 @@ def generate_residual_risks_table(risks):
     return html
 
 
+ROLE_DISPLAY_MAPPING = {
+    'admin': 'Администратор',
+    'manager': 'Продукт-менеджер',
+    'risk_assessment_team_leader': 'Руководитель команды по рискам',
+    'doctor': 'Доктор',
+    'specialist': 'Специалист по жизненному циклу',
+}
+
+
 def format_role_display_name(role: str) -> str:
     """
-    Convert role code to display name in uppercase format
-    Used in documents to display roles consistently
+    Convert role code to display name in Russian.
+    Used in documents to display roles consistently.
     """
-    role_mapping = {
-        'admin': 'АДМИНИСТРАТОР',
-        'manager': 'МЕНЕДЖЕР',
-        'specialist': 'СПЕЦИАЛИСТ ПО ЖИЗНЕННОМУ ЦИКЛУ'
-    }
-    return role_mapping.get(role, role.upper() if role else 'UNKNOWN')
+    return ROLE_DISPLAY_MAPPING.get(role, role.upper() if role else 'UNKNOWN')
+
+
+def format_roles_display(roles) -> str:
+    """
+    Convert a list of role codes (or a single role string) to a comma-separated
+    Russian display string.
+    """
+    if isinstance(roles, str):
+        roles = [roles]
+    if not roles:
+        return 'UNKNOWN'
+    return ', '.join(format_role_display_name(r) for r in roles)
 
 
 def generate_team_table(team_members, date_str):
     """Generate team members table"""
     import html as html_module
-    
+
     html = '<table><thead><tr><th>Имя</th><th>Должность</th><th>Роль</th><th>Подпись</th><th>Дата</th></tr></thead><tbody>'
-    
+
     for member in team_members:
         name = html_module.escape(member.get('name', ''))
-        role = format_role_display_name(member.get('role', ''))
-        role_escaped = html_module.escape(role)
+        roles_display = format_roles_display(member.get('roles') or member.get('role', ''))
+        role_escaped = html_module.escape(roles_display)
         html += f'<tr>'
         html += f'<td>{name}</td>'
         html += f'<td><span class="empty-field">не заполнено</span></td>'
@@ -2039,7 +2068,7 @@ def generate_team_table(team_members, date_str):
         html += f'<td></td>'
         html += f'<td>{date_str.replace(" ", ".") if isinstance(date_str, str) and "не заполнено" not in date_str else date_str}</td>'
         html += '</tr>'
-    
+
     html += '</tbody></table>'
     return html
 

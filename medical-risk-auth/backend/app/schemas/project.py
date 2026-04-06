@@ -208,6 +208,7 @@ class ProjectListResponse(BaseModel):
     created_at: datetime
     member_count: int = 0
     user_role: Optional[str] = None  # Role of current user in this project
+    user_roles: list = []  # All roles of current user in this project
 
     class Config:
         from_attributes = True

@@ -333,13 +333,6 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
       return true;
     }
 
-    // Администратор имеет полный доступ ко всем полям, кроме авто-расчётных и
-    // первых 5 столбцов в листах ЖЦ (они управляются из Risk Analysis)
-    if (hasRole('admin')) {
-      const alwaysLockedColumns = ['hazard_category', 'hazard_name', 'event_sequence', 'hazardous_situation', 'harm'];
-      return isAutoManagedSheet() && alwaysLockedColumns.includes(columnKey);
-    }
-
     // Анализ остаточного риска/пользы: доступ только у PM и руководителя команды по рискам.
     if (columnKey === 'risk_benefit_analysis') {
       if (!canUseRiskBenefitColumn()) return true;
@@ -376,16 +369,41 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
         'verification_1', 'verification_2', 'verification_3',
         'residual_risk_level', 'residual_probability', 'residual_risk_score', 'risk_level_2'
       ];
-      if (lockedUntilColumn20.includes(columnKey) && !isManagerAlwaysEditableField(columnKey)) {
+
+      // Когда риск допустимый (closed), оставляем оценочные баллы редактируемыми,
+      // но меры управления блокируем (исключение isManagerAlwaysEditableField не применяется)
+      if (row.risk_status === 'closed') {
+        if (!row.second_evaluation_done) {
+          // Первая оценка допустима — тяжесть и вероятность первичные остаются доступными
+          if (['severity_score', 'probability_score'].includes(columnKey)) {
+            // не блокируем — пропускаем дальше
+          } else if (lockedUntilColumn20.includes(columnKey)) {
+            return true;
+          }
+        } else {
+          // Вторая оценка допустима — остаточные тяжесть и вероятность остаются доступными
+          if (['residual_risk_level', 'residual_probability'].includes(columnKey)) {
+            // не блокируем — пропускаем дальше
+          } else if (lockedUntilColumn20.includes(columnKey)) {
+            return true;
+          }
+        }
+      } else if (lockedUntilColumn20.includes(columnKey) && !isManagerAlwaysEditableField(columnKey)) {
         return true;
       }
     }
 
     // Если выполнена первичная оценка - блокируем столбцы 6-9 (НО НЕ comment_1)
+    // Блокируем только если риск недопустимый (нужна вторая оценка)
     if (row.first_evaluation_done === true) {
-      const lockedAfterFirstEval = ['severity_score', 'probability_score', 'risk_score', 'risk_level_1'];
-      if (lockedAfterFirstEval.includes(columnKey)) {
-        return true;
+      const shouldLockFirstScores = row.risk_status === 'pending_second'
+        || row.risk_status === 'pending_benefit'
+        || row.second_evaluation_done === true;
+      if (shouldLockFirstScores) {
+        const lockedAfterFirstEval = ['severity_score', 'probability_score', 'risk_score', 'risk_level_1'];
+        if (lockedAfterFirstEval.includes(columnKey)) {
+          return true;
+        }
       }
     }
 
@@ -1221,6 +1239,28 @@ const ExcelTable = ({ projectId, onClose, initialSheet = null }) => {
       if (hintField) {
         newData[rowIndex][hintField] = '';
       }
+    }
+
+    // Сброс состояния оценки при изменении баллов на допустимом риске
+    // Если первичная тяжесть/вероятность меняются на закрытом (допустимом) риске — перезапуск первичной оценки
+    if ((columnKey === 'severity_score' || columnKey === 'probability_score') &&
+        newData[rowIndex].first_evaluation_done === true &&
+        newData[rowIndex].risk_status === 'closed' &&
+        !newData[rowIndex].second_evaluation_done) {
+      newData[rowIndex].first_evaluation_done = false;
+      newData[rowIndex].locked_after_second = false;
+      newData[rowIndex].risk_status = '';
+      newData[rowIndex].risk_benefit_analysis = '';
+    }
+
+    // Если остаточная тяжесть/вероятность меняются на закрытом риске после вторичной оценки — перезапуск вторичной оценки
+    if ((columnKey === 'residual_risk_level' || columnKey === 'residual_probability') &&
+        newData[rowIndex].second_evaluation_done === true &&
+        newData[rowIndex].risk_status === 'closed') {
+      newData[rowIndex].second_evaluation_done = false;
+      newData[rowIndex].locked_after_second = false;
+      newData[rowIndex].risk_status = 'pending_second';
+      newData[rowIndex].risk_benefit_analysis = '';
     }
 
     // Автоматический расчет риска

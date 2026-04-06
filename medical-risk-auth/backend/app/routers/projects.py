@@ -660,13 +660,16 @@ async def read_projects(
 
         # Determine user's role in this project
         user_role = None
+        user_roles = []
         if current_user.role == UserRole.SYS_ADMIN:
             # Sys admin is always admin in every project
             user_role = "admin"
+            user_roles = ["admin"]
         else:
             # Check if user is owner (project creator = admin)
             if project.owner_id == current_user.id:
                 user_role = "admin"
+                user_roles = ["admin"]
             else:
                 # Check if user is member and get their role
                 member = db.query(ProjectMember).filter(
@@ -675,6 +678,7 @@ async def read_projects(
                 ).first()
                 if member:
                     user_role = member.role.value
+                    user_roles = member.get_roles()
 
         project_data = ProjectListResponse(
             id=project.id,
@@ -685,7 +689,8 @@ async def read_projects(
             owner_id=project.owner_id,
             created_at=project.created_at,
             member_count=member_count,
-            user_role=user_role
+            user_role=user_role,
+            user_roles=user_roles
         )
         result.append(project_data)
 

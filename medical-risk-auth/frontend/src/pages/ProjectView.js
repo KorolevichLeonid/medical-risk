@@ -337,7 +337,7 @@ const ProjectView = () => {
 
   const formatList = (items) => {
     if (!items || items.length === 0) return 'N/A';
-    return items.join(', ');
+    return items.join('; ');
   };
 
   const formatLifecycleStageForDisplay = (stage) => {
@@ -375,7 +375,7 @@ const ProjectView = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      draft: { label: 'Ожидание продукт-менеджера', className: 'status-draft' },
+      draft: { label: 'В процессе', className: 'status-draft' },
       in_progress: { label: 'В процессе', className: 'status-progress' },
       review: { label: 'На рассмотрении', className: 'status-review' },
       completed: { label: 'Завершено', className: 'status-completed' }
@@ -733,18 +733,6 @@ const ProjectView = () => {
               Редактировать проект
             </Link>
           )}
-          {canAddMembers() && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setSelectedRole('manager');
-                setSelectedLifecycleStages([]);
-                setShowAddMember(true);
-              }}
-            >
-              ➕ Добавить участника
-            </button>
-          )}
           <button
             className="btn btn-secondary"
             onClick={() => navigate(`/project/${project.id}/table`)}
@@ -922,7 +910,7 @@ const ProjectView = () => {
               </div>
             ))}
           </div>
-          
+
           {canAddMembers() && (
             <button
               className="add-member-btn"
