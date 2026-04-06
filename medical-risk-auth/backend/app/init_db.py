@@ -342,25 +342,40 @@ def ensure_project_member_extended_columns():
 
 
 def ensure_project_member_roles_column():
-    """Ensure the multi-role JSON column exists on project_members."""
+    """Ensure the multi-role JSON column exists on project_members and backfill from role."""
     try:
         inspector = inspect(engine)
         if "project_members" not in inspector.get_table_names():
             return
         columns = {col["name"] for col in inspector.get_columns("project_members")}
-        if "roles" in columns:
-            return
         is_sqlite = engine.url.drivername.startswith("sqlite")
+        if "roles" not in columns:
+            with engine.begin() as conn:
+                if is_sqlite:
+                    try:
+                        conn.execute(text("ALTER TABLE project_members ADD COLUMN roles TEXT"))
+                    except Exception as e:
+                        if "duplicate column" not in str(e).lower():
+                            raise
+                else:
+                    conn.execute(text("ALTER TABLE project_members ADD COLUMN IF NOT EXISTS roles TEXT"))
+            print("[+] Added 'roles' column to project_members")
+
+        # Backfill: populate roles JSON from the single role column for any rows
+        # where roles is still NULL (legacy members added before multi-role support).
         with engine.begin() as conn:
             if is_sqlite:
-                try:
-                    conn.execute(text("ALTER TABLE project_members ADD COLUMN roles TEXT"))
-                except Exception as e:
-                    if "duplicate column" not in str(e).lower():
-                        raise
+                conn.execute(text(
+                    """UPDATE project_members
+                       SET roles = '["' || role || '"]'
+                       WHERE roles IS NULL"""
+                ))
             else:
-                conn.execute(text("ALTER TABLE project_members ADD COLUMN IF NOT EXISTS roles TEXT"))
-        print("[+] Added 'roles' column to project_members")
+                conn.execute(text(
+                    """UPDATE project_members
+                       SET roles = '["' || CAST(role AS text) || '"]'
+                       WHERE roles IS NULL"""
+                ))
     except Exception as e:
         print(f"[!] Error ensuring project member roles column: {e}")
         raise

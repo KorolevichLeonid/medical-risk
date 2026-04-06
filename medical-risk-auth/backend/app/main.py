@@ -9,6 +9,7 @@ from .init_db import (
     ensure_project_severity_columns,
     ensure_project_extended_columns,
     ensure_project_member_extended_columns,
+    ensure_project_member_roles_column,
     ensure_project_member_roles_normalized,
     run_postgresql_migration,
 )
@@ -83,6 +84,7 @@ def startup_migrations():
     ensure_project_severity_columns()
     ensure_project_extended_columns()
     ensure_project_member_extended_columns()
+    ensure_project_member_roles_column()
     ensure_project_member_roles_normalized()
     run_postgresql_migration()
 
