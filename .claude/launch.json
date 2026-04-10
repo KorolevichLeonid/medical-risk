@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (React)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 3000,
+      "cwd": "C:/veb 04.11/veb12.01/medical-risk/medical-risk-auth/frontend"
+    },
+    {
+      "name": "Backend (Python/uvicorn)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["run.py"],
+      "port": 8000,
+      "cwd": "C:/veb 04.11/veb12.01/medical-risk/medical-risk-auth/backend"
+    }
+  ]
+}

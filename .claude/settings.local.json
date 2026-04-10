@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(npx react-scripts:*)",
+      "Bash(taskkill /F /PID 5352)",
+      "Bash(cmd /c \"taskkill /F /PID 5352\")",
+      "Bash(cmd /c \"taskkill /F /IM node.exe\")",
+      "Bash(powershell -Command \"Stop-Process -Id 5352 -Force; Write-Host ''killed''\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force; Write-Host ''all node killed''\")",
+      "Bash(powershell -Command \"Get-Content -Raw -\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''scripts'''',{}\\), indent=2\\)\\)\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(powershell -Command \"Remove-Item -Recurse -Force ''C:\\\\veb 04.11\\\\veb12.01\\\\medical-risk\\\\medical-risk-auth\\\\frontend\\\\node_modules\\\\.cache'' -ErrorAction SilentlyContinue; Write-Host ''cache cleared''\")",
+      "Bash(powershell -Command \"Get-ChildItem ''C:\\\\veb 04.11\\\\veb12.01\\\\medical-risk\\\\medical-risk-auth\\\\frontend\\\\src\\\\pages'' | Select-Object Name\")",
+      "Bash(powershell -Command \"Remove-Item ''C:\\\\veb 04.11\\\\veb12.01\\\\medical-risk\\\\medical-risk-auth\\\\frontend\\\\src\\\\pages\\\\HomePage.js'' -Force; Write-Host ''deleted''\")",
+      "Bash(powershell -Command \"Stop-Process -Id 11888 -Force\")",
+      "Bash(python -c \":*)",
+      "Bash(grep -n \"userRole === ''admin''\" frontend/src/components/ExcelTable.js)",
+      "Bash(grep -r \"member\\\\.role\\\\|\\\\.role.*member\\\\|ProjectRole\\\\|project_role\" 'C:\\\\veb 04.11\\\\veb12.01\\\\medical-risk\\\\medical-risk-auth\\\\backend\\\\app' --include=*.py)",
+      "Bash(grep -r \"member\\\\.role\\\\|\\\\.role.*specialist\\\\|\\\\.role.*manager\\\\|\\\\.role.*admin\\\\|role.*badge\" 'C:\\\\veb 04.11\\\\veb12.01\\\\medical-risk\\\\medical-risk-auth\\\\frontend\\\\src' --include=*.js --include=*.jsx)"
+    ]
+  }
+}
