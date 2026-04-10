@@ -55,3 +55,6 @@ media/
 
 # Static files (if collected)
 staticfiles/
+
+# Local agent worktrees/config
+.claude/worktrees/
