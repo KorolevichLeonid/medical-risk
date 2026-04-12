@@ -318,7 +318,7 @@ const PersonalAccount = () => {
       {/* Stats Footer */}
       <div className="bg-white rounded-lg shadow-sm relative w-full pb-8">
         {/* pt-[50px] = 25px для кружка + 25px отступ сверху */}
-        <div className="flex flex-wrap justify-center gap-8 xl:gap-[80px] pt-[50px] pb-[30px]">
+        <div className="flex flex-wrap justify-center gap-8 xl:gap-[80px] pt-[35px] pb-[30px]">
 
           {[
             { icon: Briefcase, count: projectsCount, label: 'Мои проекты', onClick: () => navigate('/dashboard') },

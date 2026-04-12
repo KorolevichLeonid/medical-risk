@@ -65,13 +65,13 @@ const HomePage = () => {
       </header>
 
       {/* Logo below header */}
-      <div className="w-full max-w-[1440px] mx-auto px-10 lg:px-20 pt-2 pb-8">
+      <div className="w-full max-w-[1440px] mx-auto px-10 lg:px-20 pt-20 pb-8">
         <Logo />
       </div>
 
       <main>
         {/* Hero Section */}
-        <section className="w-full max-w-[1440px] mx-auto px-10 lg:px-20 pt-16 pb-32 relative">
+        <section className="w-full max-w-[1440px] mx-auto px-10 lg:px-20 pt-[26px] pb-32 relative">
           <h1 className="font-raleway font-bold text-[56px] lg:text-[68px] leading-[1.1] mb-12 text-black max-w-[700px]">
             Risk analysis<br />for medical devices
           </h1>

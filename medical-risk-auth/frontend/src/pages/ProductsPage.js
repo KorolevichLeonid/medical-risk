@@ -28,7 +28,7 @@ const ProductsPage = () => {
       price: '249',
       buttons: [{ label: 'Join with Basic', primary: true }],
       trialNote: 'Free 3-day trial',
-      features: ['Up to 3 projects', 'Up to 5 users', 'Core features', 'Email support (response within 48h)'],
+      features: ['Up to 3 projects', 'Up to 5 users', 'Core features', 'Email support (response\nwithin 48h)'],
     },
     {
       name: 'Standard',
@@ -36,7 +36,7 @@ const ProductsPage = () => {
       price: '499',
       buttons: [{ label: 'Join with Standard', primary: true }],
       trialNote: 'Free 3-day trial',
-      features: ['Up to 8 projects', 'Up to 10 users', 'Extended features', 'Email support (response within 48h)'],
+      features: ['Up to 8 projects', 'Up to 10 users', 'Extended features', 'Email support (response\nwithin 48h)'],
     },
     {
       name: 'Professional',
@@ -124,47 +124,55 @@ const ProductsPage = () => {
         {/* Pricing Cards */}
         <div className="flex justify-center gap-4 lg:gap-6 w-full mb-12 flex-wrap xl:flex-nowrap px-4">
           {plans.map((plan) => (
-            <div key={plan.name} className="bg-[#F2E6A2] rounded-[10px] pt-10 pb-8 px-4 w-[236px] min-w-[236px] h-[422px] flex flex-col items-center text-center shadow-sm shrink-0 snap-center">
-              <h3 className="font-raleway font-medium text-xl mb-4">{plan.name}</h3>
-              <p className="text-[10px] leading-[14px] text-[#505050] mb-6 min-h-[56px]" style={{ fontFamily: "'Open Sans', sans-serif" }}>
+            <div key={plan.name} className="bg-[#F2E6A2] rounded-[10px] pt-10 pb-8 px-[5px] w-[236px] min-w-[236px] h-[422px] flex flex-col items-center text-center shadow-sm shrink-0 snap-center">
+              {/* Title — Raleway medium 20px */}
+              <h3 className="font-raleway font-medium text-xl leading-[22px] mb-[5px]">{plan.name}</h3>
+
+              {/* Description — Open Sans 10px, fixed height for alignment */}
+              <p className="w-[169px] text-[10px] leading-[14px] text-[#505050] h-[70px] mb-[10px]" style={{ fontFamily: "'Open Sans', sans-serif" }}>
                 {plan.description}
               </p>
-              <div className="flex items-baseline gap-1 mb-8">
-                <span className="font-raleway font-medium text-[34px]">{plan.price}</span>
-                <span className="font-raleway font-medium text-[15px]">usd/month</span>
+
+              {/* Price — Raleway */}
+              <div className="flex items-start gap-1 mb-[20px]">
+                <span className="font-raleway font-medium text-[34px] leading-[22px]">{plan.price}</span>
+                <span className="font-raleway font-medium text-[15px] leading-[22px]">usd/month</span>
               </div>
 
-              {plan.buttons.length === 1 ? (
-                <button
-                  className="w-[186px] h-[40px] bg-transparent rounded-[10px] text-xs mb-2 flex items-center justify-center"
-                  style={{ border: '5px solid #FDFAF6', fontFamily: "'Open Sans', sans-serif" }}
-                >
-                  {plan.buttons[0].label}
-                </button>
-              ) : (
-                <div className="flex justify-between gap-[5px] w-full mb-2">
-                  {plan.buttons.map((btn, i) => (
-                    <button
-                      key={i}
-                      className="flex-1 h-[40px] rounded-[10px] text-xs flex items-center justify-center px-1"
-                      style={{
-                        border: btn.primary ? '5px solid #AED486' : '5px solid #FDFAF6',
-                        background: btn.primary ? '#FDFAF6' : 'transparent',
-                        fontFamily: "'Open Sans', sans-serif",
-                      }}
-                    >
-                      {btn.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Button area — fixed height so features align across all cards */}
+              <div className="h-[77px] flex flex-col items-center w-full shrink-0">
+                {plan.buttons.length === 1 ? (
+                  <button
+                    className="w-[186px] h-[40px] bg-transparent rounded-[10px] text-xs flex items-center justify-center"
+                    style={{ border: '5px solid #FDFAF6', fontFamily: "'Open Sans', sans-serif" }}
+                  >
+                    {plan.buttons[0].label}
+                  </button>
+                ) : (
+                  <div className="flex gap-[5px]" style={{ width: '225px' }}>
+                    {plan.buttons.map((btn, i) => (
+                      <button
+                        key={i}
+                        className="w-[110px] h-[40px] rounded-[10px] text-xs flex items-center justify-center"
+                        style={{
+                          border: btn.primary ? '5px solid #AED486' : '5px solid #FDFAF6',
+                          background: btn.primary ? '#FDFAF6' : 'transparent',
+                          fontFamily: "'Open Sans', sans-serif",
+                        }}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {plan.trialNote && (
+                  <p className="text-[10px] text-[#505050] mt-[5px]" style={{ fontFamily: "'Open Sans', sans-serif" }}>{plan.trialNote}</p>
+                )}
+              </div>
 
-              {plan.trialNote && (
-                <p className="text-[10px] text-[#505050] mb-4" style={{ fontFamily: "'Open Sans', sans-serif" }}>{plan.trialNote}</p>
-              )}
-
+              {/* Features — Open Sans 12px */}
               {plan.features.length > 0 && (
-                <ul className="text-xs leading-[22px] text-left w-full list-disc pl-4 marker:text-gray-500 mt-auto" style={{ fontFamily: "'Open Sans', sans-serif" }}>
+                <ul className="text-xs leading-[22px] text-left w-[189px] list-disc pl-4 marker:text-gray-500" style={{ fontFamily: "'Open Sans', sans-serif", whiteSpace: 'pre-line' }}>
                   {plan.features.map((f, i) => (
                     <li key={i}>{f}</li>
                   ))}

@@ -419,16 +419,20 @@
 /* ===================== List View — Table ===================== */
 .table-container {
   background: #fff;
-  border-radius: 0 0 18px 18px;
-  overflow: visible;
-  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  width: 1274px;
+  max-width: 100%;
+  height: auto;
+  box-shadow: none;
 }
 
 .table-list {
   display: table;
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0 4px;
+  border-spacing: 0 20px;
+  margin-top: -20px; /* cancel the gap above the header row */
 }
 
 .table-header-row {
@@ -735,6 +739,42 @@
 
 .floating-return:hover {
   transform: scale(1.1);
+}
+
+/* ===================== Collapsed Sidebar — Larger Cards ===================== */
+.sidebar-collapsed .projects-grid-new {
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+}
+
+.sidebar-collapsed .project-card-new {
+  min-height: 350px;
+}
+
+.sidebar-collapsed .card-project-name {
+  font-size: 18px;
+}
+
+.sidebar-collapsed .card-status-badge {
+  font-size: 12px;
+  padding: 6px 20px;
+}
+
+.sidebar-collapsed .card-role-text {
+  font-size: 14px;
+}
+
+.sidebar-collapsed .card-participants-label,
+.sidebar-collapsed .card-participants-count {
+  font-size: 13px;
+}
+
+.sidebar-collapsed .card-action-btn {
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+.sidebar-collapsed .card-progress-text {
+  font-size: 12px;
 }
 
 /* ===================== Responsive ===================== */
