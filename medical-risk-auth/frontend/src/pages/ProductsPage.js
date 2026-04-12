@@ -126,9 +126,9 @@ const ProductsPage = () => {
         {/* Pricing Cards */}
         <div className="flex justify-center gap-4 lg:gap-6 w-full mb-12 flex-wrap xl:flex-nowrap px-4">
           {plans.map((plan) => (
-            <div key={plan.name} className="bg-[#F2E6A2] rounded-xl pt-10 pb-8 px-4 w-[236px] min-w-[236px] h-[422px] flex flex-col items-center text-center shadow-sm shrink-0 snap-center">
+            <div key={plan.name} className="bg-[#F2E6A2] rounded-[10px] pt-10 pb-8 px-4 w-[236px] min-w-[236px] h-[422px] flex flex-col items-center text-center shadow-sm shrink-0 snap-center">
               <h3 className="font-raleway font-medium text-xl mb-4">{plan.name}</h3>
-              <p className="text-[10px] leading-[14px] text-[#505050] mb-6 h-[56px]">
+              <p className="text-[10px] leading-[14px] text-[#505050] mb-6 min-h-[56px]" style={{ fontFamily: "'Open Sans', sans-serif" }}>
                 {plan.description}
               </p>
               <div className="flex items-baseline gap-1 mb-8">
@@ -137,19 +137,23 @@ const ProductsPage = () => {
               </div>
 
               {plan.buttons.length === 1 ? (
-                <button className="w-full h-[40px] bg-[#FDFAF6] border-[3px] border-[#FDFAF6] rounded-xl text-xs hover:bg-white transition-colors mb-2 font-medium flex items-center justify-center">
+                <button
+                  className="w-[186px] h-[40px] bg-transparent rounded-[10px] text-xs mb-2 flex items-center justify-center"
+                  style={{ border: '5px solid #FDFAF6', fontFamily: "'Open Sans', sans-serif" }}
+                >
                   {plan.buttons[0].label}
                 </button>
               ) : (
-                <div className="flex justify-between gap-1 w-full mb-2">
+                <div className="flex justify-between gap-[5px] w-full mb-2">
                   {plan.buttons.map((btn, i) => (
                     <button
                       key={i}
-                      className={`flex-1 h-[40px] rounded-xl text-[11px] font-medium flex items-center justify-center leading-tight px-1 transition-colors ${
-                        btn.primary
-                          ? 'bg-[#FDFAF6] border-[3px] border-[#AED486] hover:bg-white'
-                          : 'bg-transparent border-[3px] border-[#FDFAF6] hover:bg-[#FDFAF6]'
-                      }`}
+                      className="flex-1 h-[40px] rounded-[10px] text-xs flex items-center justify-center px-1"
+                      style={{
+                        border: btn.primary ? '5px solid #AED486' : '5px solid #FDFAF6',
+                        background: btn.primary ? '#FDFAF6' : 'transparent',
+                        fontFamily: "'Open Sans', sans-serif",
+                      }}
                     >
                       {btn.label}
                     </button>
@@ -158,11 +162,11 @@ const ProductsPage = () => {
               )}
 
               {plan.trialNote && (
-                <p className="text-[10px] text-[#505050] mb-4">{plan.trialNote}</p>
+                <p className="text-[10px] text-[#505050] mb-4" style={{ fontFamily: "'Open Sans', sans-serif" }}>{plan.trialNote}</p>
               )}
 
               {plan.features.length > 0 && (
-                <ul className="text-xs leading-[22px] text-left w-full list-disc pl-4 marker:text-gray-500 mt-auto">
+                <ul className="text-xs leading-[22px] text-left w-full list-disc pl-4 marker:text-gray-500 mt-auto" style={{ fontFamily: "'Open Sans', sans-serif" }}>
                   {plan.features.map((f, i) => (
                     <li key={i}>{f}</li>
                   ))}
