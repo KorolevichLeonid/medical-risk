@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, User, ChevronDown } from 'lucide-react';
+import logomaxImg from '../assets/logomax.svg';
 
 const ProductsPage = () => {
   const [user, setUser] = useState(null);
@@ -103,10 +104,7 @@ const ProductsPage = () => {
       <main className="max-w-[1300px] mx-auto mt-16 md:mt-24 flex flex-col items-center text-center px-4">
         {/* Logo */}
         <div className="relative inline-block mb-8">
-          <h1 className="text-4xl md:text-[42px] font-raleway font-bold tracking-widest uppercase pb-2" style={{ background: 'linear-gradient(90deg, #0CC0DF -0.41%, #FFDE59 100.42%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            SCICYBER LAB
-          </h1>
-          <div className="absolute bottom-0 right-0 w-[94px] h-0 border-[3px] border-[#10C1DD]"></div>
+          <img src={logomaxImg} alt="SCICYBER LAB" className="h-[44px] w-auto" />
         </div>
 
         <h2 className="font-raleway font-bold text-4xl md:text-[64px] leading-tight md:leading-[62px] max-w-[1118px] mb-8">

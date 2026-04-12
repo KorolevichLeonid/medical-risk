@@ -168,41 +168,57 @@ const PersonalAccount = () => {
 
         {/* Info */}
         {isEditingProfile ? (
-          <div className="bg-white rounded-lg p-[16px] relative h-[116px] w-full xl:w-[866px] flex items-center justify-between shadow-sm">
-            <div className="grid grid-cols-2 gap-x-[20px] gap-y-[12px] w-[636px]">
-              <div className="border border-[#6E6E6E] rounded-lg px-[18px] py-[4px] h-[42px] flex flex-col justify-center">
-                <label className="text-[10px] text-black block font-open-sans leading-none mb-[2px]">Имя<span className="text-[#ED3333]">*</span></label>
-                <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="w-full text-[14px] text-[#6E6E6E] outline-none font-open-sans bg-transparent leading-none" />
+          <div className="bg-white rounded-lg px-[14px] py-[12px] w-full xl:w-[866px] shadow-sm flex items-center gap-[16px]">
+
+            {/* 4 поля: 2×2 сетка */}
+            <div className="flex flex-col gap-[8px] flex-1 min-w-0">
+              {/* Ряд 1 */}
+              <div className="flex gap-[16px]">
+                <div className="relative border border-[#6E6E6E] rounded-lg h-[42px] flex-1 min-w-0">
+                  <label className="absolute top-[5px] left-[14px] text-[10px] text-black font-open-sans leading-none pointer-events-none z-10">Имя<span className="text-[#ED3333]">*</span></label>
+                  <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange}
+                    className="absolute inset-0 w-full h-full px-[14px] pt-[18px] pb-[4px] text-[13px] text-[#6E6E6E] outline-none border-0 rounded-lg font-open-sans bg-transparent" />
+                </div>
+                <div className="relative border border-[#6E6E6E] rounded-lg h-[42px] flex-1 min-w-0">
+                  <label className="absolute top-[5px] left-[14px] text-[10px] text-black font-open-sans leading-none pointer-events-none z-10">Дата рождения<span className="text-[#ED3333]">*</span></label>
+                  <input type="text" name="birthDate" value={formData.birthDate} onChange={handleInputChange}
+                    className="absolute inset-0 w-full h-full px-[14px] pt-[18px] pb-[4px] text-[13px] text-[#6E6E6E] outline-none border-0 rounded-lg font-open-sans bg-transparent" />
+                </div>
               </div>
-              <div className="border border-[#6E6E6E] rounded-lg px-[18px] py-[4px] h-[42px] flex flex-col justify-center">
-                <label className="text-[10px] text-black block font-open-sans leading-none mb-[2px]">Дата рождения<span className="text-[#ED3333]">*</span></label>
-                <input type="text" name="birthDate" value={formData.birthDate} onChange={handleInputChange} className="w-full text-[14px] text-[#6E6E6E] outline-none font-open-sans bg-transparent leading-none" />
-              </div>
-              <div className="border border-[#6E6E6E] rounded-lg px-[18px] py-[4px] h-[42px] flex flex-col justify-center">
-                <label className="text-[10px] text-black block font-open-sans leading-none mb-[2px]">Департамент<span className="text-[#ED3333]">*</span></label>
-                <input type="text" name="department" value={formData.department} onChange={handleInputChange} className="w-full text-[14px] text-[#6E6E6E] outline-none font-open-sans bg-transparent leading-none" />
-              </div>
-              <div className="border border-[#6E6E6E] rounded-lg px-[18px] py-[4px] h-[42px] flex flex-col justify-center">
-                <label className="text-[10px] text-black block font-open-sans leading-none mb-[2px]">Должность<span className="text-[#ED3333]">*</span></label>
-                <input type="text" name="position" value={formData.position} onChange={handleInputChange} className="w-full text-[14px] text-[#6E6E6E] outline-none font-open-sans bg-transparent leading-none" />
+              {/* Ряд 2 */}
+              <div className="flex gap-[16px]">
+                <div className="relative border border-[#6E6E6E] rounded-lg h-[42px] flex-1 min-w-0">
+                  <label className="absolute top-[5px] left-[14px] text-[10px] text-black font-open-sans leading-none pointer-events-none z-10">Департамент<span className="text-[#ED3333]">*</span></label>
+                  <input type="text" name="department" value={formData.department} onChange={handleInputChange}
+                    className="absolute inset-0 w-full h-full px-[14px] pt-[18px] pb-[4px] text-[13px] text-[#6E6E6E] outline-none border-0 rounded-lg font-open-sans bg-transparent" />
+                </div>
+                <div className="relative border border-[#6E6E6E] rounded-lg h-[42px] flex-1 min-w-0">
+                  <label className="absolute top-[5px] left-[14px] text-[10px] text-black font-open-sans leading-none pointer-events-none z-10">Должность<span className="text-[#ED3333]">*</span></label>
+                  <input type="text" name="position" value={formData.position} onChange={handleInputChange}
+                    className="absolute inset-0 w-full h-full px-[14px] pt-[18px] pb-[4px] text-[13px] text-[#6E6E6E] outline-none border-0 rounded-lg font-open-sans bg-transparent" />
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col items-center justify-between h-[87px] w-[156px]">
-              <div className="flex items-center justify-between w-[60px] -ml-[2px] mb-[16px]">
-                <span className="text-[8px] text-[#6E6E6E] font-open-sans">М</span>
+            {/* Пол + Сохранить + ID */}
+            <div className="flex flex-col items-center gap-[10px] shrink-0 w-[156px]">
+              {/* Пол */}
+              <div className="flex items-center gap-[6px]">
+                <span className="text-[10px] text-[#6E6E6E] font-open-sans">М</span>
                 <div
-                  className={`flex items-center ${gender === 'female' ? 'bg-[#057642]' : 'bg-[#057642]'} rounded-[5px] w-[30px] h-[16px] relative cursor-pointer`}
+                  className="bg-[#057642] rounded-[5px] w-[30px] h-[16px] relative cursor-pointer flex items-center"
                   onClick={() => setGender(gender === 'male' ? 'female' : 'male')}
                 >
-                  <div className={`absolute ${gender === 'female' ? 'right-[2px]' : 'left-[2px]'} top-[3px] w-[10px] h-[10px] bg-white rounded-full transition-all`}></div>
+                  <div className={`absolute ${gender === 'female' ? 'right-[3px]' : 'left-[3px]'} w-[10px] h-[10px] bg-white rounded-full transition-all duration-200`}></div>
                 </div>
-                <span className="text-[8px] text-[#6E6E6E] font-open-sans">Ж</span>
+                <span className="text-[10px] text-[#6E6E6E] font-open-sans">Ж</span>
               </div>
-              <button onClick={handleSave} className="bg-[#DFEECF] text-black text-[10px] w-[156px] h-[28px] rounded-lg hover:bg-[#cde4b4] transition-colors font-raleway flex items-center justify-center mb-[2px]">
+              {/* Кнопка */}
+              <button onClick={handleSave} className="bg-[#DFEECF] text-black text-[10px] w-[156px] h-[28px] rounded-lg hover:bg-[#cde4b4] transition-colors font-raleway flex items-center justify-center">
                 Сохранить
               </button>
-              <span className="text-[8px] text-[#6E6E6E] font-raleway w-full text-center">ID пользователя: {user?.id}</span>
+              {/* ID */}
+              <span className="text-[8px] text-[#6E6E6E] font-raleway text-center whitespace-nowrap">ID пользователя: {user?.id}</span>
             </div>
           </div>
         ) : (
@@ -300,8 +316,9 @@ const PersonalAccount = () => {
       </div>
 
       {/* Stats Footer */}
-      <div className="bg-white rounded-lg shadow-sm relative w-full min-h-[249px] pb-16 xl:pb-0">
-        <div className="flex flex-wrap justify-center gap-8 xl:gap-[118px] items-center h-full pt-[40px] xl:pt-[29px] pb-[40px] xl:pb-[102px]">
+      <div className="bg-white rounded-lg shadow-sm relative w-full pb-8">
+        {/* pt-[50px] = 25px для кружка + 25px отступ сверху */}
+        <div className="flex flex-wrap justify-center gap-8 xl:gap-[80px] pt-[50px] pb-[30px]">
 
           {[
             { icon: Briefcase, count: projectsCount, label: 'Мои проекты', onClick: () => navigate('/dashboard') },
@@ -309,14 +326,28 @@ const PersonalAccount = () => {
             { icon: Users, count: '---', label: 'Команда' },
             { icon: CalendarDays, count: activeDays, label: 'Активные дни' },
           ].map((stat, i) => (
-            <div key={i} className="flex flex-col items-center mt-6 xl:mt-0 cursor-pointer" onClick={stat.onClick}>
-              <div className="w-[118px] h-[118px] bg-white border border-[#EAEAEA] shadow-[4px_4px_10px_rgba(0,0,0,0.25)] rounded-lg flex flex-col items-center justify-center relative">
-                <div className="absolute -top-[25px] w-[50px] h-[50px] bg-white border border-[#EAEAEA] shadow-[0px_4px_4px_rgba(0,0,0,0.25)] rounded-full flex items-center justify-center">
-                  <stat.icon className="w-[25px] h-[25px] text-[#11C1DD]" />
-                </div>
-                <span className="text-[50px] font-bold text-[#6E6E6E] leading-none mt-[10px] font-open-sans">{stat.count}</span>
+            <div
+              key={i}
+              className="cursor-pointer"
+              style={{ width: 118, height: 143, position: 'relative' }}
+              onClick={stat.onClick}
+            >
+              {/* Кружок с иконкой — торчит 25px выше карточки */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[50px] h-[50px] bg-white border border-[#EAEAEA] shadow-[0px_4px_4px_rgba(0,0,0,0.25)] rounded-full flex items-center justify-center z-10">
+                <stat.icon className="w-[25px] h-[25px] text-[#11C1DD]" />
               </div>
-              <span className="text-[10px] text-black mt-[15px] font-open-sans h-[17px] flex items-center">{stat.label}</span>
+
+              {/* Карточка — начинается через 25px (середина кружка) */}
+              <div className="absolute top-[25px] left-0 w-[118px] h-[118px] bg-white border border-[#EAEAEA] shadow-[4px_4px_10px_rgba(0,0,0,0.25)] rounded-lg">
+                {/* Число — 36px от верха карточки, line-height 50px */}
+                <span className="absolute top-[36px] left-0 w-full text-[50px] font-bold text-[#6E6E6E] leading-[50px] font-open-sans text-center">
+                  {stat.count}
+                </span>
+                {/* Лейбл — 91px от верха карточки (внутри карточки снизу) */}
+                <span className="absolute top-[91px] left-0 w-full text-[10px] text-black font-open-sans text-center leading-[17px]">
+                  {stat.label}
+                </span>
+              </div>
             </div>
           ))}
 

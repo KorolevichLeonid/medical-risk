@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import { Globe, User, ChevronDown, ArrowUp } from 'lucide-react';
-import logoImg from '../assets/logomax.jpg';
-import illustrationImg from '../assets/act.jpg';
+import logoImg from '../assets/logomax.svg';
+import illustrationImg from '../assets/act.svg';
 import SupportButton from '../components/SupportButton';
 
 const Logo = () => (
-  <img src={logoImg} alt="SCICYBER LAB" className="h-[52px] w-auto" />
+  <img src={logoImg} alt="SCICYBER LAB" className="h-[44px] w-auto" />
 );
 
 const HomePage = () => {

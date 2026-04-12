@@ -8,6 +8,8 @@ import {
 import SupportButton from './SupportButton';
 import API_BASE_URL from '../config';
 import './Layout.css';
+import logomaxImg from '../assets/logomax.svg';
+import logominImg from '../assets/logomin.svg';
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -196,29 +198,26 @@ const Layout = ({ children }) => {
           ))}
         </div>
 
-        {/* Logo and Toggle */}
-        <div className="absolute bottom-[20px] left-0 w-full h-[40px] flex items-center mb-[-10px]">
-          <div className={`absolute left-[71px] flex flex-col transition-all duration-300 ${isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-            <span className="font-bold text-[20px] bg-clip-text text-transparent bg-gradient-to-r from-[#0CC0DF] to-[#FFDE59] tracking-wide whitespace-nowrap">
-              SCICYBER LAB
-            </span>
-            <div className="absolute bottom-[-2px] right-0 w-[45px] border-b-[4px] border-[#10C1DD]"></div>
+        {/* Logo */}
+        <div className="absolute bottom-[20px] left-0 w-full h-[44px] flex items-center justify-center">
+          {/* Expanded: full logo — centered */}
+          <div className={`transition-all duration-300 ${isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible absolute'}`}>
+            <img src={logomaxImg} alt="SCICYBER LAB" className="h-[26px] w-auto" />
           </div>
 
-          <div className={`absolute left-[16px] flex flex-col transition-all duration-300 ${!isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-            <span className="font-bold text-[28px] bg-clip-text text-transparent bg-gradient-to-r from-[#0CC0DF] to-[#FFDE59] tracking-wide whitespace-nowrap">
-              SLAB
-            </span>
-            <div className="absolute bottom-[2px] right-0 w-[40px] border-b-[4px] border-[#10C1DD]"></div>
+          {/* Collapsed: mini logo — centered */}
+          <div className={`transition-all duration-300 ${!isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible absolute'}`}>
+            <img src={logominImg} alt="SLAB" className="h-[30px] w-auto" />
           </div>
-
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className={`absolute text-[#6E6E6E] hover:text-black transition-all duration-300 z-30 ${isSidebarOpen ? 'left-[316px]' : 'left-[108px]'}`}
-          >
-            {isSidebarOpen ? <ChevronLeft className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
-          </button>
         </div>
+
+        {/* Toggle button — on the right edge of sidebar, always visible */}
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="absolute bottom-[26px] -right-[14px] z-30 w-7 h-7 rounded-full bg-[#F0EECE] border border-gray-300 shadow-md flex items-center justify-center text-[#6E6E6E] hover:text-black transition-colors"
+        >
+          {isSidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
       </div>
 
       {/* Main Content */}
