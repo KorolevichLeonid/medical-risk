@@ -123,7 +123,7 @@ const Layout = ({ children }) => {
 
   const getActiveMenuItem = () => {
     const path = location.pathname;
-    if (path === '/' || path === '/home') return 'home';
+    if (path === '/home') return 'home';
     if (path === '/search') return 'search';
     if (path === '/dashboard' || path.startsWith('/project/')) return 'projects';
     if (path === '/changelog') return 'changelog';
@@ -256,7 +256,7 @@ const Layout = ({ children }) => {
         </div>
 
         {/* Logo */}
-        <div className="absolute bottom-[20px] left-0 w-full h-[44px] flex items-center justify-center">
+        <div className="absolute bottom-[20px] left-0 w-full h-[44px] flex items-center justify-center cursor-pointer" onClick={() => navigate('/')}>
           {/* Expanded: full logo — centered */}
           <div className={`transition-all duration-300 ${isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible absolute'}`}>
             <img src={logomaxImg} alt="SCICYBER LAB" className="h-[26px] w-auto" />

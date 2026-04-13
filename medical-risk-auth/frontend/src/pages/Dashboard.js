@@ -3,19 +3,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, Users, ChevronDown, ChevronUp } from 'lucide-react';
 
 const PencilIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="13.54" height="13.52" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M1.25 13.7292H2.16667L12 3.91667L11.0833 3L1.25 12.8125V13.7292ZM0 14.9792V12.3125L11.9792 0.354167C12.0903 0.243056 12.2222 0.15625 12.375 0.09375C12.5278 0.03125 12.6875 0 12.8542 0C13.0069 0 13.1597 0.03125 13.3125 0.09375C13.4653 0.15625 13.6042 0.243056 13.7292 0.354167L14.6458 1.27083C14.7708 1.39583 14.8611 1.53472 14.9167 1.6875C14.9722 1.84028 15 1.99306 15 2.14583C15 2.29861 14.9688 2.45486 14.9062 2.61458C14.8438 2.77431 14.7569 2.90972 14.6458 3.02083L2.66667 14.9792H0ZM11.5417 3.45833L11.0833 3L12 3.91667L11.5417 3.45833Z" fill="#6E6E6E"/>
   </svg>
 );
 
 const WarningIcon = () => (
-  <svg width="19" height="16" viewBox="0 0 19 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="16.55" height="14.29" viewBox="0 0 19 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M0 15.8333L9.16667 0L18.3333 15.8333H0ZM2.16667 14.5833H16.1667L9.16667 2.5L2.16667 14.5833ZM9.69792 13.215C9.81597 13.0946 9.875 12.9453 9.875 12.7671C9.875 12.589 9.81472 12.441 9.69417 12.3229C9.57375 12.2049 9.42445 12.1458 9.24625 12.1458C9.06819 12.1458 8.92014 12.2061 8.80208 12.3267C8.68403 12.4471 8.625 12.5964 8.625 12.7746C8.625 12.9526 8.68528 13.1007 8.80583 13.2187C8.92625 13.3368 9.07556 13.3958 9.25375 13.3958C9.43181 13.3958 9.57986 13.3356 9.69792 13.215ZM8.625 11.0833H9.875V6.41667H8.625V11.0833Z" fill="#6E6E6E"/>
   </svg>
 );
 
 const ThreeDotsIcon = () => (
-  <svg width="3" height="15" viewBox="0 0 3 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="2" height="13.33" viewBox="0 0 3 15" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M1.10463 14.7715C0.799046 14.7715 0.538544 14.6627 0.323127 14.4451C0.107709 14.2276 0 13.966 0 13.6604C0 13.3548 0.108786 13.0943 0.326358 12.8789C0.54393 12.6635 0.805509 12.5558 1.11109 12.5558C1.41668 12.5558 1.67718 12.6646 1.8926 12.8821C2.10802 13.0997 2.21573 13.3613 2.21573 13.6669C2.21573 13.9725 2.10694 14.233 1.88937 14.4484C1.6718 14.6638 1.41022 14.7715 1.10463 14.7715ZM1.10463 8.49362C0.799046 8.49362 0.538544 8.38483 0.323127 8.16726C0.107709 7.94969 0 7.68811 0 7.38252C0 7.07694 0.108786 6.81643 0.326358 6.60102C0.54393 6.3856 0.805509 6.27789 1.11109 6.27789C1.41668 6.27789 1.67718 6.38668 1.8926 6.60425C2.10802 6.82182 2.21573 7.0834 2.21573 7.38898C2.21573 7.69457 2.10694 7.95507 1.88937 8.17049C1.6718 8.38591 1.41022 8.49362 1.10463 8.49362ZM1.10463 2.21573C0.799046 2.21573 0.538544 2.10694 0.323127 1.88937C0.107709 1.6718 0 1.41022 0 1.10463C0 0.799046 0.108786 0.538544 0.326358 0.323127C0.54393 0.107709 0.805509 0 1.11109 0C1.41668 0 1.67718 0.108786 1.8926 0.326358C2.10802 0.54393 2.21573 0.805509 2.21573 1.11109C2.21573 1.41668 2.10694 1.67718 1.88937 1.8926C1.6718 2.10802 1.41022 2.21573 1.10463 2.21573Z" fill="#6E6E6E"/>
   </svg>
 );
@@ -548,9 +548,9 @@ const Dashboard = () => {
         </div>
       ) : viewMode === 'list' ? (
         /* =================== List View — Table =================== */
-        <div className="table-container">
-          <div className="table-list">
-            {/* Header */}
+        <div className="table-wrapper">
+          {/* Header — outside white container */}
+          <div className="table-list table-list-header">
             <div className="table-header-row">
               <div className="table-th table-th-id">ID</div>
               <div className="table-th table-th-name">Название проекта</div>
@@ -561,8 +561,10 @@ const Dashboard = () => {
               <div className="table-th table-th-activity">Последняя<br />активность</div>
               <div className="table-th table-th-actions"></div>
             </div>
-
-            {/* Rows */}
+          </div>
+          {/* Data rows — inside white container */}
+          <div className="table-container">
+          <div className="table-list table-list-data">
             {filteredProjects.map(project => {
               const statusInfo = getStatusInfo(project.status);
               const participantsCount = (project.memberCount || 0) + 1;
@@ -592,7 +594,7 @@ const Dashboard = () => {
                   </div>
                   <div className="table-td table-td-activity">{formatDate(project.lastUpdated)}</div>
                   <div className="table-td table-td-actions">
-                    <div className="table-actions-menu-row">
+                    <div className="table-actions-three-dot">
                       <ProjectActionsMenu
                         project={project}
                         isOpen={activeCardMenu === project.id}
@@ -628,6 +630,7 @@ const Dashboard = () => {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       ) : (
@@ -715,15 +718,6 @@ const Dashboard = () => {
                     <WarningIcon />
                     <span>Риски</span>
                   </button>
-                  {canDeleteProject(project) && (
-                    <button
-                      className="card-action-btn card-action-btn-delete"
-                      onClick={(e) => handleDeleteProject(project.id, project.name, e)}
-                      type="button"
-                    >
-                      Удалить
-                    </button>
-                  )}
                 </div>
 
                 {/* Date */}
